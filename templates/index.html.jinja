@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover is required for env(safe-area-inset-*) to report real
+     values on notched iPhones; without it the add button sits under the notch. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3bff">
+<title>{{ title }} — events in Nice &amp; the 06</title>
+<meta name="description" content="Vide-greniers, milongas, concerts, exhibitions, meetups and pop-ups across Nice and the Alpes-Maritimes. Updated daily.">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="Everything on in Nice and the 06 — updated daily.">
+<meta property="og:type" content="website">
+<style>
+:root{color-scheme:light;--ink:#0e0e0e;--paper:#f4f2ed;--accent:#1f3bff;--muted:#7d7970;--rule:#d8d4cb}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px 80px}
+a{color:var(--accent)}
+.hero{padding:44px 0 0}
+.eyebrow{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:10px}
+.eyebrow b{color:var(--ink);font-weight:600}
+h1{font-size:clamp(58px,12.5vw,168px);line-height:.83;letter-spacing:-.05em;font-weight:800;margin:26px 0 0;text-transform:uppercase}
+h1 em{font-style:normal;color:var(--accent)}
+.standfirst{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:30px 0 0;padding-bottom:28px}
+.standfirst p{font-size:17px;line-height:1.4;max-width:46ch}
+.stats{display:flex;gap:38px;align-self:end;justify-content:flex-end}
+.stat b{display:block;font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.stat span{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.marquee{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);overflow:hidden;white-space:nowrap;padding:11px 0;margin-bottom:34px;background:var(--ink);color:var(--paper)}
+.marquee-inner{display:inline-block;animation:slide 38s linear infinite}
+.marquee span{font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;padding:0 16px}
+.marquee span::after{content:"◆";margin-left:32px;color:var(--accent)}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.marquee-inner{animation:none}}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+input,select,textarea{font:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink)}
+input[type=search]{flex:1;min-width:190px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-2px}
+.cats{display:flex;flex-wrap:wrap;border:1px solid var(--ink);margin-bottom:22px}
+.cat{flex:1;text-align:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:pointer;border-right:1px solid var(--ink);user-select:none;white-space:nowrap;font-weight:600}
+.cat:last-child{border-right:0}
+.cat:hover{background:#e8e5de}
+.cat.on{background:var(--ink);color:var(--paper)}
+.cat i{font-style:normal;opacity:.5;margin-left:5px;font-weight:400}
+button{font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:9px 16px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+button:hover{background:var(--ink);color:var(--paper)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.tally{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.daymark{display:flex;align-items:baseline;gap:14px;margin:34px 0 0;padding-bottom:7px;border-bottom:2px solid var(--ink)}
+.daymark b{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.daymark span{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.row{display:grid;grid-template-columns:46px 1fr 210px 120px;gap:18px;align-items:baseline;padding:15px 0;border-bottom:1px solid var(--rule)}
+.row:hover{background:#e9e6df}
+.idx{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ttl{font-size:19px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+.ttl a{color:var(--ink);text-decoration:none}
+.ttl a:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.sub{font-size:12.5px;color:var(--muted);margin-top:4px}
+.where{font-size:12.5px}
+.where b{display:block;font-weight:600}
+.where span{color:var(--muted)}
+.kind{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;text-align:right;color:var(--muted)}
+.pill{display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:2px 6px;margin-right:5px;vertical-align:2px;background:var(--accent);color:#fff}
+.pill.out{background:transparent;color:var(--muted);border:1px solid var(--rule)}
+.sec{margin-top:76px}
+.sechead{display:flex;align-items:flex-start;gap:20px;border-top:2px solid var(--ink);padding-top:14px;margin-bottom:24px}
+.secnum{font-size:11px;letter-spacing:.16em;color:var(--muted);padding-top:9px}
+.sechead h2{font-size:clamp(30px,4.6vw,54px);font-weight:800;letter-spacing:-.035em;line-height:.95;text-transform:uppercase}
+.sechead p{font-size:13.5px;color:var(--muted);max-width:40ch;margin-left:auto;padding-top:8px}
+.form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.f-full{grid-column:1/-1}.f-half{grid-column:span 2}
+label{display:block;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;font-weight:600}
+.form input,.form select,.form textarea{width:100%}
+.callout{border-left:3px solid var(--accent);padding:12px 0 12px 16px;font-size:13px;color:#4a463f;margin-bottom:22px;max-width:78ch}
+.callout b{color:var(--ink)}
+
+/* Add-event: blue square, white plus, pinned top-right. Opens the form as a
+   dialog so it stays out of the way until wanted. */
+.addbtn{
+  position:fixed;top:24px;right:24px;z-index:50;
+  width:52px;height:52px;padding:0;border:0;border-radius:0;
+  background:var(--accent);color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .12s ease, background .12s ease;
+}
+.addbtn:hover{background:var(--ink);color:#fff;transform:scale(1.06)}
+.addbtn:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.addbtn svg{width:22px;height:22px;display:block}
+dialog{
+  border:1px solid var(--ink);border-radius:0;padding:0;background:var(--paper);
+  color:var(--ink);max-width:760px;width:calc(100% - 40px);
+}
+dialog::backdrop{background:rgba(14,14,14,.55)}
+.dlg-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  padding:22px 24px 14px;border-bottom:2px solid var(--ink);
+}
+.dlg-head h2{font-size:32px;font-weight:800;letter-spacing:-.035em;line-height:.95;text-transform:uppercase}
+.dlg-head p{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:44ch}
+.dlg-x{width:34px;height:34px;padding:0;border:1px solid var(--ink);background:transparent;
+  font-size:17px;line-height:1;cursor:pointer;flex:none}
+.dlg-x:hover{background:var(--ink);color:var(--paper)}
+.dlg-body{padding:20px 24px 24px}
+@media(max-width:860px){.addbtn{top:12px;right:12px;width:46px;height:46px}}
+.err{color:#b00020;font-size:12.5px;margin-top:8px}
+.ok{color:#0a7a3f;font-size:12.5px;margin-top:8px}
+.foot{margin-top:70px;border-top:1px solid var(--ink);padding-top:16px;font-size:11.5px;color:var(--muted)}
+.foot a{color:var(--muted)}
+.empty{padding:60px 0;text-align:center;color:var(--muted)}
+/* ---------------- tablet ---------------- */
+@media(max-width:860px){
+ .row{grid-template-columns:1fr;gap:4px}
+ .idx{display:none}
+ .standfirst{grid-template-columns:1fr;gap:22px}
+ .stats{justify-content:flex-start}
+ .form{grid-template-columns:1fr 1fr}
+}
+
+/* ---------------- phone ----------------
+   Notes on the non-obvious bits:
+   - inputs go to 16px: anything smaller makes iOS Safari zoom the whole page
+     on focus, and it never zooms back out. This is the single most common
+     mobile form bug.
+   - the category tabs become a horizontal scroll strip. As a wrapped grid,
+     12 categories = 6 rows of chrome before you see a single event.
+   - safe-area insets keep the button clear of the notch / Dynamic Island.
+   - the dialog goes near-fullscreen; a centred modal on a 390px screen is
+     just a cramped box.                                                     */
+@media(max-width:600px){
+ body{font-size:15px}
+ .wrap{padding:0 16px 64px}
+
+ .hero{padding:18px 0 0}
+ .eyebrow{font-size:9.5px;letter-spacing:.12em;gap:10px;padding-right:56px}
+ .eyebrow span:last-child{text-align:right}
+ h1{font-size:clamp(46px,15vw,74px);margin-top:18px;letter-spacing:-.04em}
+ .standfirst{margin-top:20px;padding-bottom:20px;gap:18px}
+ .standfirst p{font-size:15px;max-width:none}
+ .stats{gap:24px}
+ .stat b{font-size:30px}
+ .stat span{font-size:9px;letter-spacing:.1em}
+
+ .marquee{padding:9px 0;margin-bottom:22px}
+ .marquee span{font-size:10.5px;letter-spacing:.16em;padding:0 12px}
+ .marquee span::after{margin-left:22px}
+
+ /* Filters: search full width, the two selects share a row. */
+ .bar{gap:7px;margin-bottom:12px}
+ input[type=search]{flex:1 0 100%;min-width:0}
+ #town,#when{flex:1;min-width:0}
+ #reset{flex:0 0 auto}
+ input,select,textarea{font-size:16px;padding:11px 12px}   /* 16px: no iOS zoom */
+ button{padding:11px 14px;min-height:44px}                  /* 44px touch target */
+
+ .cats{
+   display:flex;flex-wrap:nowrap;overflow-x:auto;margin-bottom:16px;
+   -webkit-overflow-scrolling:touch;scrollbar-width:none;
+ }
+ .cats::-webkit-scrollbar{display:none}
+ .cat{flex:0 0 auto;padding:11px 13px;font-size:10.5px;min-height:42px;
+      display:flex;align-items:center;justify-content:center}
+
+ .daymark{margin-top:24px;gap:9px}
+ .daymark b{font-size:17px}
+ .daymark span{font-size:9px}
+
+ .row{padding:13px 0;gap:3px}
+ .ttl{font-size:16.5px}
+ .ttl a{
+   /* Bigger tap area without visibly changing the layout. */
+   display:inline-block;padding:2px 0;
+ }
+ .sub{font-size:12px}
+ /* Town and venue collapse onto one line. The separator hangs off the venue,
+    not the town — otherwise an event with no venue renders "Nice · " with a
+    dangling dot. */
+ .where{font-size:12px}
+ .where b{display:inline}
+ .where span{display:inline}
+ .where span:not(:empty)::before{content:" · ";color:var(--muted)}
+ /* Category label moves inline under the title rather than eating a column. */
+ .kind{display:block;text-align:left;font-size:9px;margin-top:2px}
+
+ .addbtn{top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));
+         width:44px;height:44px}
+ .addbtn svg{width:19px;height:19px}
+
+ dialog{
+   width:100%;max-width:none;height:100dvh;max-height:100dvh;
+   margin:0;border:0;display:flex;flex-direction:column;
+ }
+ dialog[open]{position:fixed;inset:0}
+ .dlg-head{padding:16px 16px 12px;padding-top:max(16px,env(safe-area-inset-top))}
+ .dlg-head h2{font-size:24px}
+ .dlg-head p{font-size:12px}
+ .dlg-x{width:44px;height:44px;font-size:19px}
+ .dlg-body{padding:16px;overflow-y:auto;flex:1;
+           padding-bottom:max(16px,env(safe-area-inset-bottom))}
+ .form{grid-template-columns:1fr;gap:12px}
+ .f-half,.f-full{grid-column:1/-1}
+ .form button{width:100%}
+ .form .f-full[style]{flex-direction:column;align-items:stretch!important}
+
+ .callout{padding-left:12px;font-size:12.5px}
+ .foot{margin-top:44px;font-size:11px}
+}
+
+/* Landscape phone: don't let a 100dvh dialog trap the form. */
+@media(max-width:900px) and (orientation:landscape) and (max-height:500px){
+ dialog{height:100dvh}
+ .dlg-body{overflow-y:auto}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow">
+    <span>Alpes-Maritimes · 06</span>
+    <span>Updated <b>{{ updated }}</b> · {{ source_count }} sources</span>
+  </div>
+  <h1>What's<br>on in <em>Nice</em></h1>
+  <div class="standfirst">
+    <p>Vide-greniers and brocantes, milongas, jazz, club nights, museum shows,
+       design and AI meetups, village fêtes and pop-ups — Nice and the coast,
+       scraped daily from the sources that actually list them.</p>
+    <div class="stats">
+      <div class="stat"><b id="s-total">{{ stats.total }}</b><span>Listed</span></div>
+      <div class="stat"><b id="s-week">0</b><span>Next 7 days</span></div>
+      <div class="stat"><b>{{ stats.towns }}</b><span>Towns</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="marquee"><div class="marquee-inner" id="mq"></div></div>
+
+<div class="bar">
+  <input type="search" id="q" placeholder="Search title, venue, town, artist, DJ…">
+  <select id="town"><option value="">All towns</option></select>
+  <select id="when">
+    <option value="">Any date</option>
+    <option value="3">Next 3 days</option>
+    <option value="7">Next 7 days</option>
+    <option value="14">Next 14 days</option>
+    <option value="30">Next 30 days</option>
+    <option value="weekend">This weekend</option>
+  </select>
+  <button id="reset">Reset</button>
+</div>
+
+<div class="cats" id="cats"></div>
+<div class="tally" id="tally"></div>
+<div id="list"></div>
+
+<button class="addbtn" id="addbtn" aria-label="Add an event" title="Add an event">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
+    <path d="M12 5v14M5 12h14"/>
+  </svg>
+</button>
+
+<dialog id="dlg" aria-labelledby="dlg-title">
+  <div class="dlg-head">
+    <div>
+      <h2 id="dlg-title">Add an event</h2>
+      <p>Organising something, or spotted a gap? Send it over with a link or a poster.</p>
+    </div>
+    <button class="dlg-x" id="dlg-close" aria-label="Close">✕</button>
+  </div>
+  <div class="dlg-body">
+  {% if submit_mode == 'none' %}
+    <div class="callout" style="margin:0">
+      <b>Submissions aren't wired up yet.</b> This site is static, so it can't receive a
+      form post on its own. Set <code>SUBMIT_ENDPOINT</code> or <code>GITHUB_REPO</code>
+      before building — see the README.
+    </div>
+  {% else %}
+    <div class="callout">
+      <b>A link or a poster is required.</b> It's checked for shape, not truth — we can
+      confirm a URL is well-formed and an image really is an image, but not that the event
+      is real. Every submission is reviewed by a person before it appears.
+    </div>
+    <form class="form" id="sform"
+          {% if submit_mode == 'endpoint' %}action="{{ submit_endpoint }}" method="POST" enctype="multipart/form-data"{% endif %}>
+      <div class="f-half"><label for="s-title">Event name *</label><input id="s-title" name="title" required></div>
+      <div><label for="s-date">Date *</label><input type="date" id="s-date" name="date" required></div>
+      <div><label for="s-end">Ends</label><input type="date" id="s-end" name="end"></div>
+      <div><label for="s-town">Town *</label><input id="s-town" name="town" required placeholder="Beaulieu-sur-Mer"></div>
+      <div><label for="s-venue">Venue</label><input id="s-venue" name="venue"></div>
+      <div><label for="s-cat">Category *</label>
+        <select id="s-cat" name="category">
+          {% for k, v in categories.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+        </select></div>
+      <div><label for="s-email">Your email</label><input type="email" id="s-email" name="email" placeholder="so we can ask"></div>
+      <div class="f-full"><label for="s-note">Note</label><input id="s-note" name="note" placeholder="Times, price, what to expect…"></div>
+      <div class="f-full"><label for="s-url">Link (proof) *</label><input id="s-url" name="url" placeholder="https://…"></div>
+      {% if submit_mode == 'endpoint' %}
+      <div class="f-full"><label for="s-img">Poster image (optional)</label><input type="file" id="s-img" name="poster" accept="image/*"></div>
+      {% endif %}
+      <div class="f-full" style="display:flex;gap:8px;align-items:center">
+        <button class="primary" type="submit">Submit for review</button>
+        <span id="smsg"></span>
+      </div>
+    </form>
+  {% endif %}
+  </div>
+</dialog>
+
+<div class="foot">
+  <strong>Sources —</strong>
+  <a href="https://brocabrac.fr/06/">Brocabrac</a> ·
+  <a href="https://tango-argentin.fr/en/nice">Tango-Argentin</a> ·
+  <a href="https://www.nice.fr/agenda/">Ville de Nice</a> ·
+  <a href="https://www.explorenicecotedazur.com/en/events/all-events/">Explore Nice Côte d'Azur</a> ·
+  <a href="https://ra.co/events/fr/nice">Resident Advisor</a> ·
+  <a href="https://www.meetup.com/find/?location=fr--nice">Meetup</a> ·
+  <a href="https://www.eventbrite.fr/d/france--nice/all-events/">Eventbrite</a> ·
+  museum &amp; art-space calendars.
+  <br>Listings link back to their source and belong to it. Data: <a href="events.json">events.json</a>.
+  <br><br>Not affiliated with any venue or organiser. Always check the source before turning up.
+</div>
+
+</div>
+
+<script id="data" type="application/json">{{ events_json }}</script>
+<script>
+const EVENTS = JSON.parse(document.getElementById("data").textContent);
+const CATNAME = {{ cat_json }};
+const $ = id => document.getElementById(id);
+const iso = d => d.toISOString().slice(0,10);
+const TODAY = iso(new Date());
+let active = new Set();
+
+$("mq").innerHTML = (() => {
+  const b = ["Vide-greniers","Milongas","Jazz","Brocantes","Exhibitions","Club nights",
+             "Design meetups","AI & tech","Village fêtes","Pop-ups","Vernissages","Expat socials",
+             "Beaulieu-sur-Mer","Villefranche","Èze","Cagnes","Antibes","Cours Saleya"];
+  const r = b.map(x=>`<span>${x}</span>`).join(""); return r+r;
+})();
+
+const cats = [...new Set(EVENTS.map(e=>e.category))]
+  .sort((a,b)=>Object.keys(CATNAME).indexOf(a)-Object.keys(CATNAME).indexOf(b));
+cats.forEach(k=>{
+  const el=document.createElement("div");
+  el.className="cat"; el.dataset.k=k;
+  el.innerHTML=`${CATNAME[k]||k}<i>0</i>`;
+  el.onclick=()=>{active.has(k)?active.delete(k):active.add(k);el.classList.toggle("on");render();};
+  $("cats").appendChild(el);
+});
+
+[...new Set(EVENTS.map(e=>e.town))].sort((a,b)=>a.localeCompare(b,"fr"))
+  .forEach(t=>{const o=document.createElement("option");o.value=o.textContent=t;$("town").appendChild(o);});
+
+function weekendRange(){
+  const n=new Date(),d=n.getDay();
+  const sat=new Date(n); sat.setDate(n.getDate()+((6-d+7)%7));
+  const sun=new Date(sat); sun.setDate(sat.getDate()+1);
+  return [iso(sat),iso(sun)];
+}
+const overlaps=(e,f,t)=>e.start<=t&&(e.end||e.start)>=f;
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const fmtDay=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+const fmtYr=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{year:"numeric"});
+
+function render(){
+  const q=$("q").value.trim().toLowerCase(), town=$("town").value, when=$("when").value;
+  let from=TODAY,to="2099-12-31";
+  if(when==="weekend") [from,to]=weekendRange();
+  else if(when){const e=new Date();e.setDate(e.getDate()+ +when);to=iso(e);}
+
+  const base=EVENTS.filter(e=>(!town||e.town===town)&&overlaps(e,from,to)&&
+    (!q||`${e.title} ${e.town} ${e.venue||""} ${e.note||""}`.toLowerCase().includes(q)));
+  [...$("cats").children].forEach(el=>{
+    el.querySelector("i").textContent=base.filter(e=>e.category===el.dataset.k).length;});
+
+  const rows=base.filter(e=>!active.size||active.has(e.category))
+    .sort((a,b)=>{const A=a.start<from?from:a.start,B=b.start<from?from:b.start;
+      return A.localeCompare(B)||a.town.localeCompare(b.town,"fr")||a.title.localeCompare(b.title);});
+
+  const w=new Date(); w.setDate(w.getDate()+7);
+  $("s-week").textContent=EVENTS.filter(e=>overlaps(e,TODAY,iso(w))).length;
+  $("tally").textContent=`${rows.length} listing${rows.length===1?"":"s"}`+
+    (when?" in range":"")+(town?` · ${town}`:"")+(active.size?" · filtered":"");
+
+  const list=$("list"); list.innerHTML="";
+  if(!rows.length){list.innerHTML='<div class="empty">Nothing matches those filters.</div>';return;}
+
+  let last=null,i=0;
+  rows.forEach(e=>{
+    const slot=e.start<from?from:e.start, ongoing=e.end&&e.start<from;
+    if(slot!==last){
+      const h=document.createElement("div"); h.className="daymark";
+      h.innerHTML=`<b>${fmtDay(slot)}</b><span>${fmtYr(slot)}</span>`;
+      list.appendChild(h); last=slot;
+    }
+    i++;
+    const r=document.createElement("div"); r.className="row";
+    r.innerHTML=`
+      <div class="idx">${String(i).padStart(2,"0")}</div>
+      <div>
+        <div class="ttl">
+          ${e.free?'<span class="pill free">Free</span>':""}
+          ${e.outdoor?'<span class="pill out">Outdoor</span>':""}
+          ${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`:esc(e.title)}
+        </div>
+        ${e.note?`<div class="sub">${esc(e.note)}</div>`:""}
+        ${ongoing?`<div class="sub"><em>running now — since ${fmtDay(e.start)}</em></div>`:""}
+      </div>
+      <div class="where"><b>${esc(e.town)}</b>
+        <span>${e.venue?esc(e.venue):""}${e.end&&e.end!==e.start?" · until "+fmtDay(e.end):""}</span></div>
+      <div class="kind">${esc(CATNAME[e.category]||e.category)}</div>`;
+    list.appendChild(r);
+  });
+}
+
+$("q").oninput=render; $("town").onchange=render; $("when").onchange=render;
+$("reset").onclick=()=>{$("q").value="";$("town").value="";$("when").value="";
+  active.clear();[...$("cats").children].forEach(c=>c.classList.remove("on"));render();};
+render();
+
+// ---- add-event dialog ----
+const dlg = $("dlg");
+$("addbtn").onclick = () => dlg.showModal();
+$("dlg-close").onclick = () => dlg.close();
+// Click the backdrop to dismiss — the dialog element itself fills the whole
+// viewport, so compare against its content box.
+dlg.addEventListener("click", e => {
+  const r = dlg.getBoundingClientRect();
+  const inside = e.clientX >= r.left && e.clientX <= r.right &&
+                 e.clientY >= r.top  && e.clientY <= r.bottom;
+  if (!inside) dlg.close();
+});
+
+{% if submit_mode == 'github' %}
+// No backend: hand off to a prefilled GitHub issue. Free, auditable, no server.
+$("sform").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const g = id => $(id).value.trim();
+  if (!g("s-url")) { $("smsg").innerHTML = '<span class="err">A link is required as proof.</span>'; return; }
+  try { new URL(g("s-url")); }
+  catch { $("smsg").innerHTML = '<span class="err">That link isn\'t a valid URL.</span>'; return; }
+  const body = [
+    `**Event:** ${g("s-title")}`, `**Date:** ${g("s-date")}${g("s-end") ? " → " + g("s-end") : ""}`,
+    `**Town:** ${g("s-town")}`, `**Venue:** ${g("s-venue") || "—"}`,
+    `**Category:** ${$("s-cat").value}`, `**Link:** ${g("s-url")}`,
+    `**Note:** ${g("s-note") || "—"}`, `**From:** ${g("s-email") || "anonymous"}`,
+  ].join("\n");
+  window.open("https://github.com/{{ github_repo }}/issues/new?labels=submission&title=" +
+    encodeURIComponent("Event: " + g("s-title")) + "&body=" + encodeURIComponent(body), "_blank");
+  $("smsg").innerHTML = '<span class="ok">Opening a submission for review…</span>';
+});
+{% endif %}
+</script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+name: Scrape and publish
+
+on:
+  schedule:
+    - cron: "0 5 * * *"        # 05:00 UTC = 07:00 Nice (06:00 in winter)
+  workflow_dispatch:           # manual "Run workflow" button
+  push:
+    branches: [main]
+    paths: ["niceevents/**", "templates/**", ".github/workflows/**"]
+
+permissions:
+  contents: write              # to commit the refreshed db
+  pages: write
+  id-token: write
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Test
+        run: pytest tests/ -q
+
+      # A source can break without the run failing — we still want the other
+      # 7 sources published. `|| true` keeps a partial scrape useful; the step
+      # summary below is where you actually see what broke.
+      - name: Scrape
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: python -m niceevents.run scrape -v 2>&1 | tee scrape.log || true
+
+      - name: Build site
+        env:
+          SITE_TITLE: "What's on in Nice"
+          GITHUB_REPO: ${{ github.repository }}
+          # SUBMIT_ENDPOINT: ${{ secrets.SUBMIT_ENDPOINT }}   # if you use Formspree
+        run: python -m niceevents.run build --out dist
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "### Scrape result"
+            echo '```'
+            tail -25 scrape.log || echo "no log"
+            echo '```'
+            grep -iE "FAILED|returned NOTHING" scrape.log && echo "⚠️ some sources need attention" || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit database
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f data/events.db
+          git diff --staged --quiet || git commit -m "data: refresh $(date -u +%Y-%m-%d)"
+          git push
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: scrape
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
