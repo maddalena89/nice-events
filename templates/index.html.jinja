@@ -18,7 +18,9 @@ body{background:var(--paper);color:var(--ink);font-family:"Helvetica Neue",Helve
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px 80px}
 a{color:var(--accent)}
 .hero{padding:44px 0 0}
-.eyebrow{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:10px}
+/* padding-right clears the fixed add-event button (52px wide at right:24px = 76px
+   of occupied gutter). Without it the button sits on top of "· 5 SOURCES". */
+.eyebrow{display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:10px;padding-right:76px}
 .eyebrow b{color:var(--ink);font-weight:600}
 h1{font-size:clamp(58px,12.5vw,168px);line-height:.83;letter-spacing:-.05em;font-weight:800;margin:26px 0 0;text-transform:uppercase}
 h1 em{font-style:normal;color:var(--accent)}
@@ -37,9 +39,16 @@ h1 em{font-style:normal;color:var(--accent)}
 input,select,textarea{font:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink)}
 input[type=search]{flex:1;min-width:190px}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-2px}
-.cats{display:flex;flex-wrap:wrap;border:1px solid var(--ink);margin-bottom:22px}
-.cat{flex:1;text-align:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:pointer;border-right:1px solid var(--ink);user-select:none;white-space:nowrap;font-weight:600}
-.cat:last-child{border-right:0}
+/* Equal columns — NOT flex:1 with flex-wrap. Under flex-wrap each ROW shares the
+   width among only the items that landed on it, so the final row of 2 rendered
+   at 50% each ("MARKETS & FÊTES" / "OTHER" stretched to half the page) while the
+   row above sat at 25%. A grid gives every cell the same width regardless of how
+   many fall on the last row.
+   4 and 3 both divide the 12 categories exactly, so there's never a ragged row.
+   The container draws top+left; each cell draws its own right+bottom. That way
+   the outer edges are single hairlines, not doubled. */
+.cats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--ink);border-right:0;border-bottom:0;margin-bottom:22px}
+.cat{display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:pointer;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);user-select:none;white-space:nowrap;font-weight:600}
 .cat:hover{background:#e8e5de}
 .cat.on{background:var(--ink);color:var(--paper)}
 .cat i{font-style:normal;opacity:.5;margin-left:5px;font-weight:400}
@@ -87,21 +96,28 @@ label{display:block;font-size:10px;letter-spacing:.13em;text-transform:uppercase
 .addbtn:hover{background:var(--ink);color:#fff;transform:scale(1.06)}
 .addbtn:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 .addbtn svg{width:22px;height:22px;display:block}
+/* max-height + a scrollable body are load-bearing, not polish. Without them a
+   dialog taller than the window overflows it and the browser gives you no way to
+   reach the bottom — the Submit button was being cut off the screen entirely.
+   The head stays put (flex:none) and only .dlg-body scrolls. */
 dialog{
   border:1px solid var(--ink);border-radius:0;padding:0;background:var(--paper);
   color:var(--ink);max-width:760px;width:calc(100% - 40px);
+  max-height:calc(100dvh - 40px);margin:auto;
+  display:flex;flex-direction:column;
 }
+dialog:not([open]){display:none}
 dialog::backdrop{background:rgba(14,14,14,.55)}
 .dlg-head{
   display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
-  padding:22px 24px 14px;border-bottom:2px solid var(--ink);
+  padding:22px 24px 14px;border-bottom:2px solid var(--ink);flex:none;
 }
 .dlg-head h2{font-size:32px;font-weight:800;letter-spacing:-.035em;line-height:.95;text-transform:uppercase}
 .dlg-head p{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:44ch}
 .dlg-x{width:34px;height:34px;padding:0;border:1px solid var(--ink);background:transparent;
   font-size:17px;line-height:1;cursor:pointer;flex:none}
 .dlg-x:hover{background:var(--ink);color:var(--paper)}
-.dlg-body{padding:20px 24px 24px}
+.dlg-body{padding:20px 24px 24px;overflow-y:auto;flex:1}
 @media(max-width:860px){.addbtn{top:12px;right:12px;width:46px;height:46px}}
 .err{color:#b00020;font-size:12.5px;margin-top:8px}
 .ok{color:#0a7a3f;font-size:12.5px;margin-top:8px}
@@ -115,6 +131,8 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
  .standfirst{grid-template-columns:1fr;gap:22px}
  .stats{justify-content:flex-start}
  .form{grid-template-columns:1fr 1fr}
+ .cats{grid-template-columns:repeat(3,1fr)}   /* 12 / 3 = 4 full rows */
+ .eyebrow{padding-right:64px}                 /* 46px button at right:12px */
 }
 
 /* ---------------- phone ----------------
@@ -153,12 +171,17 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
  input,select,textarea{font-size:16px;padding:11px 12px}   /* 16px: no iOS zoom */
  button{padding:11px 14px;min-height:44px}                  /* 44px touch target */
 
+ /* Back to a single scrolling row here, so the desktop grid's "container draws
+    top+left, cells draw right+bottom" split has to be undone: the container
+    takes its full border back and the cells drop the bottom edge. */
  .cats{
    display:flex;flex-wrap:nowrap;overflow-x:auto;margin-bottom:16px;
    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+   border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);
  }
  .cats::-webkit-scrollbar{display:none}
  .cat{flex:0 0 auto;padding:11px 13px;font-size:10.5px;min-height:42px;
+      border-bottom:0;
       display:flex;align-items:center;justify-content:center}
 
  .daymark{margin-top:24px;gap:9px}
@@ -277,9 +300,17 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
     </div>
   {% else %}
     <div class="callout">
+      {# Only the endpoint mode has a file field, so don't promise a poster upload
+         in the modes that don't offer one. #}
+      {% if submit_mode == 'endpoint' %}
       <b>A link or a poster is required.</b> It's checked for shape, not truth — we can
       confirm a URL is well-formed and an image really is an image, but not that the event
       is real. Every submission is reviewed by a person before it appears.
+      {% else %}
+      <b>A link is required.</b> It's checked for shape, not truth — we can confirm a URL
+      is well-formed, but not that the event behind it is real. Every submission is read
+      by a person before it appears on the site.
+      {% endif %}
     </div>
     <form class="form" id="sform"
           {% if submit_mode == 'endpoint' %}action="{{ submit_endpoint }}" method="POST" enctype="multipart/form-data"{% endif %}>
@@ -431,6 +462,76 @@ dlg.addEventListener("click", e => {
                  e.clientY >= r.top  && e.clientY <= r.bottom;
   if (!inside) dlg.close();
 });
+
+{% if submit_mode == 'supabase' %}
+// Posts straight to Supabase from the browser. No server of our own.
+//
+// These two values are public and that is by design — anyone can read them out
+// of this page. They identify the project; they authorise nothing. What stops a
+// stranger writing rubbish into the table is Row Level Security (insert-only,
+// plus CHECK constraints), not the secrecy of this key. tojson, not bare
+// interpolation, so the values can't break out of the string literal.
+const SB_URL = {{ supabase_url|tojson }};
+const SB_KEY = {{ supabase_anon_key|tojson }};
+
+$("sform").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const g = id => $(id).value.trim();
+  const msg = $("smsg");
+  const btn = $("sform").querySelector("button[type=submit]");
+
+  const raw = g("s-url");
+  if (!raw) { msg.innerHTML = '<span class="err">A link is required as proof.</span>'; return; }
+  let u;
+  try { u = new URL(raw); }
+  catch { msg.innerHTML = '<span class="err">That link isn\'t a valid URL.</span>'; return; }
+  // Mirrors the url_is_http CHECK in the database. Client-side this is a
+  // courtesy; the database rejects javascript:/data: regardless.
+  if (u.protocol !== "https:" && u.protocol !== "http:") {
+    msg.innerHTML = '<span class="err">The link must start with http:// or https://.</span>'; return;
+  }
+
+  btn.disabled = true;
+  msg.innerHTML = "Sending…";
+  try {
+    const r = await fetch(SB_URL + "/rest/v1/submissions", {
+      method: "POST",
+      headers: {
+        "apikey": SB_KEY,
+        "Authorization": "Bearer " + SB_KEY,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      // approved/published are deliberately not sent. The RLS policy requires
+      // them to be false, and the column defaults already are.
+      body: JSON.stringify({
+        title: g("s-title"),
+        start_date: g("s-date"),
+        end_date: g("s-end") || null,
+        town: g("s-town"),
+        venue: g("s-venue") || null,
+        category: $("s-cat").value,
+        url: raw,
+        note: g("s-note") || null,
+        email: g("s-email") || null,
+      }),
+    });
+    if (r.ok) {
+      $("sform").reset();
+      msg.innerHTML = '<span class="ok">Thank you — it\'s queued for review.</span>';
+    } else {
+      // Surface the real reason. A silent failure here means someone typed out
+      // their event and never learns it didn't land.
+      const t = await r.text();
+      msg.innerHTML = '<span class="err">Not accepted: ' + esc(t.slice(0, 180)) + '</span>';
+    }
+  } catch (err) {
+    msg.innerHTML = '<span class="err">Couldn\'t reach the server — try again in a moment.</span>';
+  } finally {
+    btn.disabled = false;
+  }
+});
+{% endif %}
 
 {% if submit_mode == 'github' %}
 // No backend: hand off to a prefilled GitHub issue. Free, auditable, no server.

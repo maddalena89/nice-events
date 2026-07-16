@@ -17,4 +17,8 @@ from . import meetup         # noqa: F401  design, business, AI, expat
 from . import ra             # noqa: F401  electronic / clubs
 from . import eventbrite     # noqa: F401  business, tech, conferences
 
+# Not scraped — read back out of our own Supabase table. Everything a human
+# approved in the Table Editor comes in through here.
+from . import submissions    # noqa: F401  community submissions
+
 __all__ = ["REGISTRY", "Scraper", "HttpScraper", "BrowserScraper"]

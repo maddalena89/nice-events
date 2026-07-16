@@ -44,17 +44,34 @@ class Scraper(ABC):
 
 
 class HttpScraper(Scraper):
+    """HTTP-backed source.
+
+    The httpx client is built on first use, not in __init__. Constructing a
+    scraper should be free: merely naming one shouldn't open a connection pool,
+    read proxy environment variables, or import optional transport backends.
+    (It used to, which made the pure mapping logic untestable — instantiating a
+    scraper inside a test blew up on a SOCKS proxy var that had nothing to do
+    with the code under test.)
+    """
+
     def __init__(self, timeout: float = 30.0):
-        self.client = httpx.Client(
-            timeout=timeout,
-            follow_redirects=True,
-            headers={
-                "User-Agent": UA,
-                "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-                "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-            },
-        )
+        self._timeout = timeout
+        self._client: Optional[httpx.Client] = None
         self._last = 0.0
+
+    @property
+    def client(self) -> httpx.Client:
+        if self._client is None:
+            self._client = httpx.Client(
+                timeout=self._timeout,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": UA,
+                    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+                    "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+                },
+            )
+        return self._client
 
     def get(self, url: str, **kw) -> Optional[httpx.Response]:
         gap = time.monotonic() - self._last
@@ -72,7 +89,11 @@ class HttpScraper(Scraper):
             return None
 
     def close(self):
-        self.client.close()
+        # Don't touch the property — closing a scraper that never fetched
+        # anything shouldn't create a client just to shut it again.
+        if self._client is not None:
+            self._client.close()
+            self._client = None
 
 
 class BrowserScraper(Scraper):

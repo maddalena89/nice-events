@@ -31,6 +31,14 @@ SITE_TITLE = os.environ.get("SITE_TITLE", "What's on in Nice")
 SUBMIT_ENDPOINT = os.environ.get("SUBMIT_ENDPOINT", "")
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "")  # e.g. "maddalena/nice-events"
 
+# Supabase. Both of these are baked into the published HTML on purpose — the
+# anon key is an identifier, not a password, and Row Level Security is what
+# actually guards the table (see supabase/schema.sql). The service_role key is
+# a different animal entirely: it bypasses RLS, is read only by the scrape step
+# from a GitHub *secret*, and must never reach this module or the template.
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+
 
 def _row_to_dict(r: sqlite3.Row) -> dict:
     d = dict(r)
@@ -70,7 +78,17 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     )
     tpl = env.get_template("index.html.jinja")
 
-    submit_mode = "endpoint" if SUBMIT_ENDPOINT else ("github" if GITHUB_REPO else "none")
+    # Supabase first: it's the only mode a passer-by can use without an account.
+    # GITHUB_REPO is always set in CI, so without this ordering the github mode
+    # would quietly win and keep asking strangers to sign up for GitHub.
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        submit_mode = "supabase"
+    elif SUBMIT_ENDPOINT:
+        submit_mode = "endpoint"
+    elif GITHUB_REPO:
+        submit_mode = "github"
+    else:
+        submit_mode = "none"
 
     html = tpl.render(
         title=SITE_TITLE,
@@ -83,6 +101,8 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         submit_mode=submit_mode,
         submit_endpoint=SUBMIT_ENDPOINT,
         github_repo=GITHUB_REPO,
+        supabase_url=SUPABASE_URL,
+        supabase_anon_key=SUPABASE_ANON_KEY,
         source_count=len({(r["source"] or "").split(":")[0] for r in rows}),
     )
     (out / "index.html").write_text(html, encoding="utf-8")
