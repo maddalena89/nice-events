@@ -44,6 +44,7 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
     d = dict(r)
     d["free"] = bool(d.get("free"))
     d["outdoor"] = bool(d.get("outdoor"))
+    d["online"] = bool(d.get("online"))
     for k in ("sources", "first_seen", "last_seen", "approved", "submitted_by"):
         d.pop(k, None)
     return {k: v for k, v in d.items() if v not in (None, "", 0) or k in ("start", "title", "town")}

@@ -26,12 +26,54 @@ from .base import BrowserScraper, register
 
 BASE = "https://www.meetup.com"
 
-# What Maddalena asked for: designers, business, AI/tech, expat — plus the
-# social stuff that surrounds them.
+# Meetup's location search returns online events too — they match "near Nice"
+# because the *group* is near Nice, or sometimes for no visible reason at all
+# (a Lyon meetup restreamed online came back under Nice). They're kept, flagged,
+# and hidden behind a checkbox rather than dropped: someone may genuinely want
+# the Tuesday language exchange on Zoom.
+#
+# Only *bracketed* markers count in the title. A bare "online" is not evidence:
+# "Online Marketing Workshop" is a real room with real chairs, and treating it
+# as a webinar would hide a legitimate Nice event. Brackets and parens are how
+# organisers actually mark format, so they're the honest signal. Everything else
+# leans on structured fields.
+_ONLINE_TITLE = re.compile(
+    r"[\[(]\s*(?:online|en\s+ligne|virtual|virtuel|zoom|webinar)\s*[\])]"
+    r"|^\s*online\s*!+",
+    re.I,
+)
+_ONLINE_VENUE = re.compile(r"^\s*online\b|online\s+event", re.I)
+
+
+def _is_online(obj: dict, venue: Optional[str], title: str) -> bool:
+    # 1. Structured, when Meetup bothers to tell us.
+    if obj.get("isOnline") is True:
+        return True
+    if str(obj.get("eventType") or "").upper() in {"ONLINE", "VIRTUAL"}:
+        return True
+    # 2. Meetup's own placeholder venue. This is the one that catches most of
+    #    them in practice.
+    if venue and _ONLINE_VENUE.search(venue):
+        return True
+    # 3. Explicit bracketed marker in the title.
+    return bool(title and _ONLINE_TITLE.search(str(title)))
+
+# Meetup search is keyword-driven: a topic that isn't in this list does not
+# exist as far as this site is concerned. That's not a scraper bug, it's a
+# blind spot — acroyoga jams were "missing" purely because nothing here ever
+# asked for them. When something's absent from the site, check this list first.
 TOPICS = [
+    # work
     "design", "ux", "business", "entrepreneur", "startup", "tech",
     "artificial-intelligence", "data-science", "networking",
+    # people
     "expat", "language-exchange", "social", "photography", "music",
+    # bodies in rooms — the whole category that was missing
+    "acroyoga", "yoga", "dance", "ecstatic-dance", "contact-improvisation",
+    "movement", "wellness", "meditation", "hiking", "climbing",
+    # alternative / kink. Meetup's own topic slugs; expect thin results and see
+    # the note in README — most of this scene deliberately doesn't list in public.
+    "alternative-lifestyle", "bdsm", "shibari", "tantra", "polyamory",
 ]
 
 RADIUS_MILES = 25  # Nice -> reaches Antibes, Cannes, Monaco
@@ -95,7 +137,18 @@ class Meetup(BrowserScraper):
 
         venue_obj = obj.get("venue") or {}
         venue = venue_obj.get("name") if isinstance(venue_obj, dict) else None
-        town = (venue_obj.get("city") if isinstance(venue_obj, dict) else None) or "Nice"
+        city = venue_obj.get("city") if isinstance(venue_obj, dict) else None
+
+        online = _is_online(obj, venue, title)
+        if online:
+            # NEVER fall through to the `or "Nice"` default below. That default
+            # was stamping "Nice" onto every Zoom call Meetup returned for the
+            # Nice location search — including a Lyon meetup restreamed online.
+            # An online event has no town; pretending it has one is the whole bug.
+            town = "Online"
+            venue = venue or "Online event"
+        else:
+            town = city or "Nice"
 
         group = obj.get("group") or {}
         gname = group.get("name") if isinstance(group, dict) else None
@@ -114,6 +167,7 @@ class Meetup(BrowserScraper):
             url=url,
             note=" · ".join(bits)[:400] or None,
             free=bool(obj.get("isFree") or obj.get("feeSettings") in (None, {})),
+            online=online,
             source=self.name,
         )
 

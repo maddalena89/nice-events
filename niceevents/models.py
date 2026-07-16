@@ -253,6 +253,11 @@ class Event:
     free: bool = False
     image: Optional[str] = None
     outdoor: bool = False
+    #: Zoom calls, webinars, "[En ligne]" replays. They come back from Meetup's
+    #: location search even though they have no connection to Nice whatsoever —
+    #: a Lyon meetup restreamed online is not an event in Nice. Kept rather than
+    #: dropped so a visitor can opt into them, but hidden by default.
+    online: bool = False
     submitted_by: Optional[str] = None      # set for community submissions
     approved: bool = True                   # submissions land False until reviewed
     fingerprint: str = field(default="", init=False)

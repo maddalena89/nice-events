@@ -36,6 +36,13 @@ h1 em{font-style:normal;color:var(--accent)}
 @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media(prefers-reduced-motion:reduce){.marquee-inner{animation:none}}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+/* "Online too" — a real control, so it gets the same box as the selects rather
+   than floating naked next to them. */
+.chk{display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer;
+     border:1px solid var(--ink);padding:9px 11px;font-size:11px;font-weight:600;
+     letter-spacing:.1em;text-transform:uppercase;user-select:none}
+.chk:hover{background:#e8e5de}
+.chk input{width:14px;height:14px;margin:0;padding:0;accent-color:var(--accent);cursor:pointer}
 input,select,textarea{font:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink)}
 input[type=search]{flex:1;min-width:190px}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-2px}
@@ -270,6 +277,7 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
     <option value="30">Next 30 days</option>
     <option value="weekend">This weekend</option>
   </select>
+  <label class="chk"><input type="checkbox" id="online"> Online too</label>
   <button id="reset">Reset</button>
 </div>
 
@@ -380,7 +388,9 @@ cats.forEach(k=>{
   $("cats").appendChild(el);
 });
 
-[...new Set(EVENTS.map(e=>e.town))].sort((a,b)=>a.localeCompare(b,"fr"))
+// Towns you can physically go to. "Online" is a format, not a place — it must
+// not appear in a list headed "All towns".
+[...new Set(EVENTS.filter(e=>!e.online).map(e=>e.town))].sort((a,b)=>a.localeCompare(b,"fr"))
   .forEach(t=>{const o=document.createElement("option");o.value=o.textContent=t;$("town").appendChild(o);});
 
 function weekendRange(){
@@ -396,11 +406,15 @@ const fmtYr=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{year:"numeric
 
 function render(){
   const q=$("q").value.trim().toLowerCase(), town=$("town").value, when=$("when").value;
+  // Online events are off unless asked for. This site is about being somewhere;
+  // a Zoom call that surfaced under "near Nice" is noise until someone opts in.
+  const showOnline=$("online").checked;
   let from=TODAY,to="2099-12-31";
   if(when==="weekend") [from,to]=weekendRange();
   else if(when){const e=new Date();e.setDate(e.getDate()+ +when);to=iso(e);}
 
   const base=EVENTS.filter(e=>(!town||e.town===town)&&overlaps(e,from,to)&&
+    (showOnline||!e.online)&&
     (!q||`${e.title} ${e.town} ${e.venue||""} ${e.note||""}`.toLowerCase().includes(q)));
   [...$("cats").children].forEach(el=>{
     el.querySelector("i").textContent=base.filter(e=>e.category===el.dataset.k).length;});
@@ -410,7 +424,10 @@ function render(){
       return A.localeCompare(B)||a.town.localeCompare(b.town,"fr")||a.title.localeCompare(b.title);});
 
   const w=new Date(); w.setDate(w.getDate()+7);
-  $("s-week").textContent=EVENTS.filter(e=>overlaps(e,TODAY,iso(w))).length;
+  // Must honour the same online rule as the list, or the headline number
+  // promises events the page then refuses to show.
+  $("s-week").textContent=EVENTS.filter(e=>(showOnline||!e.online)&&
+    overlaps(e,TODAY,iso(w))).length;
   $("tally").textContent=`${rows.length} listing${rows.length===1?"":"s"}`+
     (when?" in range":"")+(town?` · ${town}`:"")+(active.size?" · filtered":"");
 
@@ -433,6 +450,7 @@ function render(){
         <div class="ttl">
           ${e.free?'<span class="pill free">Free</span>':""}
           ${e.outdoor?'<span class="pill out">Outdoor</span>':""}
+          ${e.online?'<span class="pill out">Online</span>':""}
           ${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`:esc(e.title)}
         </div>
         ${e.note?`<div class="sub">${esc(e.note)}</div>`:""}
@@ -446,7 +464,9 @@ function render(){
 }
 
 $("q").oninput=render; $("town").onchange=render; $("when").onchange=render;
+$("online").onchange=render;
 $("reset").onclick=()=>{$("q").value="";$("town").value="";$("when").value="";
+  $("online").checked=false;
   active.clear();[...$("cats").children].forEach(c=>c.classList.remove("on"));render();};
 render();
 

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS events (
     free         INTEGER DEFAULT 0,
     image        TEXT,
     outdoor      INTEGER DEFAULT 0,
+    online       INTEGER DEFAULT 0,
     source       TEXT NOT NULL,
     sources      TEXT,               -- comma-joined, when several agree
     submitted_by TEXT,
@@ -60,6 +61,23 @@ CREATE TABLE IF NOT EXISTS runs (
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "events.db"
 
 
+#: Columns added after the first release. CREATE TABLE IF NOT EXISTS does
+#: nothing to a table that already exists, so a new column never reaches the
+#: committed events.db without an explicit ALTER. Forgetting this is silent:
+#: SELECT * simply doesn't return the column and every read sees the old shape.
+#: (name, DDL type + default)
+_MIGRATIONS: list[tuple[str, str]] = [
+    ("online", "INTEGER DEFAULT 0"),
+]
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(events)")}
+    for col, ddl in _MIGRATIONS:
+        if col not in have:
+            conn.execute(f"ALTER TABLE events ADD COLUMN {col} {ddl}")
+
+
 @contextmanager
 def connect(path: Optional[Path] = None) -> Iterator[sqlite3.Connection]:
     p = Path(path or DB_PATH)
@@ -68,6 +86,7 @@ def connect(path: Optional[Path] = None) -> Iterator[sqlite3.Connection]:
     conn.row_factory = sqlite3.Row
     try:
         conn.executescript(SCHEMA)
+        _migrate(conn)
         yield conn
         conn.commit()
     finally:
@@ -124,12 +143,13 @@ def upsert(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]
             conn.execute(
                 """INSERT INTO events
                    (fingerprint,title,start,end,time,town,venue,category,url,note,price,
-                    free,image,outdoor,source,sources,submitted_by,approved,first_seen,last_seen)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    free,image,outdoor,online,source,sources,submitted_by,approved,
+                    first_seen,last_seen)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (ev.fingerprint, ev.title, ev.start.isoformat(),
                  ev.end.isoformat() if ev.end else None, ev.time, ev.town, ev.venue,
                  ev.category, ev.url, ev.note, ev.price, int(ev.free), ev.image,
-                 int(ev.outdoor), ev.source, ev.source, ev.submitted_by,
+                 int(ev.outdoor), int(ev.online), ev.source, ev.source, ev.submitted_by,
                  int(ev.approved), now, now),
             )
             added += 1
