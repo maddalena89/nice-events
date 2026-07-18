@@ -79,6 +79,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .kind{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;text-align:right;color:var(--muted)}
 .pill{display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:2px 6px;margin-right:5px;vertical-align:2px;background:var(--accent);color:#fff}
 .pill.out{background:transparent;color:var(--muted);border:1px solid var(--rule)}
+/* Run-length sticker for exhibitions and other multi-day events. */
+.pill.run{background:transparent;color:var(--accent);border:1px solid var(--accent)}
 .sec{margin-top:76px}
 .sechead{display:flex;align-items:flex-start;gap:20px;border-top:2px solid var(--ink);padding-top:14px;margin-bottom:24px}
 .secnum{font-size:11px;letter-spacing:.16em;color:var(--muted);padding-top:9px}
@@ -294,8 +296,8 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
 <dialog id="dlg" aria-labelledby="dlg-title">
   <div class="dlg-head">
     <div>
-      <h2 id="dlg-title">Add an event</h2>
-      <p>Organising something, or spotted a gap? Send it over with a link or a poster.</p>
+      <h2 id="dlg-title">Add your event</h2>
+      <p>Throwing something, or spotted a gap? Pop it in below — takes a minute, and a real human checks every one before it goes up.</p>
     </div>
     <button class="dlg-x" id="dlg-close" aria-label="Close">✕</button>
   </div>
@@ -315,9 +317,9 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
       confirm a URL is well-formed and an image really is an image, but not that the event
       is real. Every submission is reviewed by a person before it appears.
       {% else %}
-      <b>A link is required.</b> It's checked for shape, not truth — we can confirm a URL
-      is well-formed, but not that the event behind it is real. Every submission is read
-      by a person before it appears on the site.
+      <b>Pop a link in — that's all we need.</b> It just has to point somewhere real
+      (a Facebook event, a poster, the venue's page). We can't promise every event is
+      genuine, so a human reads each one before it goes live. Nothing appears automatically.
       {% endif %}
     </div>
     <form class="form" id="sform"
@@ -325,7 +327,14 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
       <div class="f-half"><label for="s-title">Event name *</label><input id="s-title" name="title" required></div>
       <div><label for="s-date">Date *</label><input type="date" id="s-date" name="date" required></div>
       <div><label for="s-end">Ends</label><input type="date" id="s-end" name="end"></div>
-      <div><label for="s-town">Town *</label><input id="s-town" name="town" required placeholder="Beaulieu-sur-Mer"></div>
+      {# Town is a datalist, not free text: start typing and matching towns
+         appear, and submit rejects anything not already on the site. Keeps the
+         town list clean — no "Nice ", "nice", "Nice06" variants to canonicalise
+         later. The <option>s are filled from the live town list in JS. #}
+      <div><label for="s-town">Town *</label>
+        <input id="s-town" name="town" list="townlist" required autocomplete="off"
+               placeholder="Start typing a town…">
+        <datalist id="townlist"></datalist></div>
       <div><label for="s-venue">Venue</label><input id="s-venue" name="venue"></div>
       <div><label for="s-cat">Category *</label>
         <select id="s-cat" name="category">
@@ -389,9 +398,21 @@ cats.forEach(k=>{
 });
 
 // Towns you can physically go to. "Online" is a format, not a place — it must
-// not appear in a list headed "All towns".
-[...new Set(EVENTS.filter(e=>!e.online).map(e=>e.town))].sort((a,b)=>a.localeCompare(b,"fr"))
-  .forEach(t=>{const o=document.createElement("option");o.value=o.textContent=t;$("town").appendChild(o);});
+// not appear in a list headed "All towns", nor in the submission datalist.
+// One source of truth, used three ways: the filter dropdown, the submission
+// datalist, and the submit-time validation set.
+const TOWNS = [...new Set(EVENTS.filter(e=>!e.online).map(e=>e.town))]
+  .sort((a,b)=>a.localeCompare(b,"fr"));
+const TOWN_CANON = new Map(TOWNS.map(t=>[t.toLowerCase(), t]));  // typed -> canonical
+
+TOWNS.forEach(t=>{
+  const o=document.createElement("option"); o.value=o.textContent=t;
+  $("town").appendChild(o);
+});
+{
+  const dl=$("townlist");
+  if(dl) TOWNS.forEach(t=>{const o=document.createElement("option");o.value=t;dl.appendChild(o);});
+}
 
 function weekendRange(){
   const n=new Date(),d=n.getDay();
@@ -403,6 +424,35 @@ const overlaps=(e,f,t)=>e.start<=t&&(e.end||e.start)>=f;
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const fmtDay=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
 const fmtYr=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{year:"numeric"});
+const fmtShort=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+const addDays=(d,n)=>{const x=new Date(d+"T12:00:00");x.setDate(x.getDate()+n);return iso(x);};
+const isMultiDay=e=>e.end&&e.end!==e.start;
+
+// A month-long exhibition should read as one thing that runs for a while — this
+// is the "from here to here" sticker. Ongoing -> "until 31 Aug"; upcoming ->
+// "5 Aug – 31 Aug".
+function runBadge(e){
+  if(!isMultiDay(e)) return "";
+  const txt = e.start<TODAY ? `until ${fmtShort(e.end)}`
+                            : `${fmtShort(e.start)} – ${fmtShort(e.end)}`;
+  return `<span class="pill run">${txt}</span>`;
+}
+
+// When a category is being browsed, a running exhibition should appear on every
+// day it's open — so "what's on this Saturday" actually shows it. In the full
+// list (no category picked) it appears once, carrying the range badge instead,
+// or the page would drown in identical repeated rows.
+// Capped so "Any date" + a year-long show can't emit hundreds of rows.
+const EXPAND_CAP_DAYS = 31;
+function occurrences(e, from, to, expand){
+  const first = e.start < from ? from : e.start;
+  if(!expand || !isMultiDay(e)) return [first];
+  const horizon = [to, addDays(TODAY, EXPAND_CAP_DAYS), e.end]
+    .reduce((a,b)=> a<b ? a : b);
+  const out=[]; let d=first;
+  while(d <= horizon){ out.push(d); d=addDays(d,1); }
+  return out.length ? out : [first];
+}
 
 function render(){
   const q=$("q").value.trim().toLowerCase(), town=$("town").value, when=$("when").value;
@@ -419,24 +469,32 @@ function render(){
   [...$("cats").children].forEach(el=>{
     el.querySelector("i").textContent=base.filter(e=>e.category===el.dataset.k).length;});
 
-  const rows=base.filter(e=>!active.size||active.has(e.category))
-    .sort((a,b)=>{const A=a.start<from?from:a.start,B=b.start<from?from:b.start;
-      return A.localeCompare(B)||a.town.localeCompare(b.town,"fr")||a.title.localeCompare(b.title);});
+  // Unique events that pass the category filter — this is what the tally counts,
+  // so "42 listings" means 42 events, never 42 × the days they run.
+  const matched=base.filter(e=>!active.size||active.has(e.category));
+
+  // Expand to (day, event) pairs. Only when a category is being browsed does a
+  // multi-day show repeat per day; in the full list each appears once.
+  const expand=active.size>0;
+  const pairs=[];
+  matched.forEach(e=>occurrences(e,from,to,expand).forEach(day=>pairs.push([day,e])));
+  pairs.sort((a,b)=>a[0].localeCompare(b[0])||
+    a[1].town.localeCompare(b[1].town,"fr")||a[1].title.localeCompare(b[1].title));
 
   const w=new Date(); w.setDate(w.getDate()+7);
   // Must honour the same online rule as the list, or the headline number
   // promises events the page then refuses to show.
   $("s-week").textContent=EVENTS.filter(e=>(showOnline||!e.online)&&
     overlaps(e,TODAY,iso(w))).length;
-  $("tally").textContent=`${rows.length} listing${rows.length===1?"":"s"}`+
+  $("tally").textContent=`${matched.length} listing${matched.length===1?"":"s"}`+
     (when?" in range":"")+(town?` · ${town}`:"")+(active.size?" · filtered":"");
 
   const list=$("list"); list.innerHTML="";
-  if(!rows.length){list.innerHTML='<div class="empty">Nothing matches those filters.</div>';return;}
+  if(!pairs.length){list.innerHTML='<div class="empty">Nothing matches those filters.</div>';return;}
 
   let last=null,i=0;
-  rows.forEach(e=>{
-    const slot=e.start<from?from:e.start, ongoing=e.end&&e.start<from;
+  pairs.forEach(([slot,e])=>{
+    const ongoing=e.start<slot;
     if(slot!==last){
       const h=document.createElement("div"); h.className="daymark";
       h.innerHTML=`<b>${fmtDay(slot)}</b><span>${fmtYr(slot)}</span>`;
@@ -451,13 +509,13 @@ function render(){
           ${e.free?'<span class="pill free">Free</span>':""}
           ${e.outdoor?'<span class="pill out">Outdoor</span>':""}
           ${e.online?'<span class="pill out">Online</span>':""}
+          ${runBadge(e)}
           ${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`:esc(e.title)}
         </div>
         ${e.note?`<div class="sub">${esc(e.note)}</div>`:""}
-        ${ongoing?`<div class="sub"><em>running now — since ${fmtDay(e.start)}</em></div>`:""}
       </div>
       <div class="where"><b>${esc(e.town)}</b>
-        <span>${e.venue?esc(e.venue):""}${e.end&&e.end!==e.start?" · until "+fmtDay(e.end):""}</span></div>
+        <span>${e.venue?esc(e.venue):""}</span></div>
       <div class="kind">${esc(CATNAME[e.category]||e.category)}</div>`;
     list.appendChild(r);
   });
@@ -500,6 +558,14 @@ $("sform").addEventListener("submit", async ev => {
   const msg = $("smsg");
   const btn = $("sform").querySelector("button[type=submit]");
 
+  // Town must be one already on the site — no free-text new towns. The datalist
+  // suggests them; this enforces it. We send the canonical spelling, not what
+  // was typed, so "nice" and "NICE" both store as "Nice".
+  const townCanon = TOWN_CANON.get(g("s-town").toLowerCase());
+  if (!townCanon) {
+    msg.innerHTML = '<span class="err">Pick a town from the list as you type.</span>'; return;
+  }
+
   const raw = g("s-url");
   if (!raw) { msg.innerHTML = '<span class="err">A link is required as proof.</span>'; return; }
   let u;
@@ -528,7 +594,7 @@ $("sform").addEventListener("submit", async ev => {
         title: g("s-title"),
         start_date: g("s-date"),
         end_date: g("s-end") || null,
-        town: g("s-town"),
+        town: townCanon,
         venue: g("s-venue") || null,
         category: $("s-cat").value,
         url: raw,
@@ -558,12 +624,14 @@ $("sform").addEventListener("submit", async ev => {
 $("sform").addEventListener("submit", ev => {
   ev.preventDefault();
   const g = id => $(id).value.trim();
+  const townCanon = TOWN_CANON.get(g("s-town").toLowerCase());
+  if (!townCanon) { $("smsg").innerHTML = '<span class="err">Pick a town from the list as you type.</span>'; return; }
   if (!g("s-url")) { $("smsg").innerHTML = '<span class="err">A link is required as proof.</span>'; return; }
   try { new URL(g("s-url")); }
   catch { $("smsg").innerHTML = '<span class="err">That link isn\'t a valid URL.</span>'; return; }
   const body = [
     `**Event:** ${g("s-title")}`, `**Date:** ${g("s-date")}${g("s-end") ? " → " + g("s-end") : ""}`,
-    `**Town:** ${g("s-town")}`, `**Venue:** ${g("s-venue") || "—"}`,
+    `**Town:** ${townCanon}`, `**Venue:** ${g("s-venue") || "—"}`,
     `**Category:** ${$("s-cat").value}`, `**Link:** ${g("s-url")}`,
     `**Note:** ${g("s-note") || "—"}`, `**From:** ${g("s-email") || "anonymous"}`,
   ].join("\n");
