@@ -37,13 +37,6 @@ jobs:
       - name: Test
         run: pytest tests/ -q
 
-      # A source can break without the run failing — we still want the other
-      # 7 sources published. `|| true` keeps a partial scrape useful; the step
-      # summary below is where you actually see what broke.
-      # SUPABASE_SERVICE_KEY bypasses Row Level Security, so it is scoped to this
-      # step alone — the step that reads approved submissions. It is deliberately
-      # NOT present in "Build site" below, because that step renders a public HTML
-      # file and nothing that can read submitter emails belongs anywhere near it.
       - name: Scrape
         env:
           PYTHONUNBUFFERED: "1"
@@ -51,15 +44,12 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python -m niceevents.run scrape -v 2>&1 | tee scrape.log || true
 
-      # Only the anon key here. Both of these end up inside index.html by design;
-      # see the note in site.py.
       - name: Build site
         env:
           SITE_TITLE: "What's on in Nice"
           GITHUB_REPO: ${{ github.repository }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
-          # SUBMIT_ENDPOINT: ${{ secrets.SUBMIT_ENDPOINT }}   # if you use Formspree
         run: python -m niceevents.run build --out dist
 
       - name: Report
@@ -73,9 +63,6 @@ jobs:
             grep -iE "FAILED|returned NOTHING" scrape.log && echo "⚠️ some sources need attention" || true
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Saving the db is a nice-to-have (it's what makes "new this week" work).
-      # If the push ever conflicts, that must NOT stop the site from deploying —
-      # a stale database is a small problem, a site that won't publish is a big one.
       - name: Commit database
         continue-on-error: true
         run: |
