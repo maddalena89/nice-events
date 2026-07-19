@@ -102,7 +102,7 @@ class ResidentAdvisor(BrowserScraper):
             time=t,
             town=town or "Nice",
             venue=vname,
-            category="concert",
+            category="autre",   # RA is club/electronic → Clubs & other, not live music
             url=url,
             note=" · ".join(bits)[:300] or None,
             source=self.name,
@@ -138,7 +138,7 @@ class ResidentAdvisor(BrowserScraper):
                 start=start,
                 town="Nice",
                 venue=venue,
-                category="concert",
+                category="autre",   # RA is club/electronic → Clubs & other, not live music
                 url=href if href.startswith("http") else BASE + href,
                 source=self.name,
             )

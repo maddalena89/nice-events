@@ -17,7 +17,7 @@ from typing import Optional
 CATEGORIES = {
     "brocante": "Brocantes & vide-greniers",
     "danse": "Tango & dance",
-    "concert": "Concerts & clubbing",
+    "concert": "Concerts",
     "expo": "Exhibitions",
     "scene": "Stage & theatre",
     "visite": "Guided visits",
@@ -26,15 +26,28 @@ CATEGORIES = {
     "social": "Social & expat",
     "sport": "Sport",
     "marche": "Markets & fêtes",
-    "autre": "Other",
+    "autre": "Clubs & other",
 }
 
-# Ordered: first match wins. Tuned for the 06 sources specifically.
+# Ordered: FIRST MATCH WINS — order is load-bearing, read before reshuffling.
+#   * expo is ABOVE concert on purpose: nice.fr tags some museum shows with a
+#     hidden "music" type, so "Africa Pop" / "Exposition Lévitation" were landing
+#     in Concerts. Anything whose text says exposition/galerie/musée is an
+#     exhibition first, whatever else it mentions.
+#   * club/electronic is ABOVE concert and routes to "autre" (Clubs & other):
+#     live music and club nights are different things, and clubs live in Other.
+#   * "club" is only matched with context (clubbing / night club / club night),
+#     never bare — a bare "club" turned "CLUB DE LECTURE" (a book club) into a
+#     rave.
 _CATEGORY_RULES: list[tuple[str, str]] = [
     (r"vide[- ]grenier|brocante|braderie|bourse|vide[- ]dressing|vide[- ]maison|chiner", "brocante"),
     (r"\bmilonga|\btango|practica|bal\b|guinguette|salsa|bachata|kizomba|swing|lindy|danse|dance", "danse"),
-    (r"concert|jazz|dj\b|club|techno|house music|live music|festival de musique|apéro club|soirée club|rave", "concert"),
     (r"exposition|\bexpo\b|vernissage|exhibition|galerie|rétrospective|collection permanente", "expo"),
+    # Nightlife → Clubs & other. Kept separate from live music.
+    (r"\bdj\b|dj set|clubbing|night ?club|bo[iî]te de nuit|techno|\bhouse\b|\belectro\b|\brave\b|"
+     r"after[\s-]?party|club night|soir[ée]e club|ap[ée]ro club|warehouse", "autre"),
+    (r"concert|jazz|live music|musique live|orchestre|philharmoni|chorale|r[ée]cital|fanfare|"
+     r"blues|reggae|festival de musique", "concert"),
     (r"théâtre|theatre|spectacle|opéra|opera|ballet|one man show|humour|cirque|danse contemporaine", "scene"),
     (r"visite guidée|visite|guided (tour|visit)|parcours patrimoine|balade", "visite"),
     (r"atelier|workshop|stage de|masterclass|initiation|cours\b", "atelier"),
@@ -103,12 +116,49 @@ def is_nonevent(title: str) -> bool:
 
 
 def classify(*parts: Optional[str]) -> str:
-    """Guess a category from any text we have (title, type label, venue, note)."""
+    """Guess a category from any text we have (title, type label, venue).
+
+    Keyword-matches, so feed it SHORT, categorical text — a title and a type
+    label — NOT a prose description. An exhibition blurb that says "l'univers de
+    la brocante" or a concert blurb that name-drops "jazz" will land in the wrong
+    tab if you pour the whole description in here. Descriptions are for reading,
+    not classifying.
+    """
     hay = strip_accents(" ".join(p for p in parts if p).lower())
     for rx, cat in _COMPILED_RULES:
         if rx.search(hay):
             return cat
     return "autre"
+
+
+# When a source hands us its OWN type label (nice.fr's "Exposition", "Concert",
+# "Atelier"…), that's authoritative — trust it over any keyword guessing. Maps
+# the type words French sources actually emit onto our categories. First hit
+# wins, so order matters (concert before the generic checks).
+_TYPE_TO_CAT: list[tuple[str, str]] = [
+    ("exposition", "expo"), ("vernissage", "expo"),
+    ("concert", "concert"), ("musique", "concert"), ("recital", "concert"),
+    ("opera", "scene"), ("theatre", "scene"), ("spectacle", "scene"),
+    ("cirque", "scene"), ("humour", "scene"), ("danse", "danse"),
+    ("atelier", "atelier"), ("stage", "atelier"), ("masterclass", "atelier"),
+    ("visite", "visite"), ("balade", "visite"), ("patrimoine", "visite"),
+    ("conference", "business"), ("rencontre", "social"), ("lecture", "social"),
+    ("brocante", "brocante"), ("vide-grenier", "brocante"), ("vide grenier", "brocante"),
+    ("marche", "marche"), ("fete", "marche"), ("festin", "marche"),
+    ("sport", "sport"), ("randonnee", "sport"),
+    ("projection", "autre"), ("cinema", "autre"), ("film", "autre"),
+]
+
+
+def category_from_type(type_label: Optional[str]) -> Optional[str]:
+    """Map a source's own type label to a category, or None if unrecognised."""
+    t = strip_accents(type_label or "").lower()
+    if not t:
+        return None
+    for kw, cat in _TYPE_TO_CAT:
+        if kw in t:
+            return cat
+    return None
 
 
 # ------------------------------------------------------------------- towns

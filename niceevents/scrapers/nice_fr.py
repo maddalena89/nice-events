@@ -28,7 +28,7 @@ import re
 from datetime import date
 from typing import Iterator, Optional
 
-from ..models import Event, classify, parse_date, parse_time
+from ..models import Event, category_from_type, classify, parse_date, parse_time
 from .base import HttpScraper, register
 
 log = logging.getLogger(__name__)
@@ -146,7 +146,12 @@ class NiceFr(HttpScraper):
         type_name = " ".join(
             self._types.get(t, "") for t in (item.get("event_types") or [])
         ).strip()
-        cat = classify(title, type_name, note_base, venue)
+        # Trust nice.fr's OWN type first ("Exposition", "Concert", "Atelier"…).
+        # Only if it's unknown do we guess — and even then from title+type, NEVER
+        # the description, which name-drops other categories ("l'univers de la
+        # brocante", a jazz reference) and was scattering exhibitions into the
+        # wrong tabs.
+        cat = category_from_type(type_name) or classify(title, type_name)
 
         slots = acf.get("event_dates") or []
         for slot in slots:
