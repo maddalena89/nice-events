@@ -284,7 +284,7 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
 <div class="hero">
   <div class="eyebrow">
     <span>Alpes-Maritimes · 06</span>
-    <span>Updated <b>{{ updated }}</b> · {{ source_count }} sources</span>
+    <span>Updated <b>{{ updated }}</b></span>
   </div>
   <h1>What's<br>on in <em>Nice</em></h1>
   <div class="standfirst">
@@ -560,7 +560,7 @@ function render(){
       <div class="idx">${String(i).padStart(2,"0")}</div>
       <div>
         <div class="ttl">
-          ${e.free?'<span class="pill free">Free</span>':""}
+          ${e.free?'<span class="pill free">✓ Free</span>':""}
           ${e.outdoor?'<span class="pill out">Outdoor</span>':""}
           ${e.online?'<span class="pill out">Online</span>':""}
           ${runBadge(e)}
