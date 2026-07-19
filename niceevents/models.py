@@ -67,6 +67,41 @@ _COMPILED_RULES = [
 ]
 
 
+# --------------------------------------------------------------- junk filter
+# Sources like HelloAsso mix real events with club admin: subscription openings,
+# AGMs, membership renewals, end-of-year school recitals. These are not things a
+# stranger goes out to attend, so they don't belong on a what's-on site.
+#
+# Deliberately CONSERVATIVE. A false positive (dropping a real event) is worse
+# than a false negative (one stray "adhésion" slips through) — a missing concert
+# is invisible, a stray one is just noise you can hand-remove. So every pattern
+# here targets wording that a genuine public event would essentially never use
+# as its title. Matched against the accent-stripped, lowercased TITLE only;
+# matching descriptions caused real events with an "inscription obligatoire"
+# note to vanish.
+_NONEVENT_PATTERNS = [
+    r"ouverture des inscriptions",
+    r"\b(re)?inscriptions?\b",                 # "Inscriptions 2026", "Réinscription"
+    r"\badhesions?\b", r"\bcotisations?\b", r"renouvellement d.?adhesion",
+    r"\babonnement", r"\bpermanences?\b",
+    r"assemblee generale", r"\bconseil d.?administration\b", r"\breunion\b",
+    r"appel a benevoles?", r"\bbenevolat\b",
+    r"reprise des (cours|activites)",
+    # End-of-year school shows: only when a school signal is present, so a real
+    # "Concert de fin d'année du Conservatoire" or "Gala de danse argentine" is
+    # NOT caught.
+    r"fin d.?annee.*(ecole|eleves|danse\b)",
+    r"(gala|spectacle|representation).*(de l.?ecole|des eleves)",
+    r"\bkermesse\b", r"\bloto associatif\b",
+]
+_NONEVENT_RE = re.compile("|".join(_NONEVENT_PATTERNS))
+
+
+def is_nonevent(title: str) -> bool:
+    """True if the title looks like club admin, not a public event."""
+    return bool(_NONEVENT_RE.search(strip_accents(title or "").lower()))
+
+
 def classify(*parts: Optional[str]) -> str:
     """Guess a category from any text we have (title, type label, venue, note)."""
     hay = strip_accents(" ".join(p for p in parts if p).lower())

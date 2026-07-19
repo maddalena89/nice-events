@@ -104,7 +104,12 @@ class Brocabrac(HttpScraper):
         # far more robust than trying to clean it out downstream.
         tree.strip_tags(["script", "style", "template", "noscript"])
         current: Optional[date] = None
-        seen_nodes: set[int] = set()
+        # Dedup by (href, date), NOT by id(link). selectolax rebuilds Node
+        # wrappers on every access and CPython recycles the freed addresses, so
+        # id() collides between unrelated links and silently drops events — see
+        # the "Node identity is meaningless" note in niceevents/dom.py. This bug
+        # was intermittent (it depends on allocation order) and cost real time.
+        seen_keys: set[tuple[str, str]] = set()
 
         # Date headings set the context for the event blocks that FOLLOW them,
         # so this walk MUST be in document order — see niceevents/dom.py.
@@ -135,9 +140,10 @@ class Brocabrac(HttpScraper):
             if node.css_first("li a[href*='/06/'], div a[href*='/06/']") is not None \
                     and len(node.css("a[href*='/06/']")) > 1:
                 continue
-            if id(link) in seen_nodes:
+            key = (href, current.isoformat())
+            if key in seen_keys:
                 continue
-            seen_nodes.add(id(link))
+            seen_keys.add(key)
 
             ev = self._event(node, link, href, current)
             if ev:

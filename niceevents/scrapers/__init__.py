@@ -8,9 +8,11 @@ from .base import REGISTRY, Scraper, HttpScraper, BrowserScraper  # noqa: F401
 # Static HTML / JSON — no browser needed
 from . import brocabrac      # noqa: F401  vide-greniers & brocantes
 from . import nice_fr        # noqa: F401  Ville de Nice (incl. Jazz Fest)
+from . import openagenda     # noqa: F401  culture: opera, theatre, festivals (national API)
 from . import tango          # noqa: F401  milongas
 from . import explore_nca    # noqa: F401  Métropole tourist office (50 communes)
 from . import museums        # noqa: F401  Maeght, MAMAC, Matisse, Chagall…
+from . import harvest        # noqa: F401  generic JSON-LD / iCal venue harvester
 
 # JS-rendered — Playwright required
 from . import meetup         # noqa: F401  design, business, AI, expat

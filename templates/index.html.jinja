@@ -6,6 +6,15 @@
      values on notched iPhones; without it the add button sits under the notch. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1f3bff">
+<!-- PWA: installable to the home screen, opens full-screen, works offline.
+     All paths are relative so they resolve under the /nice-events/ project path. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Nice Events">
 <title>{{ title }} — events in Nice &amp; the 06</title>
 <meta name="description" content="Vide-greniers, milongas, concerts, exhibitions, meetups and pop-ups across Nice and the Alpes-Maritimes. Updated daily.">
 <meta property="og:title" content="{{ title }}">
@@ -92,6 +101,16 @@ label{display:block;font-size:10px;letter-spacing:.13em;text-transform:uppercase
 .form input,.form select,.form textarea{width:100%}
 .callout{border-left:3px solid var(--accent);padding:12px 0 12px 16px;font-size:13px;color:#4a463f;margin-bottom:22px;max-width:78ch}
 .callout b{color:var(--ink)}
+/* Snap-a-flyer */
+.snap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.snap-btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+  background:var(--accent);color:#fff;border:1px solid var(--accent);
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;
+  padding:11px 16px;min-height:44px}
+.snap-btn:hover{background:var(--ink);border-color:var(--ink)}
+.snap-msg{font-size:12.5px;color:var(--muted);flex:1;min-width:180px}
+.snap-msg.busy{color:var(--accent)}
+.snap-msg.done{color:#0a7a3f}
 
 /* Add-event: blue square, white plus, pinned top-right. Opens the form as a
    dialog so it stays out of the way until wanted. */
@@ -322,6 +341,15 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
       genuine, so a human reads each one before it goes live. Nothing appears automatically.
       {% endif %}
     </div>
+    {# Snap-a-flyer: read a poster with in-browser OCR and prefill the form. The
+       photo never leaves the device — it's decoded locally, nothing uploaded.
+       Rough by design; every field stays editable. #}
+    <div class="snap">
+      <label class="snap-btn" for="s-photo">📸 Snap or upload a flyer</label>
+      <input type="file" id="s-photo" accept="image/*" capture="environment" hidden>
+      <span class="snap-msg" id="snap-msg">Got a poster? We'll try to fill this in — then just check it.</span>
+    </div>
+
     <form class="form" id="sform"
           {% if submit_mode == 'endpoint' %}action="{{ submit_endpoint }}" method="POST" enctype="multipart/form-data"{% endif %}>
       <div class="f-half"><label for="s-title">Event name *</label><input id="s-title" name="title" required></div>
@@ -360,6 +388,7 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
   <a href="https://brocabrac.fr/06/">Brocabrac</a> ·
   <a href="https://tango-argentin.fr/en/nice">Tango-Argentin</a> ·
   <a href="https://www.nice.fr/agenda/">Ville de Nice</a> ·
+  <a href="https://openagenda.com/">OpenAgenda</a> ·
   <a href="https://www.explorenicecotedazur.com/en/events/all-events/">Explore Nice Côte d'Azur</a> ·
   <a href="https://ra.co/events/fr/nice">Resident Advisor</a> ·
   <a href="https://www.meetup.com/find/?location=fr--nice">Meetup</a> ·
@@ -541,6 +570,144 @@ dlg.addEventListener("click", e => {
   if (!inside) dlg.close();
 });
 
+// ---- snap-a-flyer: in-browser OCR, nothing leaves the device ----
+// The heavy Tesseract library is loaded only when someone actually picks a
+// photo — it must never slow the normal page load for the 99% who don't.
+const FLYER = (() => {
+  const MONTHS = {jan:1,janv:1,janvier:1,fev:2,fevr:2,fevrier:2,"février":2,mar:3,mars:3,
+    avr:4,avril:4,mai:5,jui:6,juin:6,juil:7,juillet:7,aou:8,aout:8,"août":8,
+    sep:9,sept:9,septembre:9,oct:10,octobre:10,nov:11,novembre:12,dec:12,"déc":12,decembre:12,"décembre":12};
+  const fold=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+
+  const pad=n=>String(n).padStart(2,"0");
+  const ymd=(y,mon,day)=>`${y}-${pad(mon)}-${pad(day)}`;
+  // Roll a bare day+month to the next occurrence, so "18 juillet" on a poster
+  // seen in December means next July, not one already gone. Built from calendar
+  // components — NEVER via Date()+toISOString(), whose UTC round-trip shifts the
+  // day (and sometimes the year) for anyone not exactly on UTC.
+  function rollDate(day,mon){
+    const t=new Date(), tm=t.getMonth()+1, td=t.getDate();
+    let y=t.getFullYear();
+    if(mon<tm || (mon===tm && day<td)) y+=1;
+    return ymd(y,mon,day);
+  }
+  function parseDate(text){
+    const f=fold(text);
+    // "18 juillet 2026" | "18 juil" | "sam 18 juillet"
+    let m=f.match(/\b(\d{1,2})\s+([a-z]{3,9})\.?(?:\s+(\d{4}))?/);
+    if(m && MONTHS[m[2]]){
+      const day=+m[1], mon=MONTHS[m[2]];
+      return m[3] ? ymd(+m[3],mon,day) : rollDate(day,mon);
+    }
+    // "18/07/2026" | "18/07"
+    m=f.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+    if(m){
+      const day=+m[1], mon=+m[2];
+      if(mon>=1&&mon<=12&&day>=1&&day<=31){
+        const yr=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):null;
+        return yr ? ymd(yr,mon,day) : rollDate(day,mon);
+      }
+    }
+    return "";
+  }
+  function parseTime(text){
+    const m=fold(text).match(/\b(\d{1,2})\s*[h:]\s*(\d{2})?\b/);
+    if(m){const hh=+m[1]; if(hh<=23) return `${hh}h${m[2]||""}`;}
+    return "";
+  }
+  const CAT_HINTS=[
+    [/concert|dj\b|jazz|live|techno|house|electro|rock|rap|hip.?hop|club\b|soiree|apero.?club/,"concert"],
+    [/expo|exposition|vernissage|galerie/,"expo"],
+    [/theatre|spectacle|opera|ballet|humour|one.?man|cirque|impro/,"scene"],
+    [/tango|milonga|salsa|bachata|kizomba|danse|dance|\bbal\b|swing|lindy/,"danse"],
+    [/brocante|vide.?grenier|braderie|bourse/,"brocante"],
+    [/atelier|workshop|\bstage\b|masterclass|initiation/,"atelier"],
+    [/conference|meetup|networking|startup|business|pitch|forum/,"business"],
+    [/marche\b|\bfete\b|foire|festin|carnaval|kermesse/,"marche"],
+    [/visite|balade|parcours|patrimoine/,"visite"],
+    [/yoga|course|trail|rando|match|tournoi|petanque|marathon/,"sport"],
+    [/apero|rencontre|expat|quiz|jeux|blind.?test/,"social"],
+  ];
+  function guessCategory(text){
+    const f=fold(text);
+    for(const [re,cat] of CAT_HINTS) if(re.test(f)) return cat;
+    return "";
+  }
+  function guessTown(text){
+    const f=fold(text);
+    for(const t of TOWNS) if(f.includes(fold(t))) return t;   // TOWNS defined above
+    return "";
+  }
+  function guessTitle(text){
+    // First substantial line that isn't a date, time, price or URL.
+    const bad=/^\s*$|^\d|https?:|www\.|\d\s*€|gratuit|entree|\bh\d|^\W+$/i;
+    const lines=text.split("\n").map(s=>s.trim()).filter(s=>s.length>=4 && !bad.test(s));
+    // Prefer an ALL-CAPS / long line near the top (posters shout their title).
+    lines.sort((a,b)=> (b===b.toUpperCase()?1:0)-(a===a.toUpperCase()?1:0));
+    return (lines[0]||"").slice(0,120);
+  }
+
+  // Pure text -> fields. Exposed for testing; the OCR engine feeds it.
+  function parse(text){
+    return {
+      title: guessTitle(text),
+      date: parseDate(text),
+      time: parseTime(text),
+      town: guessTown(text),
+      category: guessCategory(text),
+      note: text.replace(/\s+/g," ").trim().slice(0,300),
+    };
+  }
+  return {parse, parseDate, parseTime, guessCategory, guessTown, guessTitle};
+})();
+
+(() => {
+  const inp=$("s-photo"), msg=$("snap-msg");
+  if(!inp) return;
+  let loading=null;
+  const setMsg=(t,cls="")=>{msg.textContent=t; msg.className="snap-msg"+(cls?" "+cls:"");};
+
+  function loadTesseract(){
+    if(window.Tesseract) return Promise.resolve();
+    if(loading) return loading;
+    loading=new Promise((res,rej)=>{
+      const s=document.createElement("script");
+      s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+      s.onload=res; s.onerror=()=>rej(new Error("load failed"));
+      document.head.appendChild(s);
+    });
+    return loading;
+  }
+
+  function fill(f){
+    const set=(id,v)=>{ if(v && $(id) && !$(id).value) $(id).value=v; };
+    set("s-title",f.title); set("s-date",f.date); set("s-town",f.town);
+    if(f.category && $("s-cat")) $("s-cat").value=f.category;
+    // Time has no field of its own — fold it into the note.
+    const note=[f.time?("Heure : "+f.time):"", f.note].filter(Boolean).join(" · ");
+    set("s-note",note.slice(0,300));
+  }
+
+  inp.addEventListener("change", async () => {
+    const file=inp.files && inp.files[0];
+    if(!file) return;
+    setMsg("Loading the reader…","busy");
+    try{
+      await loadTesseract();
+      setMsg("Reading the poster…","busy");
+      const {data}=await window.Tesseract.recognize(file,"fra");
+      const text=(data && data.text)||"";
+      if(!text.trim()){ setMsg("Couldn't read that one — fill it in by hand?"); return; }
+      fill(FLYER.parse(text));
+      setMsg("Filled in what we could — please check every field.","done");
+    }catch(e){
+      setMsg("Reader didn't load — fill it in by hand?");
+    }finally{
+      inp.value="";  // let the same photo be re-picked
+    }
+  });
+})();
+
 {% if submit_mode == 'supabase' %}
 // Posts straight to Supabase from the browser. No server of our own.
 //
@@ -640,6 +807,14 @@ $("sform").addEventListener("submit", ev => {
   $("smsg").innerHTML = '<span class="ok">Opening a submission for review…</span>';
 });
 {% endif %}
+
+// ---- PWA: register the service worker so the site is installable + offline ----
+// Guarded and best-effort: a failed registration must never affect the page.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
 </script>
 </body>
 </html>

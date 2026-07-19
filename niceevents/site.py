@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
@@ -107,4 +108,14 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         source_count=len({(r["source"] or "").split(":")[0] for r in rows}),
     )
     (out / "index.html").write_text(html, encoding="utf-8")
+
+    # PWA + static assets: manifest, service worker, icons. Copied verbatim from
+    # static/ so the site is installable to a phone home screen and opens offline.
+    # Missing static dir is not an error — the site works fine without the PWA.
+    static = Path(__file__).resolve().parent.parent / "static"
+    if static.is_dir():
+        for f in static.iterdir():
+            if f.is_file():
+                shutil.copy2(f, out / f.name)
+
     return len(events), str(out)

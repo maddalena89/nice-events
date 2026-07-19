@@ -17,7 +17,7 @@ import traceback
 from datetime import date, datetime, timedelta
 
 from . import db
-from .models import CATEGORIES
+from .models import CATEGORIES, is_nonevent
 from .scrapers import REGISTRY
 
 log = logging.getLogger("niceevents")
@@ -60,6 +60,16 @@ def cmd_scrape(args) -> int:
                 events = list(scraper.fetch())
                 if hasattr(scraper, "close"):
                     scraper.close()
+
+                # Drop club admin (subscriptions, AGMs, school recitals). Human
+                # submissions are exempt — a person already vetted those, and the
+                # filter must never override a human's judgement.
+                kept = [e for e in events
+                        if e.submitted_by or not is_nonevent(e.title)]
+                junk = len(events) - len(kept)
+                if junk:
+                    log.info("%-16s filtered %d non-event(s)", name, junk)
+                events = kept
 
                 added, merged = db.upsert(conn, events)
                 db.log_run(conn, name, ok=True, found=len(events), added=added)
