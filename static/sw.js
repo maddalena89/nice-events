@@ -9,7 +9,7 @@
  *
  * Bump CACHE when the shell changes so old caches are cleaned out on activate.
  */
-const CACHE = "nice-events-v1";
+const CACHE = "nice-events-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest",
                "./icon-192.png", "./icon-512.png"];
 
