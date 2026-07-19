@@ -853,11 +853,24 @@ $("sform").addEventListener("submit", ev => {
 });
 {% endif %}
 
-// ---- PWA: register the service worker so the site is installable + offline ----
-// Guarded and best-effort: a failed registration must never affect the page.
+// ---- PWA: register the service worker, and AUTO-UPDATE ----
+// The hard-won lesson: an installed app happily serves a months-old cached copy
+// and nobody knows to clear it. So we actively pull updates. On every load we
+// ask the browser to re-check sw.js; when a new worker takes control we reload
+// once (guarded against loops). The worker itself calls skipWaiting, so a new
+// version activates immediately instead of waiting for every tab to close.
 if ("serviceWorker" in navigator) {
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    navigator.serviceWorker.register("sw.js").then(reg => {
+      reg.update();                                  // check for a newer worker now
+      setInterval(() => reg.update(), 60 * 60 * 1000);  // and hourly while open
+    }).catch(() => {});
   });
 }
 </script>
