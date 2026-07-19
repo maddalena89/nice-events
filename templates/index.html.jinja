@@ -90,12 +90,12 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .pill.out{background:transparent;color:var(--muted);border:1px solid var(--rule)}
 /* Run-length sticker for exhibitions and other multi-day events. */
 .pill.run{background:transparent;color:var(--accent);border:1px solid var(--accent)}
-/* Discrete per-event share button. Resets the global button chrome so it's just
-   a muted icon, not a bordered box. */
-.sharebtn{border:0;background:none;padding:5px;margin-left:4px;color:var(--muted);
+/* Discrete per-event icon buttons (share, add-to-calendar). Reset the global
+   button chrome so they're just muted icons, not bordered boxes. */
+.sharebtn,.calbtn{border:0;background:none;padding:5px;margin-left:2px;color:var(--muted);
   cursor:pointer;line-height:0;vertical-align:-3px;min-height:0}
-.sharebtn:hover{background:none;color:var(--accent)}
-.sharebtn svg{display:block}
+.sharebtn:hover,.calbtn:hover{background:none;color:var(--accent)}
+.sharebtn svg,.calbtn svg{display:block}
 .sharebtn[data-copied]{color:#0a7a3f}
 /* A shared event, opened via ?e=… — highlighted in blue and scrolled to. */
 .row.hl{background:rgba(31,59,255,.10);box-shadow:inset 3px 0 0 var(--accent)}
@@ -428,6 +428,10 @@ let active = new Set();
 const SITE = location.origin + location.pathname;
 const HL_FP = new URLSearchParams(location.search).get("e");
 const SHARE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/></svg>';
+const CAL_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M12 13v4M10 15h4"/></svg>';
+// Look up the full event by fingerprint (rows only carry the id, and a
+// multi-day show appears on several rows but is one event here).
+const FP_MAP = new Map(EVENTS.map(e => [e.fingerprint, e]));
 
 $("mq").innerHTML = (() => {
   const b = ["Vide-greniers","Milongas","Jazz","Brocantes","Exhibitions","Club nights",
@@ -561,6 +565,7 @@ function render(){
           ${e.online?'<span class="pill out">Online</span>':""}
           ${runBadge(e)}
           ${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`:esc(e.title)}
+          <button class="calbtn" data-fp="${esc(e.fingerprint)}" aria-label="Add to calendar" title="Add to calendar">${CAL_SVG}</button>
           <button class="sharebtn" data-fp="${esc(e.fingerprint)}" data-title="${esc(e.title)}" aria-label="Share this event" title="Share">${SHARE_SVG}</button>
         </div>
         ${e.note?`<div class="sub">${esc(e.note)}</div>`:""}
@@ -594,6 +599,51 @@ $("list").addEventListener("click", async ev => {
       b.setAttribute("data-copied","1"); setTimeout(()=>b.removeAttribute("data-copied"),1500);
     } catch(_){}
   }
+});
+
+// ---- Add to calendar: build an .ics on the fly and hand it to the OS. ----
+// Opening a .ics on iOS/Android drops straight into Apple/Google Calendar; on
+// desktop it downloads. Times are floating (local-as-shown) — no timezone
+// juggling, which is right for a listings site.
+const p2 = n => String(n).padStart(2,"0");
+const icsEsc = s => String(s||"").replace(/\\/g,"\\\\").replace(/[;,]/g,"\\$&").replace(/\n/g,"\\n");
+const dOnly = d => d.replace(/-/g,"");
+function icsFor(e){
+  const stamp = new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  let dtstart, dtend;
+  if(isMultiDay(e)){                                   // exhibition etc: all-day range
+    dtstart = "DTSTART;VALUE=DATE:"+dOnly(e.start);
+    dtend   = "DTEND;VALUE=DATE:"+dOnly(addDays(e.end,1));   // DTEND is exclusive
+  } else if(e.time){                                   // timed: default 2h long
+    const s = new Date(e.start+"T"+e.time+":00");
+    const t = new Date(s.getTime()+2*3600*1000);
+    const f = x => `${x.getFullYear()}${p2(x.getMonth()+1)}${p2(x.getDate())}T${p2(x.getHours())}${p2(x.getMinutes())}00`;
+    dtstart = "DTSTART:"+f(s); dtend = "DTEND:"+f(t);
+  } else {                                             // single day, no time: all-day
+    dtstart = "DTSTART;VALUE=DATE:"+dOnly(e.start);
+    dtend   = "DTEND;VALUE=DATE:"+dOnly(addDays(e.start,1));
+  }
+  const loc  = icsEsc([e.venue, e.town].filter(Boolean).join(", "));
+  const desc = icsEsc([e.note, e.url].filter(Boolean).join("\n"));
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//whatsonnice//EN","CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT","UID:"+e.fingerprint+"@whatsonnice.com","DTSTAMP:"+stamp,
+    dtstart, dtend, "SUMMARY:"+icsEsc(e.title),
+    loc?"LOCATION:"+loc:"", desc?"DESCRIPTION:"+desc:"", e.url?"URL:"+e.url:"",
+    "END:VEVENT","END:VCALENDAR"].filter(Boolean).join("\r\n");
+}
+$("list").addEventListener("click", ev => {
+  const b = ev.target.closest(".calbtn");
+  if(!b) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const e = FP_MAP.get(b.dataset.fp);
+  if(!e) return;
+  const blob = new Blob([icsFor(e)], {type:"text/calendar;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = (e.title||"event").replace(/[^\w-]+/g,"_").slice(0,40)+".ics";
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1500);
 });
 
 // Opened via a shared ?e=… link — bring that event into view once.
