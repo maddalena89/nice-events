@@ -35,14 +35,23 @@ from .base import HttpScraper, register
 
 log = logging.getLogger(__name__)
 
-# (name, url, kind). kind is "jsonld" (an HTML page to scan) or "ics" (a feed).
-# Seeded thin ON PURPOSE and marked UNVERIFIED: the engine below is tested with
-# fixtures, but which of these actually expose a feed can only be learned from a
-# real run. Prune the ones that come back empty; add ones you find.
-VENUES: list[tuple[str, str, str]] = [
+# (name, url, kind[, town]). kind is "jsonld" (an HTML page to scan) or "ics" (a
+# feed). The optional 4th field is a DEFAULT TOWN, used when a feed's events carry
+# no address of their own — common for Google-Calendar feeds, which often list a
+# room name but no city. Without it those events land in "Unknown" and drop out of
+# a place-based site.
+# Seeded thin ON PURPOSE: the engine below is tested with fixtures, but which of
+# these actually expose a feed can only be learned from a real run. Prune the ones
+# that come back empty; add ones you find.
+VENUES: list[tuple] = [
     # ("Théâtre National de Nice", "https://www.tnn.fr/fr/calendrier", "jsonld"),
     # ("Opéra de Nice",            "https://www.opera-nice.org/fr/agenda", "jsonld"),
-    # ("CEDAC de Cimiez",          "https://.../agenda.ics",              "ics"),
+    # La Zonmé — Nice arts collective, programme lives on a public Google Calendar.
+    ("La Zonmé",
+     "https://calendar.google.com/calendar/ical/"
+     "9fc9ae4b740cbf6e2d361a6c959c634e7d025e9412a811bafbac1c8144cd3648"
+     "%40group.calendar.google.com/public/basic.ics",
+     "ics", "Nice"),
 ]
 
 
@@ -168,28 +177,29 @@ class VenueHarvest(HttpScraper):
     def fetch(self) -> Iterator[Event]:
         today = date.today()
         seen: set[str] = set()
-        for name, url, kind in VENUES:
+        for name, url, kind, *rest in VENUES:
+            town = rest[0] if rest else None
             try:
-                yield from self._one(name, url, kind, today, seen)
+                yield from self._one(name, url, kind, today, seen, town)
             except Exception as e:                     # one venue must not sink the rest
                 log.warning("%s: %s (%s) failed — %s", self.name, name, url, e)
 
-    def _one(self, name, url, kind, today, seen) -> Iterator[Event]:
+    def _one(self, name, url, kind, today, seen, default_town=None) -> Iterator[Event]:
         r = self.get(url)
         if not r:
             return
         raws = (_events_from_ics(r.text) if kind == "ics"
                 else _events_from_jsonld(r.text))
         for raw in raws:
-            ev = (self._from_ics(raw, name, today) if kind == "ics"
-                  else self._from_jsonld(raw, name, today))
+            ev = (self._from_ics(raw, name, today, default_town) if kind == "ics"
+                  else self._from_jsonld(raw, name, today, default_town))
             if ev and ev.fingerprint not in seen:
                 seen.add(ev.fingerprint)
                 yield ev
 
     # -- mappers -----------------------------------------------------------
     def _emit(self, *, title, start, end, time, venue, city, postcode, url, desc,
-              fallback_venue, today) -> Optional[Event]:
+              fallback_venue, today, fallback_town=None) -> Optional[Event]:
         if not title or not start:
             return None
         if end and end < start:
@@ -198,9 +208,15 @@ class VenueHarvest(HttpScraper):
             return None
         town = canon_town(city or None, postcode or None)
         if town == "Unknown":
-            # No geo signal at all — assume it's the venue's town via its name,
-            # else leave it out of a place-based site.
-            town = canon_town(fallback_venue or None) if fallback_venue else "Unknown"
+            # No geo signal on the event itself. A source that DECLARED its town
+            # (4th VENUES field) is trusted next — it's a real place. Only if none
+            # was given do we guess from the source name, which for a venue is its
+            # town but for a promoter/collective is just a label.
+            if fallback_town:
+                t = canon_town(fallback_town)
+                town = t if t != "Unknown" else fallback_town
+            elif fallback_venue:
+                town = canon_town(fallback_venue or None)
         venue = venue or fallback_venue
         return Event(
             title=title, start=start, end=end, time=time,
@@ -209,7 +225,8 @@ class VenueHarvest(HttpScraper):
             url=url or None, note=(desc or None), source=self.name,
         )
 
-    def _from_jsonld(self, o: dict, venue_name: str, today: date) -> Optional[Event]:
+    def _from_jsonld(self, o: dict, venue_name: str, today: date,
+                     default_town=None) -> Optional[Event]:
         from ..models import parse_date
         venue, city, pc = _loc(o)
         return self._emit(
@@ -219,10 +236,11 @@ class VenueHarvest(HttpScraper):
             time=_jsonld_time(o.get("startDate")),
             venue=venue, city=city, postcode=pc,
             url=_clean(o.get("url")), desc=_clean(o.get("description"))[:400],
-            fallback_venue=venue_name, today=today,
+            fallback_venue=venue_name, today=today, fallback_town=default_town,
         )
 
-    def _from_ics(self, o: dict, venue_name: str, today: date) -> Optional[Event]:
+    def _from_ics(self, o: dict, venue_name: str, today: date,
+                  default_town=None) -> Optional[Event]:
         return self._emit(
             title=_clean(o.get("SUMMARY")),
             start=_ics_date(o.get("DTSTART", "")),
@@ -230,7 +248,7 @@ class VenueHarvest(HttpScraper):
             time=_ics_time(o.get("DTSTART", "")),
             venue=_clean(o.get("LOCATION")) or None, city=None, postcode=None,
             url=_clean(o.get("URL")), desc=_clean(o.get("DESCRIPTION"))[:400],
-            fallback_venue=venue_name, today=today,
+            fallback_venue=venue_name, today=today, fallback_town=default_town,
         )
 
 
