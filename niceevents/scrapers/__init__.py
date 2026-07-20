@@ -19,6 +19,7 @@ from . import panda          # noqa: F401  Panda Events gigs (109 / Frigo 16 / T
 from . import harvest        # noqa: F401  generic JSON-LD / iCal venue harvester
 
 # JS-rendered — Playwright required
+from . import theatres_nice  # noqa: F401  municipal & partner theatres [browser]
 from . import meetup         # noqa: F401  design, business, AI, expat
 from . import ra             # noqa: F401  electronic / clubs
 from . import eventbrite     # noqa: F401  business, tech, conferences
