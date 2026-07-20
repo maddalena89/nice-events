@@ -182,9 +182,17 @@ def _events_from_ics(text: str) -> Iterator[dict]:
                 cur["EXDATE"] = (cur.get("EXDATE", "") + "," + val).strip(",")
 
 
-# A French address tail: "... 06300 Nice". Pull the town + postcode out of an
-# iCal LOCATION so calendar feeds land in the right place instead of "Unknown".
-_ICS_ADDR = re.compile(r"(0[1-9]\d{3})\s+([A-Za-zÀ-ÿ'’.\- ]{2,40})")
+# A French 5-digit postcode. Take the LAST one in the string — the postcode sits
+# right before the town, after the street number (which can also be 4–5 digits).
+_PC = re.compile(r"\b(\d{5})\b")
+
+# Country words that flag an out-of-France listing. A national association's
+# calendar (swing camps, festivals) carries dates in Sweden, Belgium, etc. that
+# have no place on a Nice/06 what's-on.
+_FOREIGN = re.compile(
+    r"\b(su[eè]de|sweden|norv[eè]ge|belgi|allemagne|germany|deutschland|espagne|"
+    r"spain|espa[nñ]a|italie|italia|italy|portugal|suisse|switzerland|schweiz|"
+    r"royaume-uni|angleterre|england|pays-bas|autriche|maroc|tunisie)\b", re.I)
 
 
 def _split_ics_location(loc: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
@@ -195,13 +203,28 @@ def _split_ics_location(loc: str) -> tuple[Optional[str], Optional[str], Optiona
     the town is left to the caller's fallback."""
     if not loc:
         return None, None, None
-    m = _ICS_ADDR.search(loc)
-    if not m:
+    matches = list(_PC.finditer(loc))
+    if not matches:
         return loc.strip() or None, None, None
-    postcode, city = m.group(1), m.group(2).strip(" ,.-")
-    # Venue = whatever came before the postcode (the street/place), tidied.
+    m = matches[-1]
+    postcode = m.group(1)
+    city = re.split(r"[,\n]", loc[m.end():])[0].strip(" ,.-") or None
     venue = loc[: m.start()].strip(" ,.-") or None
-    return venue, city or None, postcode
+    return venue, city, postcode
+
+
+def _in_scope(city: Optional[str], postcode: Optional[str], loc: str) -> bool:
+    """Is this iCal event actually in the Alpes-Maritimes (06)?
+
+    National feeds list events everywhere; this keeps the site to its patch. A
+    06 postcode passes; any other French postcode fails; a foreign country word
+    fails; and an event with NO address at all passes (a local feed's practice
+    with just a room name — the caller's default town handles it)."""
+    if loc and _FOREIGN.search(loc):
+        return False
+    if postcode:
+        return postcode.startswith("06")
+    return True
 
 
 # ------------------------------------------------------- recurrence (RRULE)
@@ -432,7 +455,10 @@ class VenueHarvest(HttpScraper):
 
     def _from_ics(self, o: dict, venue_name: str, today: date,
                   default_town=None) -> Optional[Event]:
-        venue, city, postcode = _split_ics_location(_clean(o.get("LOCATION")))
+        loc = _clean(o.get("LOCATION"))
+        venue, city, postcode = _split_ics_location(loc)
+        if not _in_scope(city, postcode, loc):     # a Montpellier / Sweden date
+            return None
         return self._emit(
             title=_clean(o.get("SUMMARY")),
             start=_ics_date(o.get("DTSTART", "")),
