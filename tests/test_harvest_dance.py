@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from niceevents.scrapers.harvest import (
-    VenueHarvest, _events_from_ics, _ics_starts, _split_ics_location,
+    VenueHarvest, _events_from_ics, _ics_starts, _in_scope, _split_ics_location,
 )
 
 H = VenueHarvest.__new__(VenueHarvest)
@@ -21,6 +21,33 @@ def test_location_pulls_town_and_postcode():
 
 def test_location_without_postcode_is_all_venue():
     assert _split_ics_location("Cave Romagnan, Nice") == ("Cave Romagnan, Nice", None, None)
+
+
+def test_location_reads_non_06_french_postcode():
+    _, city, pc = _split_ics_location("Promenade du Peyrou, 34000 Montpellier, France")
+    assert (city, pc) == ("Montpellier", "34000")
+
+
+# --------------------------------------------------- 06-only scope gate
+def test_scope_keeps_06_drops_elsewhere_and_foreign():
+    assert _in_scope("Nice", "06000", "12 rue X 06000 Nice") is True
+    assert _in_scope("Montpellier", "34000", "... 34000 Montpellier") is False
+    assert _in_scope("Mont-Dore", "63240", "... 63240 Mont-Dore") is False
+    assert _in_scope(None, None, "Herräng, 763 71 Herräng, Suède") is False
+    # No address at all: a local feed's practice — let the default town place it.
+    assert _in_scope(None, None, "") is True
+
+
+def test_from_ics_drops_out_of_area_event():
+    ics = """BEGIN:VCALENDAR
+BEGIN:VEVENT
+SUMMARY:Swingin' Montpellier
+DTSTART:20260722T200000
+LOCATION:Promenade du Peyrou, Rue la Blottière, 34000 Montpellier, France
+END:VEVENT
+END:VCALENDAR"""
+    (o,) = list(_events_from_ics(ics))
+    assert H._from_ics(o, "Swingin'Nice", TODAY, "Nice") is None
 
 
 # --------------------------------------------------------- real salsa feed
