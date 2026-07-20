@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import date
+from datetime import date, timedelta
 from typing import Iterator, Optional
 
 from selectolax.parser import HTMLParser
@@ -52,6 +52,17 @@ VENUES: list[tuple] = [
      "9fc9ae4b740cbf6e2d361a6c959c634e7d025e9412a811bafbac1c8144cd3648"
      "%40group.calendar.google.com/public/basic.ics",
      "ics", "Nice"),
+    # Swingin'Nice — lindy hop / swing across the 06. Public Google Calendar,
+    # recurring practices (RRULE) + one-off workshops & the festival.
+    ("Swingin'Nice",
+     "https://calendar.google.com/calendar/ical/"
+     "swing06events%40gmail.com/public/basic.ics",
+     "ics", "Nice"),
+    # Liste Salsa d'Olivier — salsa / bachata / kizomba socials, whole 06. Each
+    # entry carries its own address, so the town comes from the LOCATION itself.
+    ("Liste Salsa d'Olivier",
+     "https://salsa.faurax.fr/calendrier.php?dpt=06",
+     "ics"),
 ]
 
 
@@ -162,10 +173,181 @@ def _events_from_ics(text: str) -> Iterator[dict]:
             cur = None
         elif cur is not None and ":" in line:
             key, val = _ics_prop(line)
-            if key in ("SUMMARY", "DTSTART", "DTEND", "LOCATION", "URL", "DESCRIPTION"):
+            if key in ("SUMMARY", "DTSTART", "DTEND", "LOCATION", "URL",
+                       "DESCRIPTION", "RRULE"):
                 # ICS escapes commas/semicolons/newlines with backslashes.
                 cur[key] = (val.replace("\\,", ",").replace("\\;", ";")
                                .replace("\\n", " ").replace("\\N", " "))
+            elif key == "EXDATE":               # may repeat; accumulate raw dates
+                cur["EXDATE"] = (cur.get("EXDATE", "") + "," + val).strip(",")
+
+
+# A French address tail: "... 06300 Nice". Pull the town + postcode out of an
+# iCal LOCATION so calendar feeds land in the right place instead of "Unknown".
+_ICS_ADDR = re.compile(r"(0[1-9]\d{3})\s+([A-Za-zÀ-ÿ'’.\- ]{2,40})")
+
+
+def _split_ics_location(loc: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """(venue, city, postcode) from an iCal LOCATION string.
+
+    'Le WAG, 5 Rue Leonetti 06160 Juan-les-Pins' -> ('Le WAG, 5 Rue Leonetti',
+    'Juan-les-Pins', '06160'). No postcode -> the whole string is the venue and
+    the town is left to the caller's fallback."""
+    if not loc:
+        return None, None, None
+    m = _ICS_ADDR.search(loc)
+    if not m:
+        return loc.strip() or None, None, None
+    postcode, city = m.group(1), m.group(2).strip(" ,.-")
+    # Venue = whatever came before the postcode (the street/place), tidied.
+    venue = loc[: m.start()].strip(" ,.-") or None
+    return venue, city or None, postcode
+
+
+# ------------------------------------------------------- recurrence (RRULE)
+_WD = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
+_HORIZON_DAYS = 120          # how far ahead to materialise a repeating event
+
+
+def _rrule_dates(start: date, rrule: str, exdates: set,
+                 win_start: date, win_end: date) -> list[date]:
+    """Expand a weekly/monthly/daily RRULE into concrete dates inside the window.
+
+    Calendar feeds (Google Calendar especially) store a recurring social as ONE
+    event with a start date months in the past plus an RRULE. Read literally it's
+    a past event and gets dropped, so a weekly salsa or lindy night would never
+    show. This materialises the next occurrences instead. Supports the shapes
+    dance socials actually use: FREQ WEEKLY/MONTHLY/DAILY, INTERVAL, BYDAY
+    (incl. nth / last weekday for MONTHLY), COUNT and UNTIL."""
+    p = dict(kv.split("=", 1) for kv in rrule.split(";") if "=" in kv)
+    freq = p.get("FREQ", "").upper()
+    interval = max(int(p.get("INTERVAL", "1") or 1), 1)
+    count = int(p["COUNT"]) if p.get("COUNT", "").isdigit() else None
+    until = None
+    mu = re.match(r"(\d{4})(\d{2})(\d{2})", p.get("UNTIL", "") or "")
+    if mu:
+        until = date(int(mu[1]), int(mu[2]), int(mu[3]))
+    byday = [b for b in p.get("BYDAY", "").split(",") if b]
+
+    out: list[date] = []
+    n = 0
+
+    def keep(d: date) -> Optional[bool]:
+        nonlocal n
+        if until and d > until:
+            return False                     # stop
+        if d > win_end:
+            return False
+        n += 1
+        if d >= win_start and d >= start and d not in exdates:
+            out.append(d)
+        return not (count and n >= count)
+
+    if freq == "DAILY":
+        step = 0
+        while True:
+            d = start + timedelta(days=interval * step)
+            if keep(d) is False:
+                break
+            step += 1
+            if step > 4000:
+                break
+
+    elif freq == "WEEKLY":
+        wds = sorted(_WD[b[-2:]] for b in byday) if byday else [start.weekday()]
+        base = start - timedelta(days=start.weekday())
+        wk = 0
+        stop = False
+        while not stop:
+            ws = base + timedelta(weeks=interval * wk)
+            if ws > win_end:
+                break
+            for wd in wds:
+                occ = ws + timedelta(days=wd)
+                if occ < start:
+                    continue
+                if keep(occ) is False:
+                    stop = True
+                    break
+            wk += 1
+            if wk > 700:
+                break
+
+    elif freq == "MONTHLY":
+        y, mo = start.year, start.month
+        for _ in range(120):                 # up to 10 years of months, capped by window
+            month_days = _month_dates(y, mo, byday, start.day)
+            for occ in month_days:
+                if occ < start:
+                    continue
+                r = keep(occ)
+                if r is False:
+                    return out
+            first = date(y, mo, 1)
+            if first > win_end:
+                break
+            # advance INTERVAL months
+            idx = (y * 12 + (mo - 1)) + interval
+            y, mo = idx // 12, idx % 12 + 1
+    return out
+
+
+def _month_dates(year: int, month: int, byday: list[str], dom: int) -> list[date]:
+    """The dates in a given month matched by a MONTHLY rule's BYDAY (e.g. '-1TH',
+    '3WE'), or the plain day-of-month when there's no BYDAY."""
+    if not byday:
+        try:
+            return [date(year, month, dom)]
+        except ValueError:
+            return []
+    out: list[date] = []
+    for token in byday:
+        m = re.match(r"(-?\d)?([A-Z]{2})$", token)
+        if not m or m.group(2) not in _WD:
+            continue
+        nth = int(m.group(1)) if m.group(1) else 0
+        wd = _WD[m.group(2)]
+        days = [d for d in _month_weekday_days(year, month, wd)]
+        if nth == 0:
+            out.extend(days)
+        elif nth > 0 and nth <= len(days):
+            out.append(days[nth - 1])
+        elif nth < 0 and -nth <= len(days):
+            out.append(days[nth])
+    return sorted(out)
+
+
+def _month_weekday_days(year: int, month: int, wd: int) -> list[date]:
+    d = date(year, month, 1)
+    out = []
+    while d.month == month:
+        if d.weekday() == wd:
+            out.append(d)
+        d += timedelta(days=1)
+    return out
+
+
+def _ics_starts(raw: dict, today: date) -> list[str]:
+    """The concrete DTSTART strings an ICS event resolves to: itself if one-off,
+    or its materialised occurrences if it carries an RRULE. Time-of-day (and
+    thus the displayed start time) is carried over from the original DTSTART."""
+    dt = raw.get("DTSTART", "")
+    rrule = raw.get("RRULE")
+    if not rrule:
+        return [dt] if dt else []
+    start = _ics_date(dt)
+    if not start:
+        return []
+    tsuffix = ""
+    mt = re.search(r"T(\d{6})", dt) or re.search(r"T(\d{4})", dt)
+    if mt:
+        t = mt.group(1)
+        tsuffix = "T" + (t if len(t) == 6 else t + "00")
+    exdates = {d for tok in (raw.get("EXDATE", "") or "").split(",")
+               if (d := _ics_date(tok.strip()))}
+    win_end = today + timedelta(days=_HORIZON_DAYS)
+    return [f"{d:%Y%m%d}{tsuffix}" for d in
+            _rrule_dates(start, rrule, exdates, today, win_end)]
 
 
 @register
@@ -188,11 +370,20 @@ class VenueHarvest(HttpScraper):
         r = self.get(url)
         if not r:
             return
-        raws = (_events_from_ics(r.text) if kind == "ics"
-                else _events_from_jsonld(r.text))
-        for raw in raws:
-            ev = (self._from_ics(raw, name, today, default_town) if kind == "ics"
-                  else self._from_jsonld(raw, name, today, default_town))
+        if kind == "ics":
+            for raw in _events_from_ics(r.text):
+                # A recurring event fans out into its upcoming occurrences.
+                for start_str in _ics_starts(raw, today):
+                    inst = dict(raw, DTSTART=start_str)
+                    if raw.get("RRULE"):
+                        inst.pop("DTEND", None)     # per-occurrence: no stale end
+                    ev = self._from_ics(inst, name, today, default_town)
+                    if ev and ev.fingerprint not in seen:
+                        seen.add(ev.fingerprint)
+                        yield ev
+            return
+        for raw in _events_from_jsonld(r.text):
+            ev = self._from_jsonld(raw, name, today, default_town)
             if ev and ev.fingerprint not in seen:
                 seen.add(ev.fingerprint)
                 yield ev
@@ -241,12 +432,13 @@ class VenueHarvest(HttpScraper):
 
     def _from_ics(self, o: dict, venue_name: str, today: date,
                   default_town=None) -> Optional[Event]:
+        venue, city, postcode = _split_ics_location(_clean(o.get("LOCATION")))
         return self._emit(
             title=_clean(o.get("SUMMARY")),
             start=_ics_date(o.get("DTSTART", "")),
             end=_ics_date(o.get("DTEND", "")) if o.get("DTEND") else None,
             time=_ics_time(o.get("DTSTART", "")),
-            venue=_clean(o.get("LOCATION")) or None, city=None, postcode=None,
+            venue=venue, city=city, postcode=postcode,
             url=_clean(o.get("URL")), desc=_clean(o.get("DESCRIPTION"))[:400],
             fallback_venue=venue_name, today=today, fallback_town=default_town,
         )
