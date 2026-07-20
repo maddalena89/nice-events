@@ -52,7 +52,7 @@ h1 em{font-style:normal;color:var(--accent)}
      letter-spacing:.1em;text-transform:uppercase;user-select:none}
 .chk:hover{background:#e8e5de}
 .chk input{width:14px;height:14px;margin:0;padding:0;accent-color:var(--accent);cursor:pointer}
-input,select,textarea{font:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink)}
+input,select,textarea{font:inherit;font-size:14.5px;padding:10px 12px;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink)}
 input[type=search]{flex:1;min-width:190px}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-2px}
 /* Equal columns — NOT flex:1 with flex-wrap. Under flex-wrap each ROW shares the
@@ -106,18 +106,18 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .sechead p{font-size:13.5px;color:var(--muted);max-width:40ch;margin-left:auto;padding-top:8px}
 .form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .f-full{grid-column:1/-1}.f-half{grid-column:span 2}
-label{display:block;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;font-weight:600}
+label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-weight:600}
 .form input,.form select,.form textarea{width:100%}
-.callout{border-left:3px solid var(--accent);padding:12px 0 12px 16px;font-size:13px;color:#4a463f;margin-bottom:22px;max-width:78ch}
+.callout{border-left:3px solid var(--accent);background:rgba(31,59,255,.05);padding:14px 16px;font-size:15px;line-height:1.5;color:#4a463f;margin-bottom:22px;max-width:56ch}
 .callout b{color:var(--ink)}
 /* Snap-a-flyer */
 .snap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
-.snap-btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+.snap-btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13.5px;
   background:var(--accent);color:#fff;border:1px solid var(--accent);
   font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;
   padding:11px 16px;min-height:44px}
 .snap-btn:hover{background:var(--ink);border-color:var(--ink)}
-.snap-msg{font-size:12.5px;color:var(--muted);flex:1;min-width:180px}
+.snap-msg{font-size:14px;color:var(--muted);flex:1;min-width:180px}
 .snap-msg.busy{color:var(--accent)}
 .snap-msg.done{color:#0a7a3f}
 
@@ -145,12 +145,18 @@ dialog{
 }
 dialog:not([open]){display:none}
 dialog::backdrop{background:rgba(14,14,14,.55)}
+/* A little pop on open — the form springs in rather than blinking into place. */
+@keyframes dlgpop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes bdfade{from{opacity:0}to{opacity:1}}
+dialog[open]{animation:dlgpop .2s cubic-bezier(.2,.85,.25,1)}
+dialog[open]::backdrop{animation:bdfade .2s ease}
+@media(prefers-reduced-motion:reduce){dialog[open],dialog[open]::backdrop{animation:none}}
 .dlg-head{
   display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
   padding:22px 24px 14px;border-bottom:2px solid var(--ink);flex:none;
 }
-.dlg-head h2{font-size:32px;font-weight:800;letter-spacing:-.035em;line-height:.95;text-transform:uppercase}
-.dlg-head p{font-size:12.5px;color:var(--muted);margin-top:6px;max-width:44ch}
+.dlg-head h2{font-size:34px;font-weight:800;letter-spacing:-.035em;line-height:.95;text-transform:uppercase}
+.dlg-head p{font-size:15px;color:var(--ink);margin-top:8px;max-width:40ch}
 .dlg-x{width:34px;height:34px;padding:0;border:1px solid var(--ink);background:transparent;
   font-size:17px;line-height:1;cursor:pointer;flex:none}
 .dlg-x:hover{background:var(--ink);color:var(--paper)}
@@ -331,7 +337,7 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
   <div class="dlg-head">
     <div>
       <h2 id="dlg-title">Add your event</h2>
-      <p>Throwing something, or spotted a gap? Pop it in below — takes a minute, and a real human checks every one before it goes up.</p>
+      <p>Spotted a gap? Add it — a real person checks each one.</p>
     </div>
     <button class="dlg-x" id="dlg-close" aria-label="Close">✕</button>
   </div>
@@ -347,13 +353,10 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
       {# Only the endpoint mode has a file field, so don't promise a poster upload
          in the modes that don't offer one. #}
       {% if submit_mode == 'endpoint' %}
-      <b>A link or a poster is required.</b> It's checked for shape, not truth — we can
-      confirm a URL is well-formed and an image really is an image, but not that the event
-      is real. Every submission is reviewed by a person before it appears.
+      <b>Add a link or poster.</b> A human reviews every one before it appears.
       {% else %}
-      <b>Pop a link in — that's all we need.</b> It just has to point somewhere real
-      (a Facebook event, a poster, the venue's page). We can't promise every event is
-      genuine, so a human reads each one before it goes live. Nothing appears automatically.
+      <b>Just drop a link</b> — a poster, a Facebook event, the venue page. A human
+      reviews every one before it appears.
       {% endif %}
     </div>
     {# Snap-a-flyer: read a poster with in-browser OCR and prefill the form. The
@@ -362,7 +365,7 @@ dialog::backdrop{background:rgba(14,14,14,.55)}
     <div class="snap">
       <label class="snap-btn" for="s-photo">📸 Snap or upload a flyer</label>
       <input type="file" id="s-photo" accept="image/*" capture="environment" hidden>
-      <span class="snap-msg" id="snap-msg">Got a poster? We'll try to fill this in — then just check it.</span>
+      <span class="snap-msg" id="snap-msg">Got a poster? We'll fill it in — just check it after.</span>
     </div>
 
     <form class="form" id="sform"
