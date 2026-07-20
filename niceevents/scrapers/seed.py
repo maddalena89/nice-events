@@ -26,13 +26,13 @@ SEED: list[tuple] = [
     ("2026-06-26", "2026-09-11", "Jazz at the Château", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz & blues · recurring dates", "https://www.explorenicecotedazur.com/en/event/jazz-at-the-chateau/", False),
     ("2026-02-21", "2026-11-29", "Concerts at the Trinquette Jazz Club", "Villefranche-sur-Mer", "La Trinquette", "concert", "Jazz & blues · recurring", "https://www.explorenicecotedazur.com/en/event/concerts-at-the-trinquette-jazz-club/", False),
     ("2026-09-12", "2026-09-19", "Beaulieu Classic Festival", "Beaulieu-sur-Mer", "Petite Afrique, Casino, Église St Michael, Hôtel Royal Riviera", "concert", "8 days of classical music · opening 12 Sept: Nice Opera Chorus", "https://www.explorenicecotedazur.com/en/event/beaulieu-classic-festival-2026/", False),
-    ("2026-07-01", "2026-07-31", "Belaprem", "Nice", "City neighbourhoods", "concert", "Ville de Nice summer music happenings", "https://www.explorenicecotedazur.com/en/event/belaprem/", True),
+    # Belaprem lives in its own module now (per-night line-up), so no umbrella here.
     ("2026-09-18", "2026-09-20", "LEC Summer Finals 2026", "Nice", "Palais Nikaïa", "autre", "League of Legends esports finals", "https://www.nikaia.fr/programmation/lec-summer-finals-2026", False),
     ("2026-09-25", "", "La Légende de Monte-Cristo, le Musical", "Nice", "Palais Nikaïa", "scene", "20h · musical", "https://www.nikaia.fr/programmation/la-legende-de-monte-cristo-le-musical", False),
     ("2026-07-25", "2026-07-26", "Fête du Cheval", "Levens", "", "autre", "Horse festival · village fête", "https://www.explorenicecotedazur.com/en/event/horse-festival/", False),
     ("2026-07-06", "2026-08-22", "Summer Nights at the Hippodrome", "Cagnes-sur-Mer", "Hippodrome de la Côte d'Azur", "autre", "Evening race meetings", "https://www.explorenicecotedazur.com/en/event/summer-nights-at-the-hippodrome-summer-horse-meeting/", False),
     ("2026-06-19", "2026-09-11", "Étoiles grandeur nature", "Vence", "", "autre", "Astronomy observation evenings", "https://www.explorenicecotedazur.com/en/event/etoiles-grandeur-nature/", False),
-    ("2026-07-19", "2026-07-26", "Les Contes d'apéro", "Nice", "Promenade du Paillon — Kiosque du TNN", "scene", "19h nightly · Marivaux saga, poetry & slam", "https://www.tnn.fr/fr/les-temps-forts/Les-Contes-d-apero", True),
+    # Les Contes d'apéro is on nice.fr (TNN) already — the scraper covers it per night.
 
     # ---- exhibitions: Nice ----
     ("2026-06-17", "2026-09-28", "Henri Matisse – Yves Saint Laurent. Le beau, la mode et le bonheur", "Nice", "Musée Matisse", "expo", "Major summer show · fashion & Matisse", "https://www.explorenicecotedazur.com/en/event/henri-matisse-yves-saint-laurent-le-beau-la-mode-et-le-bonheur/", False),
