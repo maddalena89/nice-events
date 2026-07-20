@@ -41,7 +41,8 @@ CATEGORIES = {
 #     rave.
 _CATEGORY_RULES: list[tuple[str, str]] = [
     (r"vide[- ]grenier|brocante|braderie|bourse|vide[- ]dressing|vide[- ]maison|chiner", "brocante"),
-    (r"\bmilonga|\btango|practica|bal\b|guinguette|salsa|bachata|kizomba|swing|lindy|danse|dance", "danse"),
+    (r"\bmilonga|\btango|practica|bal\b|guinguette|salsa|bachata|kizomba|zouk|"
+     r"swing|lindy|charleston|balboa|danse|dance|soir[ée]es? latin|latino|latina", "danse"),
     (r"exposition|\bexpo\b|vernissage|exhibition|galerie|rétrospective|collection permanente", "expo"),
     # Nightlife → Clubs & other. Kept separate from live music.
     (r"\bdj\b|dj set|clubbing|night ?club|bo[iî]te de nuit|techno|\bhouse\b|\belectro\b|\brave\b|"
