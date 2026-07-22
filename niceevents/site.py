@@ -39,7 +39,23 @@ GITHUB_REPO = os.environ.get("GITHUB_REPO", "")  # e.g. "maddalena/nice-events"
 # actually guards the table (see supabase/schema.sql). The service_role key is
 # a different animal entirely: it bypasses RLS, is read only by the scrape step
 # from a GitHub *secret*, and must never reach this module or the template.
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+def _clean_supabase_url(raw: str) -> str:
+    """Normalise to the Supabase project root (…supabase.co).
+
+    A common misconfiguration is pasting the full REST endpoint
+    (…supabase.co/rest/v1) as SUPABASE_URL. The client then appends
+    "/rest/v1/submissions" again, producing "…/rest/v1/rest/v1/submissions",
+    which PostgREST rejects with PGRST125 "Invalid path specified in request URL".
+    Stripping a trailing /rest[/v1] here makes either form work.
+    """
+    u = (raw or "").strip().rstrip("/")
+    for suffix in ("/rest/v1", "/rest"):
+        if u.endswith(suffix):
+            u = u[: -len(suffix)]
+    return u.rstrip("/")
+
+
+SUPABASE_URL = _clean_supabase_url(os.environ.get("SUPABASE_URL", ""))
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
 

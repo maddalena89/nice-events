@@ -348,7 +348,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   <div class="dlg-head">
     <div>
       <h2 id="dlg-title">Add your event</h2>
-      <p>Spotted a gap? Add it — a real person checks each one.</p>
+      <p>Spotted a gap? Add it. A real person takes a look before it goes live.</p>
     </div>
     <button class="dlg-x" id="dlg-close" aria-label="Close">✕</button>
   </div>
@@ -364,10 +364,10 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
       {# Only the endpoint mode has a file field, so don't promise a poster upload
          in the modes that don't offer one. #}
       {% if submit_mode == 'endpoint' %}
-      <b>Add a link or poster.</b> A human reviews every one before it appears.
+      <b>Add a link or poster.</b> A real person takes a look before it goes live.
       {% else %}
-      <b>Just drop a link</b> — a poster, a Facebook event, the venue page. A human
-      reviews every one before it appears.
+      <b>Just drop a link:</b> a poster, a Facebook event, the venue page. A real
+      person takes a look before it goes live.
       {% endif %}
     </div>
     {# Snap-a-flyer: read a poster and prefill the form. With an AI endpoint
@@ -1098,6 +1098,10 @@ const FLYER = (() => {
 // interpolation, so the values can't break out of the string literal.
 const SB_URL = {{ supabase_url|tojson }};
 const SB_KEY = {{ supabase_anon_key|tojson }};
+// Belt-and-suspenders: if the project URL was set with a trailing /rest/v1 (a
+// common mistake that yields PGRST125 "Invalid path"), strip it so the endpoint
+// below is always exactly one /rest/v1/… deep.
+const SB_REST = SB_URL.replace(/\/+$/,"").replace(/\/rest(\/v1)?$/,"") + "/rest/v1/submissions";
 
 $("sform").addEventListener("submit", async ev => {
   ev.preventDefault();
@@ -1127,7 +1131,7 @@ $("sform").addEventListener("submit", async ev => {
   btn.disabled = true;
   msg.innerHTML = "Sending…";
   try {
-    const r = await fetch(SB_URL + "/rest/v1/submissions", {
+    const r = await fetch(SB_REST, {
       method: "POST",
       headers: {
         "apikey": SB_KEY,
