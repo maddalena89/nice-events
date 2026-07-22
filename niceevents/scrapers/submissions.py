@@ -34,7 +34,7 @@ log = logging.getLogger(__name__)
 # Only the columns we need. Notably NOT `email` — it's the submitter's private
 # contact detail, it has no business in a public events feed, and the surest way
 # to never leak it is to never load it.
-_COLS = "id,title,start_date,end_date,town,venue,category,url,note"
+_COLS = "id,title,start_date,end_date,time,town,venue,category,url,note"
 
 
 @register
@@ -113,6 +113,7 @@ class Submissions(HttpScraper):
             title=title,
             start=start,
             end=end,
+            time=(row.get("time") or None),
             town=canon_town(row.get("town")),
             venue=(row.get("venue") or None),
             category=cat,

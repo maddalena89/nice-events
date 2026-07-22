@@ -118,6 +118,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .f-full{grid-column:1/-1}.f-half{grid-column:span 2}
 label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-weight:600}
+label i{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400;opacity:.6}
 .form input,.form select,.form textarea{width:100%}
 .callout{border-left:3px solid var(--accent);background:rgba(31,59,255,.05);padding:14px 16px;font-size:15px;line-height:1.5;color:#4a463f;margin-bottom:22px;max-width:56ch}
 .callout b{color:var(--ink)}
@@ -363,12 +364,8 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     <div class="callout">
       {# Only the endpoint mode has a file field, so don't promise a poster upload
          in the modes that don't offer one. #}
-      {% if submit_mode == 'endpoint' %}
-      <b>Add a link or poster.</b> A real person takes a look before it goes live.
-      {% else %}
-      <b>Just drop a link:</b> a poster, a Facebook event, the venue page. A real
-      person takes a look before it goes live.
-      {% endif %}
+      <b>Add what's on.</b> Fill in the details. A real person takes a look before
+      it goes live.
     </div>
     {# Snap-a-flyer: read a poster and prefill the form. With an AI endpoint
        configured (POSTER_AI_URL, or a deployed Supabase read-poster function) the
@@ -386,25 +383,28 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 
     <form class="form" id="sform"
           {% if submit_mode == 'endpoint' %}action="{{ submit_endpoint }}" method="POST" enctype="multipart/form-data"{% endif %}>
-      <div class="f-half"><label for="s-title">Event name *</label><input id="s-title" name="title" required></div>
-      <div><label for="s-date">Date *</label><input type="date" id="s-date" name="date" required></div>
-      <div><label for="s-end">Ends</label><input type="date" id="s-end" name="end"></div>
+      {# Balanced two-per-row layout. Everything is required except Ends, Note and
+         Link. Category is a <select> so it always has a value. #}
+      <div class="f-full"><label for="s-title">Event name *</label><input id="s-title" name="title" required></div>
+      <div class="f-half"><label for="s-date">Date *</label><input type="date" id="s-date" name="date" required></div>
+      <div class="f-half"><label for="s-time">Time *</label><input type="time" id="s-time" name="time" required></div>
       {# Town is a datalist, not free text: start typing and matching towns
          appear, and submit rejects anything not already on the site. Keeps the
-         town list clean — no "Nice ", "nice", "Nice06" variants to canonicalise
+         town list clean, no "Nice ", "nice", "Nice06" variants to canonicalise
          later. The <option>s are filled from the live town list in JS. #}
-      <div><label for="s-town">Town *</label>
+      <div class="f-half"><label for="s-town">Town *</label>
         <input id="s-town" name="town" list="townlist" required autocomplete="off"
                placeholder="Start typing a town…">
         <datalist id="townlist"></datalist></div>
-      <div><label for="s-venue">Venue</label><input id="s-venue" name="venue"></div>
-      <div><label for="s-cat">Category *</label>
+      <div class="f-half"><label for="s-venue">Venue *</label><input id="s-venue" name="venue" required></div>
+      <div class="f-half"><label for="s-cat">Category *</label>
         <select id="s-cat" name="category">
           {% for k, v in categories.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
         </select></div>
-      <div><label for="s-email">Your email</label><input type="email" id="s-email" name="email" placeholder="so we can ask"></div>
-      <div class="f-full"><label for="s-note">Note</label><input id="s-note" name="note" placeholder="Times, price, what to expect…"></div>
-      <div class="f-full"><label for="s-url">Link (proof) *</label><input id="s-url" name="url" placeholder="https://…"></div>
+      <div class="f-half"><label for="s-end">Ends <i>(optional)</i></label><input type="date" id="s-end" name="end"></div>
+      <div class="f-full"><label for="s-email">Your email *</label><input type="email" id="s-email" name="email" required placeholder="so we can confirm it's you"></div>
+      <div class="f-full"><label for="s-note">Note <i>(optional)</i></label><input id="s-note" name="note" placeholder="Price, what to expect…"></div>
+      <div class="f-full"><label for="s-url">Link <i>(optional)</i></label><input id="s-url" name="url" placeholder="https://… a poster, Facebook event, venue page"></div>
       {% if submit_mode == 'endpoint' %}
       <div class="f-full"><label for="s-img">Poster image (optional)</label><input type="file" id="s-img" name="poster" accept="image/*"></div>
       {% endif %}
@@ -1051,10 +1051,10 @@ const FLYER = (() => {
   // AI result (richer shape: start_date / end_date / venue) -> form.
   function fillAI(f){
     setV("s-title",f.title); setV("s-date",f.start_date); setV("s-end",f.end_date);
+    setV("s-time",f.time);   // the model returns HH:MM, which the time input wants
     setV("s-town",f.town); setV("s-venue",f.venue);
     if(f.category && $("s-cat") && [...$("s-cat").options].some(o=>o.value===f.category)) $("s-cat").value=f.category;
-    const note=[f.time?("Heure : "+f.time):"", f.note].filter(Boolean).join(" · ");
-    setV("s-note",note.slice(0,300));
+    if(f.note) setV("s-note",String(f.note).slice(0,300));
   }
 
   async function ocrFallback(file){
@@ -1103,29 +1103,58 @@ const SB_KEY = {{ supabase_anon_key|tojson }};
 // below is always exactly one /rest/v1/… deep.
 const SB_REST = SB_URL.replace(/\/+$/,"").replace(/\/rest(\/v1)?$/,"") + "/rest/v1/submissions";
 
+// Turn a raw PostgREST/Postgres error into something a human can act on. The DB
+// speaks in constraint names; people don't. Never show the raw JSON.
+function friendlySubmitError(text, status){
+  const t = (text || "").toLowerCase();
+  if (t.includes("start_sane"))       return "Please pick an upcoming date (2024 or later).";
+  if (t.includes("end_after_start"))  return "The end date can't be before the start date.";
+  if (t.includes("title_len"))        return "The event name needs to be 3 to 200 characters.";
+  if (t.includes("town_len"))         return "That town name doesn't look right.";
+  if (t.includes("url_is_http") || t.includes("regular expression") || t.includes("repetition count"))
+                                      return "That link doesn't look right. Paste a full web address starting with https://.";
+  if (t.includes("category"))         return "Please choose a category from the list.";
+  if (t.includes("email"))            return "That email address doesn't look right.";
+  if (status === 409 || t.includes("duplicate")) return "That event looks like it's already listed.";
+  return "Sorry, that didn't go through. Please double-check the fields and try again.";
+}
+
 $("sform").addEventListener("submit", async ev => {
   ev.preventDefault();
   const g = id => $(id).value.trim();
   const msg = $("smsg");
   const btn = $("sform").querySelector("button[type=submit]");
 
-  // Town must be one already on the site — no free-text new towns. The datalist
-  // suggests them; this enforces it. We send the canonical spelling, not what
-  // was typed, so "nice" and "NICE" both store as "Nice".
-  const townCanon = TOWN_CANON.get(g("s-town").toLowerCase());
-  if (!townCanon) {
-    msg.innerHTML = '<span class="err">Pick a town from the list as you type.</span>'; return;
-  }
+  const bad = m => { msg.innerHTML = '<span class="err">' + m + '</span>'; };
 
+  // Required: everything except Ends, Note and Link.
+  if (!g("s-title")) { bad("Please add an event name."); return; }
+
+  // Town must be one already on the site — the datalist suggests them, this
+  // enforces it. We store the canonical spelling, so "nice"/"NICE" -> "Nice".
+  const townCanon = TOWN_CANON.get(g("s-town").toLowerCase());
+  if (!townCanon) { bad("Pick a town from the list as you type."); return; }
+  if (!g("s-venue")) { bad("Please add a venue."); return; }
+
+  const email = g("s-email");
+  if (!email) { bad("Please add your email."); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { bad("That email address doesn't look right."); return; }
+
+  // Date + time. An events site is about what's coming up, so a past date is
+  // almost always a typo — catch it kindly rather than via a DB constraint.
+  const startD = g("s-date");
+  if (!startD) { bad("Please add a date."); return; }
+  if (startD < TODAY) { bad("That date is in the past. Pick an upcoming date."); return; }
+  const endD = g("s-end");
+  if (endD && endD < startD) { bad("The end date can't be before the start date."); return; }
+  if (!g("s-time")) { bad("Please add a start time."); return; }
+
+  // Link is OPTIONAL now (the email identifies the submitter). Validate if given.
   const raw = g("s-url");
-  if (!raw) { msg.innerHTML = '<span class="err">A link is required as proof.</span>'; return; }
-  let u;
-  try { u = new URL(raw); }
-  catch { msg.innerHTML = '<span class="err">That link isn\'t a valid URL.</span>'; return; }
-  // Mirrors the url_is_http CHECK in the database. Client-side this is a
-  // courtesy; the database rejects javascript:/data: regardless.
-  if (u.protocol !== "https:" && u.protocol !== "http:") {
-    msg.innerHTML = '<span class="err">The link must start with http:// or https://.</span>'; return;
+  if (raw) {
+    let u;
+    try { u = new URL(raw); } catch { bad("That link isn't a valid URL."); return; }
+    if (u.protocol !== "https:" && u.protocol !== "http:") { bad("The link must start with http:// or https://."); return; }
   }
 
   btn.disabled = true;
@@ -1145,21 +1174,23 @@ $("sform").addEventListener("submit", async ev => {
         title: g("s-title"),
         start_date: g("s-date"),
         end_date: g("s-end") || null,
+        time: g("s-time") || null,
         town: townCanon,
-        venue: g("s-venue") || null,
+        venue: g("s-venue"),
         category: $("s-cat").value,
-        url: raw,
+        url: raw || null,
         note: g("s-note") || null,
-        email: g("s-email") || null,
+        email: email,
       }),
     });
     if (r.ok) {
       // Snapshot what they typed BEFORE reset, so they can grab a shareable card
       // for the event they just added — the little reward for contributing.
       const card = { title:g("s-title"), start:g("s-date"), end:g("s-end")||null,
-                     town:townCanon, venue:g("s-venue")||null, category:$("s-cat").value };
+                     time:g("s-time")||null, town:townCanon, venue:g("s-venue")||null,
+                     category:$("s-cat").value };
       $("sform").reset();
-      msg.innerHTML = '<span class="ok">Thank you — it\'s queued for review.</span> ';
+      msg.innerHTML = '<span class="ok">Thank you! It\'s queued for review.</span> ';
       if (card.title && card.start) {
         const cb=document.createElement("button");
         cb.type="button"; cb.textContent="📇 Get a shareable card";
@@ -1168,13 +1199,13 @@ $("sform").addEventListener("submit", async ev => {
         msg.appendChild(cb);
       }
     } else {
-      // Surface the real reason. A silent failure here means someone typed out
-      // their event and never learns it didn't land.
+      // Translate the real reason into plain language — never dump raw JSON at
+      // someone who just typed out their event.
       const t = await r.text();
-      msg.innerHTML = '<span class="err">Not accepted: ' + esc(t.slice(0, 180)) + '</span>';
+      msg.innerHTML = '<span class="err">' + esc(friendlySubmitError(t, r.status)) + '</span>';
     }
   } catch (err) {
-    msg.innerHTML = '<span class="err">Couldn\'t reach the server — try again in a moment.</span>';
+    msg.innerHTML = '<span class="err">Couldn\'t reach the server. Please try again in a moment.</span>';
   } finally {
     btn.disabled = false;
   }

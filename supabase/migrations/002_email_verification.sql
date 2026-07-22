@@ -21,9 +21,11 @@ alter table public.submissions
 
 -- The link, when given, must still be a real http(s) URL (blocks javascript:/data:
 -- XSS). When absent, that's fine now.
+-- Length via char_length, NOT a {min,max} regex bound: Postgres caps regex
+-- repetition counts at 255, so '{4,400}' raises 2201B and every INSERT fails.
 alter table public.submissions drop constraint if exists url_is_http;
 alter table public.submissions add constraint url_is_http
-  check (url is null or url ~* '^https?://[^ ]{4,400}$');
+  check (url is null or (char_length(url) <= 400 and url ~* '^https?://[^ ]+$'));
 
 -- A basic shape check on the email so obviously-fake input is rejected at the DB.
 alter table public.submissions drop constraint if exists email_shape;

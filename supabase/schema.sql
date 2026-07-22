@@ -17,10 +17,11 @@ create table if not exists public.submissions (
   title       text not null,
   start_date  date not null,
   end_date    date,
+  "time"      text,                       -- HH:MM start time
   town        text not null,
   venue       text,
   category    text not null,
-  url         text not null,
+  url         text,                       -- link is optional; email identifies the submitter
   note        text,
   email       text,
 
@@ -40,7 +41,13 @@ create table if not exists public.submissions (
 
   -- Proof link must be a real http(s) URL. Blocks javascript: and data: URIs,
   -- which would otherwise be a stored-XSS vector the moment we render the link.
-  constraint url_is_http check (url ~* '^https?://[^ ]{4,400}$'),
+  -- NB: length is checked with char_length, NOT a {min,max} regex bound — Postgres
+  -- caps regex repetition counts at 255, so '{4,400}' raises 2201B "invalid
+  -- repetition count(s)" and the whole INSERT fails.
+  constraint url_is_http check (url is null or (char_length(url) <= 400 and url ~* '^https?://[^ ]+$')),
+
+  -- Start time, if given, must look like HH:MM (24h).
+  constraint time_shape check ("time" is null or "time" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
 
   -- Category must be one we actually render. Anything else would land in a
   -- filter tab that doesn't exist.
