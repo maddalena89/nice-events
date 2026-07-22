@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's on in Nice</title>
+<!-- GitHub Pages serves this file for any path that isn't a real file. That's
+     how the clean short links work: whatsonnice.com/jasmine has no file, so this
+     runs, turns the last path segment into ?e=<slug>, and bounces to the app,
+     which resolves the slug to an event and scrolls to it.
+     A genuinely wrong URL just lands on the homepage with nothing highlighted —
+     a soft, friendly 404. -->
+<script>
+(function () {
+  var dir = location.pathname.replace(/[^/]*$/, "");   // directory (root or project path)
+  var slug = location.pathname.slice(dir.length);       // the bit after it
+  var extra = location.search ? "&" + location.search.slice(1) : "";
+  var target = slug
+    ? dir + "?e=" + encodeURIComponent(decodeURIComponent(slug)) + extra + location.hash
+    : dir;
+  location.replace(target);
+})();
+</script>
+<meta http-equiv="refresh" content="1;url=/">
+</head>
+<body style="margin:0;background:#f4f2ed;color:#0e0e0e;font:16px/1.5 'Helvetica Neue',Arial,sans-serif;display:grid;place-items:center;min-height:100vh">
+  <p style="color:#7d7970">Taking you to <a href="/" style="color:#1f3bff">What's on in Nice</a>…</p>
+</body>
+</html>

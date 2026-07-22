@@ -69,6 +69,14 @@ SEED: list[tuple] = [
     ("2026-08-01", "2026-12-18", "Expositions AMSL Aquarelle & « Levens d'un temp è de deman »", "Levens", "", "expo", "Watercolour & local heritage", "https://www.explorenicecotedazur.com/en/event/expositions-de-lamsl-aquarelle-et-de-lassociation-levens-dun-temp-e-de-deman/", False),
     ("2026-07-09", "2026-11-01", "Mémoires de l'eau", "Vence", "", "expo", "", "https://www.explorenicecotedazur.com/en/event/exposition-memoires-de-leau/", False),
     ("2026-07-04", "2026-08-29", "Escales littorales", "Saint-Martin-Vésubie", "", "expo", "", "https://www.explorenicecotedazur.com/en/event/exhibition-escales-littorales/", False),
+
+    # ---- spotted in the wild: Le Bistrot Poète (Nice) ----
+    # From posters on the door, 34 rue Tonduti de l'Escarène, 06000 Nice (@bistrotpoete).
+    # The 17 Jul finissage of "Iel & Mer" (Mary Joly & Denis Gibelin) is already
+    # past, so it's not listed — seed drops past-dated entries at build time anyway.
+    # NB: the poster spells the artist "Jasmine"; the monthly flyer wrote "Y'asmine".
+    ("2026-07-23", "2026-09-07", "Exposition Jasmine", "Nice", "Le Bistrot Poète · 34 rue Tonduti de l'Escarène", "expo", "Vernissage jeu. 23 juil. à partir de 18h · visible jusqu'au 7 septembre", "https://www.instagram.com/bistrotpoete/", True),
+    ("2026-07-23", "", "Vernissage de l'artiste Jasmine", "Nice", "Le Bistrot Poète · 34 rue Tonduti de l'Escarène", "expo", "À partir de 18h · expo visible jusqu'au 7 septembre", "https://www.instagram.com/bistrotpoete/", True),
 ]
 
 

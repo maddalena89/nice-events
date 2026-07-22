@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sqlite3
+import unicodedata
 from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
@@ -39,6 +41,22 @@ GITHUB_REPO = os.environ.get("GITHUB_REPO", "")  # e.g. "maddalena/nice-events"
 # from a GitHub *secret*, and must never reach this module or the template.
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+
+
+def _canonical_host() -> str:
+    """Production host for absolute short links (whatsonnice.com/<slug>).
+
+    Env override wins; otherwise read it from static/CNAME so the printed link and
+    QR are correct even when the site is built and previewed somewhere else.
+    """
+    h = os.environ.get("SITE_HOST", "").strip()
+    if h:
+        return h
+    cname = Path(__file__).resolve().parent.parent / "static" / "CNAME"
+    if cname.is_file():
+        lines = cname.read_text(encoding="utf-8").strip().splitlines()
+        return lines[0].strip() if lines else ""
+    return ""
 
 
 def _collapse_overlaps(events: list[dict]) -> list[dict]:
@@ -102,6 +120,47 @@ def _merge_cluster(members: list[dict], start: date, end: date) -> dict:
     return base
 
 
+# Short, human-friendly slug for a card's real short link (whatsonnice.com/<slug>).
+# Drops event-type filler and articles, keeps the first couple of distinctive
+# words: "Vernissage de l'artiste Jasmine" -> "jasmine". MUST match the JS
+# fallback in the template (cardSlug) so a card built before the next scrape and
+# one built after point at the same place.
+_CARD_STOP = set((
+    "vernissage exposition expo concert soiree spectacle atelier festival brocante "
+    "marche visite balade projection l la le les de des du au aux un une et the a of "
+    "at in on and with avec artiste artist en fete"
+).split())
+
+
+# No em/en dashes in any displayed title — collapse them to a plain " - ". Source
+# titles occasionally carry them ("Ellsworth Kelly — At the Edge of Water"); this
+# normalises everything the site shows (listing, feed, cards) in one place.
+_DASH_RE = re.compile(r"\s*[—–]\s*")
+
+
+def _clean_title(t: str) -> str:
+    return _DASH_RE.sub(" - ", t or "")
+
+
+def _card_slug(title: str) -> str:
+    t = unicodedata.normalize("NFD", title or "")
+    t = "".join(c for c in t if not unicodedata.combining(c)).lower()
+    words = re.sub(r"[^a-z0-9\s]", " ", t).split()
+    keep = [w for w in words if w not in _CARD_STOP and len(w) > 1]
+    return "-".join((keep or words)[:2])
+
+
+def _assign_slugs(events: list[dict]) -> None:
+    """Give every event a unique `slug` in place. Collisions get -2, -3, … in a
+    stable order (by start then title) so a given event keeps its slug run to run."""
+    seen: dict[str, int] = {}
+    for e in sorted(events, key=lambda e: (e.get("start", ""), e.get("title", ""))):
+        base = _card_slug(e.get("title", "")) or (e.get("fingerprint", "") or "event")[:8]
+        n = seen.get(base, 0) + 1
+        seen[base] = n
+        e["slug"] = base if n == 1 else f"{base}-{n}"
+
+
 def _row_to_dict(r: sqlite3.Row) -> dict:
     d = dict(r)
     d["free"] = bool(d.get("free"))
@@ -115,6 +174,9 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
 def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     rows = db.upcoming(conn)
     events = _collapse_overlaps([_row_to_dict(r) for r in rows])
+    for e in events:                      # no em dashes in any displayed title
+        e["title"] = _clean_title(e.get("title", ""))
+    _assign_slugs(events)                 # stable, unique short link per event
     stats = db.stats(conn)
 
     out = Path(out_dir)
@@ -153,6 +215,16 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     else:
         submit_mode = "none"
 
+    # AI poster reader endpoint. Explicit POSTER_AI_URL wins; otherwise, if
+    # Supabase is configured, default to its read-poster function so deploying the
+    # function is all it takes to switch the snap-a-flyer from on-device OCR to AI.
+    # Empty string -> the form keeps using in-browser OCR only.
+    poster_ai_url = os.environ.get("POSTER_AI_URL", "")
+    poster_ai_key = os.environ.get("POSTER_AI_KEY", "")
+    if not poster_ai_url and SUPABASE_URL and SUPABASE_ANON_KEY:
+        poster_ai_url = f"{SUPABASE_URL}/functions/v1/read-poster"
+        poster_ai_key = SUPABASE_ANON_KEY
+
     html = tpl.render(
         title=SITE_TITLE,
         events_json=json.dumps(events, ensure_ascii=False, separators=(",", ":")),
@@ -166,6 +238,9 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         github_repo=GITHUB_REPO,
         supabase_url=SUPABASE_URL,
         supabase_anon_key=SUPABASE_ANON_KEY,
+        canonical_host=_canonical_host(),
+        poster_ai_url=poster_ai_url,
+        poster_ai_key=poster_ai_key,
         source_count=len({(r["source"] or "").split(":")[0] for r in rows}),
     )
     (out / "index.html").write_text(html, encoding="utf-8")
