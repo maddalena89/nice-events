@@ -294,6 +294,24 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  dialog{height:100dvh}
  .dlg-body{overflow-y:auto}
 }
+
+/* ---------- Add-event form: friendlier "Option B" styling ---------- */
+.form label{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;color:#4a463f}
+.form label i{opacity:.55}
+.form input,.form select{border:1px solid #dcd8cf;border-radius:11px;background:#fff;padding:11px 13px;font-size:15px}
+.form input:focus,.form select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,59,255,.16)}
+.form input::placeholder{color:#b3aea3}
+.form .hint{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4;text-transform:none;letter-spacing:0}
+.form button.primary{border-radius:11px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:700;padding:14px 18px}
+.form button.primary:hover{background:#1730d6;border-color:#1730d6;color:#fff}
+/* the snap area becomes a soft, dashed "drop a flyer" panel */
+.snap{display:block;margin-bottom:20px}
+.snap-btn{display:flex;align-items:center;gap:12px;width:100%;justify-content:flex-start;
+  background:#fff;color:#4a463f;border:1.5px dashed #c7c2b8;border-radius:12px;
+  padding:12px 15px;font-size:13.5px;letter-spacing:0;text-transform:none;font-weight:600;min-height:0}
+.snap-btn::before{content:"📸";background:var(--accent);color:#fff;border-radius:9px;padding:7px 9px;font-size:15px;line-height:1}
+.snap-btn:hover{background:#fff;border-color:var(--accent);color:var(--ink)}
+.snap-msg{display:block;flex:none;font-size:12.5px;color:var(--muted);margin-top:8px;min-width:0}
 </style>
 </head>
 <body>
@@ -373,7 +391,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
        on-device with OCR and never leaves the phone. Either way it's a rough
        first pass and every field stays editable. #}
     <div class="snap">
-      <label class="snap-btn" for="s-photo">📸 Snap or upload a flyer</label>
+      <label class="snap-btn" for="s-photo">Snap or upload a flyer</label>
       {# No `capture` attribute: on a phone that forced the camera open and hid the
          photo library. Without it the browser offers both: take a photo OR pick
          an existing one from the album. #}
@@ -385,7 +403,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
           {% if submit_mode == 'endpoint' %}action="{{ submit_endpoint }}" method="POST" enctype="multipart/form-data"{% endif %}>
       {# Balanced two-per-row layout. Everything is required except Ends, Note and
          Link. Category is a <select> so it always has a value. #}
-      <div class="f-full"><label for="s-title">Event name *</label><input id="s-title" name="title" required></div>
+      <div class="f-full"><label for="s-title">Event name *</label><input id="s-title" name="title" required placeholder="e.g. Vernissage Jasmine"><div class="hint">The event's own name, not the venue.</div></div>
       <div class="f-half"><label for="s-date">Date *</label><input type="date" id="s-date" name="date" required></div>
       <div class="f-half"><label for="s-time">Time *</label><input type="time" id="s-time" name="time" required></div>
       {# Town is a datalist, not free text: start typing and matching towns
@@ -402,9 +420,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
           {% for k, v in categories.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
         </select></div>
       <div class="f-half"><label for="s-end">Ends <i>(optional)</i></label><input type="date" id="s-end" name="end"></div>
-      <div class="f-full"><label for="s-email">Your email *</label><input type="email" id="s-email" name="email" required placeholder="so we can confirm it's you"></div>
+      <div class="f-full"><label for="s-email">Your email *</label><input type="email" id="s-email" name="email" required placeholder="you@email.com"><div class="hint">Just to confirm it's really you. Never shown on the site.</div></div>
       <div class="f-full"><label for="s-note">Note <i>(optional)</i></label><input id="s-note" name="note" placeholder="Price, what to expect…"></div>
-      <div class="f-full"><label for="s-url">Link <i>(optional)</i></label><input id="s-url" name="url" placeholder="https://… a poster, Facebook event, venue page"></div>
+      <div class="f-full"><label for="s-url">Link <i>(optional)</i></label><input id="s-url" name="url" placeholder="https://… a poster, Facebook event, venue page"><div class="hint">Handy proof, but not required.</div></div>
       {% if submit_mode == 'endpoint' %}
       <div class="f-full"><label for="s-img">Poster image (optional)</label><input type="file" id="s-img" name="poster" accept="image/*"></div>
       {% endif %}
