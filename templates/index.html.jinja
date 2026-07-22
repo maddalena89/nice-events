@@ -312,6 +312,12 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 .snap-btn::before{content:"📸";background:var(--accent);color:#fff;border-radius:9px;padding:7px 9px;font-size:15px;line-height:1}
 .snap-btn:hover{background:#fff;border-color:var(--accent);color:var(--ink)}
 .snap-msg{display:block;flex:none;font-size:12.5px;color:var(--muted);margin-top:8px;min-width:0}
+/* bold black header band on the add-event form (keeps the black up top) */
+#dlg .dlg-head{background:var(--ink);border-bottom:0}
+#dlg .dlg-head h2{color:var(--paper)}
+#dlg .dlg-head p{color:var(--paper);opacity:.8}
+#dlg .dlg-x{border-color:var(--paper);color:var(--paper)}
+#dlg .dlg-x:hover{background:var(--paper);color:var(--ink)}
 </style>
 </head>
 <body>
@@ -367,7 +373,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   <div class="dlg-head">
     <div>
       <h2 id="dlg-title">Add your event</h2>
-      <p>Spotted a gap? Add it. A real person takes a look before it goes live.</p>
+      <p>Spotted a gap? Add it below.</p>
     </div>
     <button class="dlg-x" id="dlg-close" aria-label="Close">✕</button>
   </div>
@@ -379,12 +385,6 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
       before building — see the README.
     </div>
   {% else %}
-    <div class="callout">
-      {# Only the endpoint mode has a file field, so don't promise a poster upload
-         in the modes that don't offer one. #}
-      <b>Add what's on.</b> Fill in the details. A real person takes a look before
-      it goes live.
-    </div>
     {# Snap-a-flyer: read a poster and prefill the form. With an AI endpoint
        configured (POSTER_AI_URL, or a deployed Supabase read-poster function) the
        photo is sent there to be read by a vision model; otherwise it's decoded
