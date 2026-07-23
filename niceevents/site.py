@@ -90,9 +90,39 @@ def _collapse_overlaps(events: list[dict]) -> list[dict]:
     def d(s: str) -> date:
         return date.fromisoformat(s)
 
-    groups: dict[tuple, list[dict]] = {}
+    # Cluster near-duplicate titles within a town: the same event from two sources
+    # often differs only in wording ("Coun - Libera l'Art" vs "Coun. Libera l'Art
+    # au Palais Lascaris", or "…un prêt d'exception" vs "…un prêt d'exception au
+    # musée"). Exact-key grouping misses these, so also merge when one normalised
+    # title is a word-boundary prefix of another (>= 8 chars, so short generic
+    # titles aren't swallowed). The date sweep below still keeps non-overlapping
+    # repeats apart.
+    MIN_PREFIX = 8
+    by_town: dict[str, list[dict]] = {}
     for e in events:
-        groups.setdefault((_title_key(e.get("title", "")), e.get("town", "")), []).append(e)
+        by_town.setdefault(e.get("town", ""), []).append(e)
+
+    def _root_key(sorted_keys: list[str], root: dict[str, str], tk: str) -> str:
+        for shorter in sorted_keys:
+            if shorter == tk:
+                break                                   # only strictly shorter keys precede it
+            # The prefix must be a real, multi-word title (>= 3 words), so a
+            # one-word series name ("Belaprem") never swallows its per-night acts
+            # ("Belaprem — Do Brasil"), while "Coun - Libera l'Art" still absorbs
+            # "Coun. Libera l'Art au Palais Lascaris".
+            if len(shorter) >= MIN_PREFIX and shorter.count("-") >= 2 and tk.startswith(shorter + "-"):
+                return root.get(shorter, shorter)
+        return tk
+
+    groups: dict[tuple, list[dict]] = {}
+    for town, evs in by_town.items():
+        keys = sorted({_title_key(e.get("title", "")) for e in evs}, key=len)
+        root: dict[str, str] = {}
+        for k in keys:
+            root[k] = _root_key(keys, root, k)
+        for e in evs:
+            ck = root[_title_key(e.get("title", ""))]
+            groups.setdefault((ck, town), []).append(e)
 
     out: list[dict] = []
     for evs in groups.values():
