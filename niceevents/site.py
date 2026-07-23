@@ -26,7 +26,7 @@ from typing import Optional
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from . import db
-from .models import CATEGORIES, _title_key
+from .models import CATEGORIES, _title_key, slugify
 
 TPL_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -148,6 +148,41 @@ def _collapse_overlaps(events: list[dict]) -> list[dict]:
     return out
 
 
+def _collapse_recurring(events: list[dict]) -> list[dict]:
+    """Fold a single event that recurs on many dates at the SAME venue into one row.
+
+    A guided tour listed on 13 separate dates, a weekly milonga, a monthly brocante
+    at the same square — these are one thing, not fifteen, and listing each date
+    floods the page. We group by title + venue + town and, when a venue is present
+    and the group repeats, merge into one row spanning its first-to-last date.
+
+    Venue is load-bearing: it's what tells "the Musée Matisse tour, on many dates"
+    apart from "two different brocantes that happen to share a generic name". Events
+    with no venue are left exactly as they are — without one we can't tell a genuine
+    repeat from a coincidence, so we don't guess.
+    """
+    groups: dict[tuple, list[dict]] = {}
+    out: list[dict] = []
+    for e in events:
+        v = slugify(e.get("venue") or "")
+        if not v:
+            out.append(e)
+            continue
+        groups.setdefault((_title_key(e.get("title", "")), v, e.get("town", "")), []).append(e)
+
+    for evs in groups.values():
+        if len(evs) == 1:
+            out.append(evs[0])
+            continue
+        evs.sort(key=lambda e: (e["start"], e.get("end") or e["start"]))
+        start = date.fromisoformat(evs[0]["start"])
+        end = max(date.fromisoformat(e.get("end") or e["start"]) for e in evs)
+        out.append(_merge_cluster(evs, start, end))
+
+    out.sort(key=lambda e: (e["start"], e.get("title", "")))
+    return out
+
+
 def _merge_cluster(members: list[dict], start: date, end: date) -> dict:
     """One event out of an overlapping cluster: earliest entry wins the copy,
     missing fields filled from the rest, date range widened to the union."""
@@ -220,6 +255,7 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
 def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     rows = db.upcoming(conn)
     events = _collapse_overlaps([_row_to_dict(r) for r in rows])
+    events = _collapse_recurring(events)  # fold same-event-many-dates into one row
     for e in events:                      # no em dashes in any displayed title
         e["title"] = _clean_title(e.get("title", ""))
     _assign_slugs(events)                 # stable, unique short link per event

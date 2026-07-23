@@ -1,7 +1,11 @@
 """Build-time collapse of same-title / same-town overlapping events."""
 from __future__ import annotations
 
-from niceevents.site import _collapse_overlaps
+from niceevents.site import _collapse_overlaps, _collapse_recurring
+
+
+def _pipeline(evs):
+    return _collapse_recurring(_collapse_overlaps(evs))
 
 
 def test_multiday_and_perday_collapse_to_one():
@@ -47,3 +51,33 @@ def test_different_towns_not_merged():
     ]
     out = _collapse_overlaps(evs)
     assert len(out) == 2
+
+
+def test_recurring_same_venue_collapses():
+    # A guided tour on many separate dates at one venue -> a single row spanning them.
+    evs = [
+        {"title": "Visite guidée Matisse", "town": "Nice", "venue": "Musée Matisse", "start": "2026-07-25"},
+        {"title": "Visite guidée Matisse", "town": "Nice", "venue": "Musée Matisse", "start": "2026-08-01"},
+        {"title": "Visite guidée Matisse", "town": "Nice", "venue": "Musée Matisse", "start": "2026-09-05"},
+    ]
+    out = _pipeline(evs)
+    assert len(out) == 1
+    assert out[0]["start"] == "2026-07-25" and out[0]["end"] == "2026-09-05"
+
+
+def test_recurring_no_venue_kept():
+    # No venue -> can't tell a repeat from a coincidence, so leave them apart.
+    evs = [
+        {"title": "Cours de salsa", "town": "Nice", "start": "2026-07-24"},
+        {"title": "Cours de salsa", "town": "Nice", "start": "2026-07-31"},
+    ]
+    assert len(_pipeline(evs)) == 2
+
+
+def test_recurring_different_venue_kept():
+    # Same generic name, different places -> two different events.
+    evs = [
+        {"title": "Brocante", "town": "Nice", "venue": "Place Garibaldi", "start": "2026-07-05"},
+        {"title": "Brocante", "town": "Nice", "venue": "Cours Saleya", "start": "2026-07-12"},
+    ]
+    assert len(_pipeline(evs)) == 2
