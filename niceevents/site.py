@@ -250,6 +250,8 @@ def _tidy_text(t: str) -> str:
     t = html.unescape(t or "")
     t = unicodedata.normalize("NFKC", t)
     t = t.replace("**", "").replace("__", "")
+    t = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", t)   # [label](url) -> label
+    t = re.sub(r"#{1,6}\s*", "", t)                   # ## heading markers
     t = _DASH_RE.sub(" - ", t)
     return re.sub(r"\s+", " ", t).strip()
 

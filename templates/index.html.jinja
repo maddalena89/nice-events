@@ -92,6 +92,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .ttl a{color:var(--ink);text-decoration:none}
 .ttl a:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .sub{font-size:12.5px;color:var(--muted);margin-top:4px}
+.sub .etime{font-weight:700;color:var(--ink)}
 .where{font-size:12.5px}
 .where b{display:block;font-weight:600}
 .where span{color:var(--muted)}
@@ -672,7 +673,12 @@ function render(){
     const ttl = (e.url && !e.cancelled)
       ? `<a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`
       : `<span class="tt">${esc(e.title)}</span>`;
-    const sub = e.cancelled ? esc(e.cancel_note||"Annulé") : (e.note?esc(e.note):"");
+    // Time comes from the structured `time` field (false midnights already
+    // dropped), shown the same way for every event, then the description. This is
+    // what used to be baked inconsistently into the note text.
+    const desc = e.cancelled ? esc(e.cancel_note||"Annulé") : (e.note?esc(e.note):"");
+    const tm = (!e.cancelled && e.time) ? `<span class="etime">${esc(e.time)}</span>` : "";
+    const sub = (tm && desc) ? `${tm} · ${desc}` : (tm || desc);
     r.innerHTML=`
       <div class="idx">${String(i).padStart(2,"0")}</div>
       <div>
