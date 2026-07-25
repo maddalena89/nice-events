@@ -15,10 +15,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Nice Events">
-<title>{{ title }} — events in Nice &amp; the 06</title>
+<title>{{ title }} · events in Nice &amp; the 06</title>
 <meta name="description" content="Vide-greniers, milongas, concerts, exhibitions, meetups and pop-ups across Nice and the Alpes-Maritimes. Updated daily.">
 <meta property="og:title" content="{{ title }}">
-<meta property="og:description" content="Everything on in Nice and the 06 — updated daily.">
+<meta property="og:description" content="Everything on in Nice and the 06, updated daily.">
 <meta property="og:type" content="website">
 <style>
 :root{color-scheme:light;--ink:#0e0e0e;--paper:#f4f2ed;--accent:#1f3bff;--muted:#7d7970;--rule:#d8d4cb}
@@ -337,7 +337,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   <h1>What's<br>on in <em>Nice</em></h1>
   <div class="standfirst">
     <p>Vide-greniers and brocantes, milongas, jazz, club nights, museum shows,
-       design and AI meetups, village fêtes and pop-ups — Nice and the coast,
+       design and AI meetups, village fêtes and pop-ups. Nice and the coast,
        scraped daily from the sources that actually list them.</p>
     <div class="stats">
       <div class="stat"><b id="s-total">{{ stats.total }}</b><span>Listed</span></div>
@@ -388,7 +388,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     <div class="callout" style="margin:0">
       <b>Submissions aren't wired up yet.</b> This site is static, so it can't receive a
       form post on its own. Set <code>SUBMIT_ENDPOINT</code> or <code>GITHUB_REPO</code>
-      before building — see the README.
+      before building. See the README.
     </div>
   {% else %}
     {# Snap-a-flyer: read a poster and prefill the form. With an AI endpoint
@@ -491,7 +491,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 </dialog>
 
 <div class="foot">
-  <strong>Sources —</strong>
+  <strong>Sources:</strong>
   <a href="https://brocabrac.fr/06/">Brocabrac</a> ·
   <a href="https://tango-argentin.fr/en/nice">Tango-Argentin</a> ·
   <a href="https://www.nice.fr/agenda/">Ville de Nice</a> ·
@@ -598,7 +598,7 @@ const isMultiDay=e=>e.end&&e.end!==e.start;
 function runBadge(e){
   if(!isMultiDay(e)) return "";
   const txt = e.start<TODAY ? `until ${fmtShort(e.end)}`
-                            : `${fmtShort(e.start)} – ${fmtShort(e.end)}`;
+                            : `${fmtShort(e.start)} - ${fmtShort(e.end)}`;
   return `<span class="pill run">${txt}</span>`;
 }
 
@@ -1344,9 +1344,9 @@ $("sform").addEventListener("submit", ev => {
   catch { $("smsg").innerHTML = '<span class="err">That link isn\'t a valid URL.</span>'; return; }
   const body = [
     `**Event:** ${g("s-title")}`, `**Date:** ${g("s-date")}${g("s-end") ? " → " + g("s-end") : ""}`,
-    `**Town:** ${townCanon}`, `**Venue:** ${g("s-venue") || "—"}`,
+    `**Town:** ${townCanon}`, `**Venue:** ${g("s-venue") || "-"}`,
     `**Category:** ${$("s-cat").value}`, `**Link:** ${g("s-url")}`,
-    `**Note:** ${g("s-note") || "—"}`, `**From:** ${g("s-email") || "anonymous"}`,
+    `**Note:** ${g("s-note") || "-"}`, `**From:** ${g("s-email") || "anonymous"}`,
   ].join("\n");
   window.open("https://github.com/{{ github_repo }}/issues/new?labels=submission&title=" +
     encodeURIComponent("Event: " + g("s-title")) + "&body=" + encodeURIComponent(body), "_blank");

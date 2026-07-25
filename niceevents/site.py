@@ -13,6 +13,7 @@ backend at all. See README.
 """
 from __future__ import annotations
 
+import html
 import json
 import os
 import re
@@ -242,8 +243,69 @@ _CARD_STOP = set((
 _DASH_RE = re.compile(r"\s*[—–]\s*")
 
 
+def _tidy_text(t: str) -> str:
+    """Fix the things scraped free text drags in: HTML entities (&quot;), fake-bold
+    or fullwidth unicode (𝒅𝒊𝒎𝒂𝒏𝒄𝒉𝒆𝒔 -> dimanches), stray markdown bold markers
+    from social sources, em/en dashes (never wanted), and runs of whitespace."""
+    t = html.unescape(t or "")
+    t = unicodedata.normalize("NFKC", t)
+    t = t.replace("**", "").replace("__", "")
+    t = _DASH_RE.sub(" - ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
 def _clean_title(t: str) -> str:
-    return _DASH_RE.sub(" - ", t or "")
+    return _DASH_RE.sub(" - ", _tidy_text(t))
+
+
+# The note column is a grab-bag: many scrapers prefix it with the time and a
+# category label ("19:00 · Concert · real description"), both of which the page
+# already shows elsewhere (the date pill, the category tab). Strip that prefix so
+# the note reads as a plain description.
+_TIME_LEAD = re.compile(r"^\s*\d{1,2}[:h]\d{2}(?:\s*[–-]\s*\d{1,2}[:h]\d{2})?\s*·\s*")
+_LABEL_LEAD = re.compile(r"^\s*([^\s·][^·]{0,24}?)\s*·\s*")
+_CAT_LABELS = frozenset((
+    "concert atelier theatre spectacle projection brocante ballet vide-grenier "
+    "rencontre exposition opera lecture animation danse humour conference visite "
+    "festival stage cirque comedie recital expo scene marche sport social business "
+    "one-man-show cabaret jazz cine cinema film"
+).split())
+
+# Free-entry vs paid, inferred from words when the scraper didn't set the flag.
+_FREE_POS = re.compile(r"(gratuit\w*|entr[ée]es?\s+libres?|acc[eè]s\s+libres?|free\s+entry)", re.I)
+_PRICE = re.compile(r"(\d+[\.,]?\d*\s*(€|euros?)|\btarif|\bpayant|prix\s*:\s*\d)", re.I)
+
+
+def _ascii_fold(w: str) -> str:
+    w = unicodedata.normalize("NFD", w)
+    return "".join(c for c in w if not unicodedata.combining(c)).lower()
+
+
+def _note_full(note: str) -> str:
+    """Tidy a note and drop its redundant leading time / category label, but do
+    NOT shorten it yet — free/paid detection wants the whole text first."""
+    t = _tidy_text(note)
+    t = _TIME_LEAD.sub("", t).strip()
+    m = _LABEL_LEAD.match(t)
+    if m and _ascii_fold(m.group(1)) in _CAT_LABELS:
+        t = t[m.end():].strip()
+    return t
+
+
+def _shorten(t: str, limit: int = 150) -> str:
+    """A short, tidy description: end on a sentence if there's one, else on a word
+    boundary with an ellipsis. Never an em dash."""
+    if len(t) <= limit:
+        return t
+    window = t[: limit + 1]
+    for p in (". ", "! ", "? ", "; "):
+        i = window.rfind(p)
+        if i >= 60:
+            return t[: i + 1].strip()
+    i = window.rfind(" ")
+    if i < 40:
+        i = limit
+    return t[:i].rstrip(" ,;:·-–—") + "…"
 
 
 def _card_slug(title: str) -> str:
@@ -272,6 +334,23 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
     d["online"] = bool(d.get("online"))
     for k in ("sources", "first_seen", "last_seen", "approved", "submitted_by"):
         d.pop(k, None)
+
+    # A bare 00:00 is almost always "time unknown" defaulted to midnight, not a
+    # real midnight start. Drop it so the page never claims a false time.
+    if (d.get("time") or "").strip() == "00:00":
+        d["time"] = None
+
+    # Tidy the venue too (entities, dashes) but never shorten it.
+    if d.get("venue"):
+        d["venue"] = _tidy_text(d["venue"])
+
+    # Normalise the description: tidy entities/unicode, drop the redundant
+    # time+category prefix, infer free/paid from the full text, then keep it short.
+    full = _note_full(d.get("note"))
+    if not d["free"] and _FREE_POS.search(full) and not _PRICE.search(full):
+        d["free"] = True
+    d["note"] = _shorten(full)
+
     return {k: v for k, v in d.items() if v not in (None, "", 0) or k in ("start", "title", "town")}
 
 
