@@ -33,10 +33,14 @@ def _fold(s: str) -> str:
 
 #: (url exact, title contains, town, YYYY-MM-DD). Any field left None is a
 #: wildcard; the fields you DO set must all match for the event to be dropped.
+#:
+#: IMPORTANT: do NOT add a nice.fr event just because its /agenda/<slug>/ page
+#: returns 404 to an automated fetch. nice.fr blocks bots (429/404), so that is
+#: NOT proof the event is dead. Verify against the source of truth first:
+#:   https://www.nice.fr/wp-json/wp/v2/events?search=<title>
+#: If the WordPress API still lists it with a future date, it is REAL. Only add
+#: events here that are genuinely gone or bogus in the source itself.
 SUPPRESSED: list[tuple] = [
-    # Dead nice.fr listing: detail page 404s, dated in July for an end-of-year
-    # party. Not a real event.
-    ("https://www.nice.fr/agenda/fete-de-fin-dannee/", None, None, None),
 ]
 
 
