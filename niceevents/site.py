@@ -277,6 +277,17 @@ _CAT_LABELS = frozenset((
 _FREE_POS = re.compile(r"(gratuit\w*|entr[ée]es?\s+libres?|acc[eè]s\s+libres?|free\s+entry)", re.I)
 _PRICE = re.compile(r"(\d+[\.,]?\d*\s*(€|euros?)|\btarif|\bpayant|prix\s*:\s*\d)", re.I)
 
+# The chips the page shows. "brocante" (Brocantes & vide-greniers) is folded into
+# the "marche" chip, renamed "Brocantes & fêtes" and surfaced first, so those
+# events live with the markets and fêtes. "brocante" stays a valid scraper/DB
+# category; we remap it to "marche" only at build time (in _row_to_dict) so the
+# events group under the merged chip. The page then prepends an "All the events"
+# chip in front of these (see the template).
+_DISPLAY_CATEGORIES = {
+    "marche": "Brocantes & fêtes",
+    **{k: v for k, v in CATEGORIES.items() if k not in ("brocante", "marche")},
+}
+
 
 def _ascii_fold(w: str) -> str:
     w = unicodedata.normalize("NFD", w)
@@ -345,6 +356,10 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
     # Tidy the venue too (entities, dashes) but never shorten it.
     if d.get("venue"):
         d["venue"] = _tidy_text(d["venue"])
+
+    # Fold brocantes into the markets & fêtes chip for display.
+    if d.get("category") == "brocante":
+        d["category"] = "marche"
 
     # Normalise the description: tidy entities/unicode, drop the redundant
     # time+category prefix, infer free/paid from the full text, then keep it short.
@@ -420,8 +435,8 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     html = tpl.render(
         title=SITE_TITLE,
         events_json=json.dumps(events, ensure_ascii=False, separators=(",", ":")),
-        categories=CATEGORIES,
-        cat_json=json.dumps(CATEGORIES, ensure_ascii=False),
+        categories=_DISPLAY_CATEGORIES,
+        cat_json=json.dumps(_DISPLAY_CATEGORIES, ensure_ascii=False),
         stats=stats,
         updated=date.today().strftime("%-d %B %Y") if os.name != "nt"
                 else date.today().strftime("%d %B %Y"),

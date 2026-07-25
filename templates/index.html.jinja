@@ -552,13 +552,33 @@ $("mq").innerHTML = (() => {
   const r = b.map(x=>`<span>${x}</span>`).join(""); return r+r;
 })();
 
+// "All the events" — the default view, black and active the moment the page
+// loads. It turns off as soon as a real category is picked, and back on when
+// none are left selected. Under the hood "All" just means the active set is
+// empty, which render() already reads as "show everything".
+const allEl=document.createElement("div");
+allEl.className="cat on"; allEl.id="cat-all";
+allEl.textContent="All the events";
+allEl.onclick=()=>{
+  active.clear();
+  document.querySelectorAll("#cats .cat").forEach(c=>c.classList.remove("on"));
+  allEl.classList.add("on");
+  render();
+};
+$("cats").appendChild(allEl);
+
 const cats = [...new Set(EVENTS.map(e=>e.category))]
   .sort((a,b)=>Object.keys(CATNAME).indexOf(a)-Object.keys(CATNAME).indexOf(b));
 cats.forEach(k=>{
   const el=document.createElement("div");
   el.className="cat"; el.dataset.k=k;
   el.innerHTML=`${CATNAME[k]||k}<i>0</i>`;
-  el.onclick=()=>{active.has(k)?active.delete(k):active.add(k);el.classList.toggle("on");render();};
+  el.onclick=()=>{
+    active.has(k)?active.delete(k):active.add(k);
+    el.classList.toggle("on");
+    allEl.classList.toggle("on", active.size===0);   // "All" reflects empty selection
+    render();
+  };
   $("cats").appendChild(el);
 });
 
@@ -634,7 +654,8 @@ function render(){
     (!freeOnly||e.free)&&
     (!q||`${e.title} ${e.town} ${e.venue||""} ${e.note||""}`.toLowerCase().includes(q)));
   [...$("cats").children].forEach(el=>{
-    el.querySelector("i").textContent=base.filter(e=>e.category===el.dataset.k).length;});
+    const c=el.querySelector("i"); if(!c) return;        // skip the "All" chip
+    c.textContent=base.filter(e=>e.category===el.dataset.k).length;});
 
   // Unique events that pass the category filter — this is what the tally counts,
   // so "42 listings" means 42 events, never 42 × the days they run.
@@ -706,7 +727,10 @@ $("q").oninput=render; $("town").onchange=render; $("when").onchange=render;
 $("online").onchange=render; $("freeonly").onchange=render;
 $("reset").onclick=()=>{$("q").value="";$("town").value="";$("when").value="";
   $("online").checked=false; $("freeonly").checked=false;
-  active.clear();[...$("cats").children].forEach(c=>c.classList.remove("on"));render();};
+  active.clear();
+  document.querySelectorAll("#cats .cat").forEach(c=>c.classList.remove("on"));
+  $("cat-all").classList.add("on");                    // reset back to "All the events"
+  render();};
 render();
 
 // Share a single event. Uses the native share sheet on phones; falls back to
