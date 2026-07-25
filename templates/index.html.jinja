@@ -303,9 +303,10 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 /* ---------- Add-event form: friendlier "Option B" styling ---------- */
 .form label{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;color:#4a463f}
 .form label i{opacity:.55}
-.form input,.form select{border:1px solid #dcd8cf;border-radius:11px;background:#fff;padding:11px 13px;font-size:15px}
-.form input:focus,.form select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,59,255,.16)}
-.form input::placeholder{color:#b3aea3}
+.form input,.form select,.form textarea{border:1px solid #dcd8cf;border-radius:11px;background:#fff;padding:11px 13px;font-size:15px}
+.form input:focus,.form select:focus,.form textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,59,255,.16)}
+.form input::placeholder,.form textarea::placeholder{color:#b3aea3}
+.form textarea{font:inherit;resize:vertical;min-height:92px;line-height:1.45}
 .form .hint{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4;text-transform:none;letter-spacing:0}
 .form button.primary{border-radius:11px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:700;padding:14px 18px}
 .form button.primary:hover{background:#1730d6;border-color:#1730d6;color:#fff}
@@ -461,9 +462,31 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
        person gives new additions a friendly once-over first. And if you walk past
        a poster, just snap it and the site will try to fill in the details for you.</p>
     <p>A weekly email of what's new is on the way. Want to be first to get it?
-       <a href="mailto:hello@whatsonnice.com?subject=Newsletter">Say hi</a> and
+       <button type="button" class="linklike" id="hello-open">Say hi</button> and
        you're on the list.</p>
     <p class="sign">Made with love in Nice. 💙</p>
+  </div>
+</dialog>
+
+{# Shared little dialog for both "Report a bug" and "Say hi". Same table, tagged
+   by kind. Kept deliberately tiny: one message box, one optional email. #}
+<dialog id="msg-dlg" aria-labelledby="msg-title">
+  <div class="dlg-head">
+    <div>
+      <h2 id="msg-title">Report a bug</h2>
+      <p id="msg-sub">Something off on the site? Tell me here.</p>
+    </div>
+    <button class="dlg-x" id="msg-close" aria-label="Close">✕</button>
+  </div>
+  <div class="dlg-body">
+    <form class="form" id="mform">
+      <div class="f-full"><label for="m-body" id="m-body-lab">What's wrong? *</label><textarea id="m-body" placeholder="What's wrong, and which event (name or link)?"></textarea></div>
+      <div class="f-full"><label for="m-email" id="m-email-lab">Your email <i>(optional)</i></label><input type="email" id="m-email" placeholder="you@email.com"><div class="hint" id="m-email-hint">Only if you'd like a reply. Never shown on the site.</div></div>
+      <div class="f-full" style="display:flex;gap:8px;align-items:center">
+        <button class="primary" type="submit" id="m-send">Send</button>
+        <span id="mmsg"></span>
+      </div>
+    </form>
   </div>
 </dialog>
 
@@ -481,6 +504,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   <br>Listings link back to their source and belong to it. Data: <a href="events.json">events.json</a>.
   <br><br>Not affiliated with any venue or organiser. Always check the source before turning up.
   <br><br><button type="button" class="linklike" id="about-open2">About this project</button>
+  · <button type="button" class="linklike" id="bug-open">Report a bug</button>
 </div>
 
 </div>
@@ -924,6 +948,74 @@ aboutDlg.addEventListener("click", e => {
   const inside = e.clientX >= r.left && e.clientX <= r.right &&
                  e.clientY >= r.top  && e.clientY <= r.bottom;
   if (!inside) aboutDlg.close();
+});
+
+// ---- messages dialog: "Report a bug" + "Say hi", both -> Supabase ----
+// One tiny dialog, one table (tagged by kind). SB_URL/SB_KEY are declared later
+// in this script; we only read them inside the submit handler, which runs on a
+// click, long after they're defined.
+const msgDlg = $("msg-dlg");
+const MSG_MODES = {
+  bug:   {title:"Report a bug", sub:"Something off on the site? Tell me here.",
+          bodyLab:"What's wrong? *", bodyPh:"What's wrong, and which event (name or link)?",
+          emailLab:"Your email <i>(optional)</i>", bodyRequired:true, send:"Send report"},
+  hello: {title:"Say hi", sub:"Want the weekly email of what's new? Leave your address.",
+          bodyLab:"A note <i>(optional)</i>", bodyPh:"Anything you'd like to say…",
+          emailLab:"Your email *", bodyRequired:false, send:"Count me in"},
+};
+let msgKind = "bug";
+function openMsg(kind){
+  msgKind = kind;
+  const m = MSG_MODES[kind];
+  $("msg-title").textContent = m.title;
+  $("msg-sub").textContent   = m.sub;
+  $("m-body-lab").innerHTML  = m.bodyLab;
+  $("m-body").placeholder    = m.bodyPh;
+  $("m-email-lab").innerHTML = m.emailLab;
+  $("m-send").textContent    = m.send;
+  $("m-body").value = ""; $("m-email").value = ""; $("mmsg").textContent = "";
+  msgDlg.showModal();
+}
+if ($("bug-open"))   $("bug-open").onclick   = () => openMsg("bug");
+if ($("hello-open")) $("hello-open").onclick = () => { aboutDlg.close(); openMsg("hello"); };
+$("msg-close").onclick = () => msgDlg.close();
+msgDlg.addEventListener("click", e => {
+  const r = msgDlg.getBoundingClientRect();
+  const inside = e.clientX >= r.left && e.clientX <= r.right &&
+                 e.clientY >= r.top  && e.clientY <= r.bottom;
+  if (!inside) msgDlg.close();
+});
+$("mform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const m     = MSG_MODES[msgKind];
+  const body  = $("m-body").value.trim();
+  const email = $("m-email").value.trim();
+  const mmsg  = $("mmsg");
+  const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+  if (m.bodyRequired && !body){ mmsg.innerHTML='<span class="err">Please say what’s wrong.</span>'; return; }
+  if (!m.bodyRequired && !email){ mmsg.innerHTML='<span class="err">Please add your email so I can add you.</span>'; return; }
+  if (email && !emailOk){ mmsg.innerHTML='<span class="err">That email doesn’t look right.</span>'; return; }
+  if (typeof SB_URL !== "string" || !SB_URL){ mmsg.innerHTML='<span class="err">Messaging isn’t wired up yet.</span>'; return; }
+  const endpoint = SB_URL.replace(/\/+$/,"").replace(/\/rest(\/v1)?$/,"") + "/rest/v1/messages";
+  mmsg.textContent = "Sending…";
+  try{
+    const r = await fetch(endpoint, {
+      method:"POST",
+      headers:{ "apikey":SB_KEY, "Authorization":"Bearer "+SB_KEY,
+                "Content-Type":"application/json", "Prefer":"return=minimal" },
+      body: JSON.stringify({ kind:msgKind, body:body||null, email:email||null,
+                             page_url: location.href.slice(0,400) }),
+    });
+    if (r.ok){
+      mmsg.innerHTML = '<span class="ok">'+(msgKind==="bug"?"Thank you, noted.":"You’re on the list. 💙")+'</span>';
+      setTimeout(()=>msgDlg.close(), 1400);
+    } else {
+      const t = (await r.text().catch(()=>"")).toLowerCase();
+      mmsg.innerHTML = '<span class="err">'+(t.includes("email_shape")?"That email doesn’t look right.":"Sorry, that didn’t send. Please try again.")+'</span>';
+    }
+  } catch(_){
+    mmsg.innerHTML = '<span class="err">Network hiccup. Please try again.</span>';
+  }
 });
 
 // ---- snap-a-flyer: in-browser OCR, nothing leaves the device ----
