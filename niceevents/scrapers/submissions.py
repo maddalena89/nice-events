@@ -23,8 +23,14 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import date
 from typing import Iterator, Optional
+
+# Strip a trailing /rest or /rest/v1 that someone may have pasted onto
+# SUPABASE_URL. Without this we'd build ".../rest/v1/rest/v1/submissions", which
+# PostgREST rejects (the request comes back 401/404 and no submissions load).
+_REST_TAIL = re.compile(r"/rest(/v1)?/?$")
 
 from ..models import CATEGORIES, Event, canon_town, parse_date
 from .base import HttpScraper, register
@@ -45,6 +51,7 @@ class Submissions(HttpScraper):
 
     def _cfg(self) -> tuple[Optional[str], Optional[str]]:
         url = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
+        url = _REST_TAIL.sub("", url)          # tolerate a pasted /rest/v1 suffix
         key = os.environ.get("SUPABASE_SERVICE_KEY") or ""
         return (url or None), (key or None)
 
