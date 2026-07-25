@@ -100,6 +100,11 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .pill.out{background:transparent;color:var(--muted);border:1px solid var(--rule)}
 /* Run-length sticker for exhibitions and other multi-day events. */
 .pill.run{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+/* Cancelled event: red badge + struck-through title, greyed row. */
+.pill.cancel{background:#c8102e;color:#fff}
+.row.cancelled{opacity:.72}
+.row.cancelled .tt{text-decoration:line-through;text-decoration-thickness:2px;color:var(--muted)}
+.row.cancelled .sub{color:#c8102e;font-weight:600}
 /* Discrete per-event icon buttons (share, add-to-calendar). Reset the global
    button chrome so they're just muted icons, not bordered boxes. */
 .sharebtn,.calbtn,.cardbtn{border:0;background:none;padding:5px;margin-left:2px;color:var(--muted);
@@ -638,22 +643,27 @@ function render(){
       list.appendChild(h); last=slot;
     }
     i++;
-    const r=document.createElement("div"); r.className="row"; r.dataset.fp=e.fingerprint;
+    const r=document.createElement("div"); r.className="row"+(e.cancelled?" cancelled":""); r.dataset.fp=e.fingerprint;
     if(e.fingerprint===HL_FP) r.classList.add("hl");
+    const ttl = (e.url && !e.cancelled)
+      ? `<a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`
+      : `<span class="tt">${esc(e.title)}</span>`;
+    const sub = e.cancelled ? esc(e.cancel_note||"Annulé") : (e.note?esc(e.note):"");
     r.innerHTML=`
       <div class="idx">${String(i).padStart(2,"0")}</div>
       <div>
         <div class="ttl">
+          ${e.cancelled?'<span class="pill cancel">Annulé</span>':""}
           ${e.free?'<span class="pill free">Free</span>':""}
           ${e.outdoor?'<span class="pill out">Outdoor</span>':""}
           ${e.online?'<span class="pill out">Online</span>':""}
           ${runBadge(e)}
-          ${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`:esc(e.title)}
+          ${ttl}
           <button class="calbtn" data-fp="${esc(e.fingerprint)}" aria-label="Add to calendar" title="Add to calendar">${CAL_SVG}</button>
           <button class="sharebtn" data-fp="${esc(e.fingerprint)}" data-title="${esc(e.title)}" aria-label="Share this event" title="Share">${SHARE_SVG}</button>
           <button class="cardbtn" data-fp="${esc(e.fingerprint)}" aria-label="Get a shareable card" title="Shareable card">${CARD_SVG}</button>
         </div>
-        ${e.note?`<div class="sub">${esc(e.note)}</div>`:""}
+        ${sub?`<div class="sub">${sub}</div>`:""}
       </div>
       <div class="where"><b>${esc(e.town)}</b>
         <span>${e.venue?esc(e.venue):""}</span></div>

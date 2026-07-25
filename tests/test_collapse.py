@@ -62,7 +62,10 @@ def test_recurring_same_venue_collapses():
     ]
     out = _pipeline(evs)
     assert len(out) == 1
-    assert out[0]["start"] == "2026-07-25" and out[0]["end"] == "2026-09-05"
+    e = out[0]
+    assert e["start"] == "2026-07-25"          # anchored on the next date
+    assert not e.get("end")                    # single day, not a continuous range
+    assert "Also on" in (e.get("note") or "")  # other dates noted
 
 
 def test_recurring_no_venue_kept():

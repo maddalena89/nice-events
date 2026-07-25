@@ -26,6 +26,7 @@ from typing import Optional
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from . import db
+from .cancellations import mark_cancelled
 from .models import CATEGORIES, _title_key, slugify
 
 TPL_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -148,6 +149,14 @@ def _collapse_overlaps(events: list[dict]) -> list[dict]:
     return out
 
 
+_MONTHS_ABBR = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _fmt_day(iso: str) -> str:
+    _, m, d = iso.split("-")
+    return f"{int(d)} {_MONTHS_ABBR[int(m)]}"
+
+
 def _collapse_recurring(events: list[dict]) -> list[dict]:
     """Fold a single event that recurs on many dates at the SAME venue into one row.
 
@@ -175,9 +184,22 @@ def _collapse_recurring(events: list[dict]) -> list[dict]:
             out.append(evs[0])
             continue
         evs.sort(key=lambda e: (e["start"], e.get("end") or e["start"]))
-        start = date.fromisoformat(evs[0]["start"])
-        end = max(date.fromisoformat(e.get("end") or e["start"]) for e in evs)
-        out.append(_merge_cluster(evs, start, end))
+        # Discrete recurrence (a monthly milonga, a tour on set dates) is NOT a
+        # continuous run: anchor it on the NEXT date as a single day and list the
+        # other dates in the note, instead of a span that would wrongly read as
+        # "on every day". (True continuous exhibitions arrive as one row with a
+        # real start+end and never reach this branch.)
+        d0 = date.fromisoformat(evs[0]["start"])
+        base = _merge_cluster(evs, d0, d0)                 # single day, end dropped
+        others = [e["start"] for e in evs[1:] if e.get("start") != evs[0]["start"]]
+        if others:
+            shown = others[:4]
+            summ = "Also on " + ", ".join(_fmt_day(x) for x in shown)
+            if len(others) > len(shown):
+                summ += " +%d more" % (len(others) - len(shown))
+            base["note"] = (base["note"] + " · " + summ) if base.get("note") else summ
+        base["recurring"] = True
+        out.append(base)
 
     out.sort(key=lambda e: (e["start"], e.get("title", "")))
     return out
@@ -254,8 +276,13 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
 
 def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     rows = db.upcoming(conn)
-    events = _collapse_overlaps([_row_to_dict(r) for r in rows])
-    events = _collapse_recurring(events)  # fold same-event-many-dates into one row
+    dicts = mark_cancelled([_row_to_dict(r) for r in rows])
+    # Cancelled events stay as their own struck-through row, and must NOT be folded
+    # into a collapsed range, or a single cancelled date would disappear into an
+    # otherwise-active run of the same event.
+    cancelled = [e for e in dicts if e.get("cancelled")]
+    active = [e for e in dicts if not e.get("cancelled")]
+    events = _collapse_recurring(_collapse_overlaps(active)) + cancelled
     for e in events:                      # no em dashes in any displayed title
         e["title"] = _clean_title(e.get("title", ""))
     _assign_slugs(events)                 # stable, unique short link per event
