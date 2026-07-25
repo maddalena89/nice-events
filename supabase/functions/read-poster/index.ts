@@ -23,7 +23,11 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const MODEL = Deno.env.get("POSTER_MODEL") ?? "claude-3-5-haiku-latest";
+// Must be a VISION-capable model: 3.5 Haiku is text-only and can't see the
+// poster. Sonnet reads real posters (script fonts, text over photos) well, and a
+// poster read only happens when someone taps "read this", so the cost is tiny.
+// Override with the POSTER_MODEL secret if you want a cheaper/newer vision model.
+const MODEL = Deno.env.get("POSTER_MODEL") ?? "claude-3-5-sonnet-latest";
 const KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 
 // The 12 categories the site actually renders. Kept in sync with models.py.
