@@ -176,7 +176,7 @@ class Brocabrac(HttpScraper):
         if exhibitors:
             bits.append(f"~{exhibitors[1]} exhibitors")
         elif size:
-            bits.append(["small", "medium", "large", "very large"][min(size, 4) - 1])
+            bits.append(["small", "medium-sized", "large", "very large"][min(size, 4) - 1] + " market")
 
         return Event(
             title=title,
