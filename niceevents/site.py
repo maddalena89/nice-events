@@ -27,6 +27,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from . import db
 from .cancellations import mark_cancelled
+from .suppress import drop_suppressed
 from .models import CATEGORIES, _title_key, slugify
 
 TPL_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -276,7 +277,8 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
 
 def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     rows = db.upcoming(conn)
-    dicts = mark_cancelled([_row_to_dict(r) for r in rows])
+    # Remove phantom / dead listings first, before anything else looks at them.
+    dicts = mark_cancelled(drop_suppressed([_row_to_dict(r) for r in rows]))
     # Cancelled events stay as their own struck-through row, and must NOT be folded
     # into a collapsed range, or a single cancelled date would disappear into an
     # otherwise-active run of the same event.
