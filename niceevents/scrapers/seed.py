@@ -38,16 +38,8 @@ SEED: list[tuple] = [
     ("2026-09-04", "", "Sheik of Swing", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
     ("2026-09-11", "", "Romano Dandies", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
 
-    # Trinquette Jazz Club (Villefranche): ticketed club nights (18€/12€). Only
-    # the confirmed upcoming block; the venue's later dates render via JS.
-    ("2026-07-30", "", "Carlos G. Lopes", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
-    ("2026-07-31", "", "Guitar Night Vol. 9 with Olivier Giraudo", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
-    ("2026-08-01", "", "Simon Chivallon Trio", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
-    ("2026-08-02", "", "Luca Fenoli & Thomas Delor Trio", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 20h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
-    ("2026-08-07", "", "Mounam Sings Nina Simone", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
-    ("2026-08-08", "", "The Kareem Kandi World Orchestra", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
-    ("2026-08-14", "", "Nina Papa Quartet", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
-    ("2026-08-15", "", "Les Voix de Gaïa", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    # Trinquette Jazz Club (Villefranche) is now scraped live from the club's
+    # own site (see scrapers/trinquette.py), so no hand-entered nights here.
     ("2026-09-12", "2026-09-19", "Beaulieu Classic Festival", "Beaulieu-sur-Mer", "Petite Afrique, Casino, Église St Michael, Hôtel Royal Riviera", "concert", "8 days of classical music · opening 12 Sept: Nice Opera Chorus", "https://www.explorenicecotedazur.com/en/event/beaulieu-classic-festival-2026/", False),
     # Belaprem lives in its own module now (per-night line-up), so no umbrella here.
     ("2026-09-18", "2026-09-20", "LEC Summer Finals 2026", "Nice", "Palais Nikaïa", "autre", "League of Legends esports finals", "https://www.nikaia.fr/programmation/lec-summer-finals-2026", False),

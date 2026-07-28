@@ -21,6 +21,7 @@ from . import harvest        # noqa: F401  generic JSON-LD / iCal venue harveste
 
 # JS-rendered — Playwright required
 from . import theatres_nice  # noqa: F401  municipal & partner theatres [browser]
+from . import trinquette     # noqa: F401  La Trinquette Jazz Club (Villefranche) [browser]
 from . import meetup         # noqa: F401  design, business, AI, expat
 from . import ra             # noqa: F401  electronic / clubs
 from . import eventbrite     # noqa: F401  business, tech, conferences
