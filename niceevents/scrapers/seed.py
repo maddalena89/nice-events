@@ -13,11 +13,29 @@ build time, so a stale line here is harmless; refresh the exhibitions each seaso
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Iterator, Optional
 
 from ..models import Event
 from .base import Scraper, register
+
+# Seed notes carry the start time the French way ("21h00", "20h00"); pull it into
+# the event's own time field. The site then shows the time once and strips the
+# duplicate out of the note.
+_NOTE_TIME = re.compile(r"\b(\d{1,2})\s*h\s*(\d{2})?\b", re.I)
+
+
+def _note_time(note: Optional[str]) -> Optional[str]:
+    if not note:
+        return None
+    m = _NOTE_TIME.search(note)
+    if not m:
+        return None
+    h, mi = int(m.group(1)), int(m.group(2) or 0)
+    if 0 <= h <= 23 and 0 <= mi <= 59:
+        return f"{h:02d}:{mi:02d}"
+    return None
 
 #: (start, end, title, town, venue, category, note, url, free)
 #: end="" for single-day; venue="" when unknown.
@@ -38,8 +56,17 @@ SEED: list[tuple] = [
     ("2026-09-04", "", "Sheik of Swing", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
     ("2026-09-11", "", "Romano Dandies", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
 
-    # Trinquette Jazz Club (Villefranche) is now scraped live from the club's
-    # own site (see scrapers/trinquette.py), so no hand-entered nights here.
+    # Trinquette Jazz Club (Villefranche): ticketed club nights (18€/12€), read
+    # off the club's own monthly programme at trinquettejazzclub.com. Refresh the
+    # upcoming block each month; past-dated lines drop themselves at build.
+    ("2026-07-30", "", "Carlos G. Lopes", "Villefranche-sur-Mer", "La Trinquette Jazz Club", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.billetweb.fr/carlos-g-lopes3", False),
+    ("2026-07-31", "", "Guitar Night Vol. 9 with Olivier Giraudo", "Villefranche-sur-Mer", "La Trinquette Jazz Club", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.billetweb.fr/guitar-night-vol-9-avec-olivier-giraudo", False),
+    ("2026-08-01", "", "Simon Chivallon Trio", "Villefranche-sur-Mer", "La Trinquette Jazz Club", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-08-02", "", "Luca Fenoli & Thomas Delor Trio", "Villefranche-sur-Mer", "La Trinquette Jazz Club", "concert", "Trinquette Jazz Club · 20h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-08-07", "", "Mounam Sings Nina Simone", "Villefranche-sur-Mer", "La Trinquette Jazz Club", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.billetweb.fr/mounam-sings-nina-simone-2026", False),
+    ("2026-08-08", "", "The Kareem Kandi World Orchestra", "Villefranche-sur-Mer", "La Trinquette Jazz Club", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.billetweb.fr/the-kareem-kandi-world-orchestra3", False),
+    ("2026-08-14", "", "Nina Papa Quartet", "Villefranche-sur-Mer", "La Trinquette Jazz Club", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.billetweb.fr/nina-papa-quartet-aout-2026", False),
+    ("2026-08-15", "", "Les Voix de Gaïa", "Villefranche-sur-Mer", "La Trinquette Jazz Club", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.billetweb.fr/les-voix-de-gaia-aout-2026", False),
     ("2026-09-12", "2026-09-19", "Beaulieu Classic Festival", "Beaulieu-sur-Mer", "Petite Afrique, Casino, Église St Michael, Hôtel Royal Riviera", "concert", "8 days of classical music · opening 12 Sept: Nice Opera Chorus", "https://www.explorenicecotedazur.com/en/event/beaulieu-classic-festival-2026/", False),
     # Belaprem lives in its own module now (per-night line-up), so no umbrella here.
     ("2026-09-18", "2026-09-20", "LEC Summer Finals 2026", "Nice", "Palais Nikaïa", "autre", "League of Legends esports finals", "https://www.nikaia.fr/programmation/lec-summer-finals-2026", False),
@@ -111,6 +138,7 @@ class Seed(Scraper):
                 title=title,
                 start=start,
                 end=end,
+                time=_note_time(note),               # pull "21h00" out of the note
                 town=town,
                 venue=venue or None,
                 category=cat,
