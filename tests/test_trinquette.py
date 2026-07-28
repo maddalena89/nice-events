@@ -10,32 +10,38 @@ import datetime
 
 from niceevents.scrapers.trinquette import Trinquette
 
-# A future year so nothing is dropped as past regardless of when tests run.
+# Shaped like the real Nicepage export: the club prints the hour on its OWN
+# line, above the act name — the parser must read it as the time, never the
+# title. A future year so nothing is dropped as past regardless of when tests run.
 _HOME = """
 <html><body>
 <nav><a href="/">ACCUEIL</a><a href="/AGENDA">AGENDA</a></nav>
 
 <div class="u-container">
-  <h6>JEUDI 30 JUILLET 2099 21H</h6>
-  <h2>Carlos G. Lopes</h2>
+  <h4>JEUDI 30 JUILLET 2099</h4>
+  <h2>21H</h2>
+  <h3>Carlos G. Lopes</h3>
   <a href="https://www.billetweb.fr/carlos-g-lopes3">JE RESERVE !</a>
 </div>
 
 <div class="u-container">
-  <h6>DIMANCHE 2 AOÛT 2099 20H</h6>
-  <h2>Luca Fenoli &amp; Thomas Delor Trio</h2>
+  <h4>DIMANCHE 2 AOÛT 2099</h4>
+  <h2>20H</h2>
+  <h3>Luca Fenoli &amp; Thomas Delor Trio</h3>
   <a href="https://www.billetweb.fr/luca-fenoli-thomas-delor-trio">JE RESERVE !</a>
 </div>
 
 <div class="u-container">
-  <h6>VENDREDI 14 AOÛT 2099 21H</h6>
-  <h2>NINA PAPA QUARTET</h2>
+  <h4>VENDREDI 14 AOÛT 2099</h4>
+  <h2>21H</h2>
+  <h3>NINA PAPA QUARTET</h3>
   <a href="https://www.billetweb.fr/nina-papa-quartet-aout-2099">JE RESERVE !</a>
 </div>
 
 <div class="u-container">
-  <h6>SAMEDI 1 AOÛT 2099 21H</h6>
-  <h2>Simon Chivallon Trio</h2>
+  <h4>SAMEDI 1 AOÛT 2099</h4>
+  <h2>21H</h2>
+  <h3>Simon Chivallon Trio</h3>
   <!-- no ticket link this week -->
 </div>
 
@@ -54,6 +60,14 @@ def test_parses_each_night():
     assert "NINA PAPA QUARTET" in evs
     assert "Simon Chivallon Trio" in evs
     assert len(evs) == 4
+
+
+def test_time_line_is_never_the_title():
+    # The "21H" / "20H" line is the start time, not an act. No event may be
+    # titled after it. (This is the exact bug the first version shipped.)
+    titles = [e.title for e in _events(_HOME)]
+    assert not any(t.strip().rstrip("Hh").isdigit() for t in titles)
+    assert "21H" not in titles and "20H" not in titles
 
 
 def test_dates_times_and_sunday_default():

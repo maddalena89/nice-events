@@ -266,6 +266,8 @@ def _clean_title(t: str) -> str:
 # the note reads as a plain description.
 _TIME_LEAD = re.compile(r"^\s*\d{1,2}[:h]\d{2}(?:\s*[–-]\s*\d{1,2}[:h]\d{2})?\s*·\s*")
 _LABEL_LEAD = re.compile(r"^\s*([^\s·][^·]{0,24}?)\s*·\s*")
+# A note segment that is nothing but a start time ("21h00", "20:00", "21h").
+_BARE_TIME = re.compile(r"^\d{1,2}\s*[h:]\s*\d{0,2}\s*$", re.I)
 _CAT_LABELS = frozenset((
     "concert atelier theatre spectacle projection brocante ballet vide-grenier "
     "rencontre exposition opera lecture animation danse humour conference visite "
@@ -302,6 +304,12 @@ def _note_full(note: str) -> str:
     m = _LABEL_LEAD.match(t)
     if m and _ascii_fold(m.group(1)) in _CAT_LABELS:
         t = t[m.end():].strip()
+    # Drop any standalone time segment ("· 21h00 ·"): the start time is shown on
+    # its own line, so a time repeated inside the note is just a duplicate.
+    if "·" in t:
+        parts = [p.strip() for p in t.split("·")]
+        parts = [p for p in parts if p and not _BARE_TIME.match(p)]
+        t = " · ".join(parts)
     return t
 
 

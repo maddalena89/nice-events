@@ -41,6 +41,15 @@ def _fold(s: str) -> str:
 #: If the WordPress API still lists it with a future date, it is REAL. Only add
 #: events here that are genuinely gone or bogus in the source itself.
 SUPPRESSED: list[tuple] = [
+    # The métropole tourist office lists one 9-month "Concerts at the Trinquette
+    # Jazz Club" umbrella (Feb–Nov). We now scrape the club's real per-night
+    # line-up, so the umbrella is a redundant, uninformative block. Drop it.
+    ("https://www.explorenicecotedazur.com/en/event/concerts-at-the-trinquette-jazz-club/", None, None, None),
+    # Clean up the bad rows the first Trinquette scrape stored before the parser
+    # fix: their title is just the start time ("21H" / "20H"). Scoped to the club
+    # town so nothing else is touched. Remove these lines after 2 Aug 2026.
+    (None, "21h", "Villefranche-sur-Mer", None),
+    (None, "20h", "Villefranche-sur-Mer", None),
 ]
 
 

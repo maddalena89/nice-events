@@ -59,6 +59,11 @@ _SKIP_LINE = re.compile(
     re.I,
 )
 
+# A line that is JUST a start time — "21H", "21H00", "20 h", "21:00". The club
+# prints the hour on its own line, above the act name; it is the time, never
+# the title.
+_TIME_ONLY = re.compile(r"^(\d{1,2})\s*[h:]\s*(\d{2})?\s*$", re.I)
+
 
 def _norm(s: str) -> str:
     """Accent-fold + lowercase + collapse spaces, for pattern matching."""
@@ -113,25 +118,35 @@ class Trinquette(BrowserScraper):
             if not start:
                 i += 1
                 continue
+            # The hour may be on the date line ("... 2026 21H") or on its own
+            # line just below it. Read it from whichever we find.
             hour = m.group(4)
-            time = f"{int(hour):02d}:00" if hour else ("20:00" if start.weekday() == 6 else "21:00")
+            time = f"{int(hour):02d}:00" if hour else None
 
-            # Title: the next line that isn't a button or another date line.
+            # Title: the next line that isn't the time, a button, or a new date.
             title = ""
             j = i + 1
-            while j < n and j <= i + 4:
+            while j < n and j <= i + 5:
                 cand = lines[j]
                 cn = _norm(cand)
                 if _DATE_RE.search(cn):
                     break
+                tm = _TIME_ONLY.match(cn)
+                if tm:                                  # a bare "21H" line = the time
+                    if not time:
+                        time = f"{int(tm.group(1)):02d}:{int(tm.group(2) or 0):02d}"
+                    j += 1
+                    continue
                 if _SKIP_LINE.match(cn) or len(cand) < 2:
                     j += 1
                     continue
                 title = cand
                 break
-            if not title or is_nonevent(title):
+            if not title or is_nonevent(title) or _TIME_ONLY.match(_norm(title)):
                 i += 1
                 continue
+            if not time:                                # default: Sunday 20h, else 21h
+                time = "20:00" if start.weekday() == 6 else "21:00"
 
             url = self._match_ticket(title, tickets) or HOME
             yield Event(
