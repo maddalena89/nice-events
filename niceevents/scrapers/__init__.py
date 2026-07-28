@@ -11,6 +11,7 @@ from . import nice_fr        # noqa: F401  Ville de Nice (incl. Jazz Fest)
 from . import openagenda     # noqa: F401  culture: opera, theatre, festivals (national API)
 from . import tango          # noqa: F401  milongas
 from . import explore_nca    # noqa: F401  Métropole tourist office (50 communes)
+from . import departement06  # noqa: F401  Département 06 agenda (Soirées Estivales, etc.)
 from . import museums        # noqa: F401  MAMAC, Matisse, Chagall…
 from . import maeght         # noqa: F401  Fondation Maeght (Saint-Paul-de-Vence) [browser]
 from . import seed           # noqa: F401  hand-curated coast & hinterland exhibitions
