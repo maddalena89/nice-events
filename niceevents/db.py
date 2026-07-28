@@ -203,6 +203,28 @@ def prune_past(conn, keep_days: int = 2) -> int:
     return cur.rowcount
 
 
+def prune_retired(conn, active_sources) -> int:
+    """Drop events left behind by a scraper we've removed.
+
+    The db is persistent, so a row stays until its date passes even after the
+    source that created it is gone. When a scraper is retired (or renamed) its
+    rows would otherwise linger with stale, possibly wrong data. Delete any row
+    whose every source is no longer active. Human submissions (submitted_by set)
+    are always kept — a person vetted those, they belong to no scraper.
+    """
+    active = {s for s in active_sources}
+    dead = []
+    for r in conn.execute(
+        "SELECT fingerprint, source, sources FROM events WHERE submitted_by IS NULL"
+    ).fetchall():
+        srcs = {s.strip() for s in (r["sources"] or r["source"] or "").split(",") if s.strip()}
+        if srcs and active.isdisjoint(srcs):
+            dead.append((r["fingerprint"],))
+    if dead:
+        conn.executemany("DELETE FROM events WHERE fingerprint = ?", dead)
+    return len(dead)
+
+
 def upcoming(conn, days: Optional[int] = None, include_pending: bool = False) -> list[sqlite3.Row]:
     today = date.today().isoformat()
     sql = "SELECT * FROM events WHERE COALESCE(end, start) >= ?"

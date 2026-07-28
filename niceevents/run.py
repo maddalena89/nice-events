@@ -90,6 +90,12 @@ def cmd_scrape(args) -> int:
             pruned = db.prune_past(conn)
             if pruned:
                 log.info("pruned %d past events", pruned)
+            # A full run (not --only) knows the complete active source list, so
+            # it can safely clear rows left by scrapers we've since removed.
+            if not args.only:
+                retired = db.prune_retired(conn, set(REGISTRY))
+                if retired:
+                    log.info("pruned %d event(s) from retired sources", retired)
 
         s = db.stats(conn)
 
