@@ -23,8 +23,31 @@ from .base import Scraper, register
 #: end="" for single-day; venue="" when unknown.
 SEED: list[tuple] = [
     # ---- festivals / concerts / seasonal ----
-    ("2026-06-26", "2026-09-11", "Jazz at the Château", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz & blues · recurring dates", "https://www.explorenicecotedazur.com/en/event/jazz-at-the-chateau/", False),
-    ("2026-02-21", "2026-11-29", "Concerts at the Trinquette Jazz Club", "Villefranche-sur-Mer", "La Trinquette", "concert", "Jazz & blues · recurring", "https://www.explorenicecotedazur.com/en/event/concerts-at-the-trinquette-jazz-club/", False),
+    # Jazz au Château (Haut-de-Cagnes): free Friday nights, one act each. Source:
+    # ville.cagnes.fr. Seed drops the already-past dates automatically at build.
+    ("2026-06-26", "", "Big Band and jazz groups of the Conservatoire de Cagnes-sur-Mer", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 20h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-07-03", "", "Trio Frankie Rochester", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-07-10", "", "Quartet Accordéon Project", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-07-17", "", "Laurent Epstein Quartet", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-07-24", "", "Manu Le Prince Quartet", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-07-31", "", "Swinguys", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-08-07", "", "Papaya Jazz Flashback", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-08-14", "", "Licks & Brains", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-08-21", "", "The Jazz Bicravers", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-08-28", "", "Les Accordes Swing", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-09-04", "", "Sheik of Swing", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+    ("2026-09-11", "", "Romano Dandies", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
+
+    # Trinquette Jazz Club (Villefranche): ticketed club nights (18€/12€). Only
+    # the confirmed upcoming block; the venue's later dates render via JS.
+    ("2026-07-30", "", "Carlos G. Lopes", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-07-31", "", "Guitar Night Vol. 9 with Olivier Giraudo", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-08-01", "", "Simon Chivallon Trio", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-08-02", "", "Luca Fenoli & Thomas Delor Trio", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 20h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-08-07", "", "Mounam Sings Nina Simone", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-08-08", "", "The Kareem Kandi World Orchestra", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-08-14", "", "Nina Papa Quartet", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
+    ("2026-08-15", "", "Les Voix de Gaïa", "Villefranche-sur-Mer", "La Trinquette", "concert", "Trinquette Jazz Club · 21h00 · 18€/12€", "https://www.trinquettejazzclub.com/", False),
     ("2026-09-12", "2026-09-19", "Beaulieu Classic Festival", "Beaulieu-sur-Mer", "Petite Afrique, Casino, Église St Michael, Hôtel Royal Riviera", "concert", "8 days of classical music · opening 12 Sept: Nice Opera Chorus", "https://www.explorenicecotedazur.com/en/event/beaulieu-classic-festival-2026/", False),
     # Belaprem lives in its own module now (per-night line-up), so no umbrella here.
     ("2026-09-18", "2026-09-20", "LEC Summer Finals 2026", "Nice", "Palais Nikaïa", "autre", "League of Legends esports finals", "https://www.nikaia.fr/programmation/lec-summer-finals-2026", False),
