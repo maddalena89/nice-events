@@ -604,6 +604,8 @@ TOWNS.forEach(t=>{
   const o=document.createElement("option"); o.value=o.textContent=t;
   $("town").appendChild(o);
 });
+// Start focused on Nice itself; "All towns" and every commune stay one click away.
+if (TOWNS.includes("Nice")) $("town").value = "Nice";
 {
   const dl=$("townlist");
   if(dl) TOWNS.forEach(t=>{const o=document.createElement("option");o.value=t;dl.appendChild(o);});
