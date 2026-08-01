@@ -30,6 +30,7 @@ from . import db
 from .cancellations import mark_cancelled
 from .suppress import drop_suppressed
 from .models import CATEGORIES, _title_key, classify, slugify
+from .overrides import apply_override
 
 TPL_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -387,6 +388,8 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
         guess = classify(d.get("title"), d.get("venue"))
         if guess != "autre":
             d["category"] = guess
+    # Hand-pinned category corrections win over everything above.
+    apply_override(d)
 
     # Normalise the description: tidy entities/unicode, drop the redundant
     # time+category prefix, infer free/paid from the full text, then keep it short.
