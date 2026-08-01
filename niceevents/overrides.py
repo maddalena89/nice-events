@@ -35,6 +35,9 @@ OVERRIDES: list[tuple] = [
     # Awareness event with a short-film premiere, tagged Business by the source.
     ("https://www.eventbrite.com/e/billets-journee-mondiale-de-la-lutte-contre-la-traite-detres-humains-1994946039306",
      None, None, "social"),
+    # An AI build workshop: fits both Workshops and Business/Tech, and the site
+    # allows one tab, so pin it to Business, tech & AI where the AI crowd looks.
+    ("https://www.meetup.com/nice-nomads/events/315842030/", None, None, "business"),
 ]
 
 
