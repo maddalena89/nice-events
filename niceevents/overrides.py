@@ -38,6 +38,9 @@ OVERRIDES: list[tuple] = [
     # An AI build workshop: fits both Workshops and Business/Tech, and the site
     # allows one tab, so pin it to Business, tech & AI where the AI crowd looks.
     ("https://www.meetup.com/nice-nomads/events/315842030/", None, None, "business"),
+    # Tagged Concert by the source; the curator files it under Theatre.
+    ("https://www.helloasso.com/associations/academie-internationale-d-ete-de-nice/evenements/mercredi-5-aout-20h",
+     None, None, "scene"),
 ]
 
 
