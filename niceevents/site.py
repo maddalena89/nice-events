@@ -29,7 +29,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from . import db
 from .cancellations import mark_cancelled
 from .suppress import drop_suppressed
-from .models import CATEGORIES, _title_key, slugify
+from .models import CATEGORIES, _title_key, classify, slugify
 
 TPL_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -300,6 +300,10 @@ def _note_full(note: str) -> str:
     """Tidy a note and drop its redundant leading time / category label, but do
     NOT shorten it yet — free/paid detection wants the whole text first."""
     t = _tidy_text(note)
+    # A note that is nothing but a bare time ("00:00", "21h00") is junk from a
+    # scraper that had no real description, not something to show under a title.
+    if _BARE_TIME.match(t.strip()):
+        return ""
     t = _TIME_LEAD.sub("", t).strip()
     m = _LABEL_LEAD.match(t)
     if m and _ascii_fold(m.group(1)) in _CAT_LABELS:
@@ -368,6 +372,21 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
     # Fold brocantes into the markets & fêtes chip for display.
     if d.get("category") == "brocante":
         d["category"] = "marche"
+
+    # Fix categories at display time. Meetup never gives an authoritative type, so
+    # its stored category is only a guess and often wrong (a generic "meetup" or a
+    # coffee morning is not nightlife); re-derive it from the title and default a
+    # generic result to Social & expat, where these gatherings belong. For other
+    # sources, only upgrade a row still stuck in the generic "autre" bucket when
+    # the title clearly matches a real category. This never overrides a specific
+    # category a source stated on purpose.
+    if d.get("source") == "meetup":
+        guess = classify(d.get("title"), d.get("venue"))
+        d["category"] = guess if guess != "autre" else "social"
+    elif d.get("category") == "autre":
+        guess = classify(d.get("title"), d.get("venue"))
+        if guess != "autre":
+            d["category"] = guess
 
     # Normalise the description: tidy entities/unicode, drop the redundant
     # time+category prefix, infer free/paid from the full text, then keep it short.

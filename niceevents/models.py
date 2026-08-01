@@ -48,16 +48,17 @@ _CATEGORY_RULES: list[tuple[str, str]] = [
     (r"\bdj\b|dj set|clubbing|night ?club|bo[iî]te de nuit|techno|\bhouse\b|\belectro\b|\brave\b|"
      r"after[\s-]?party|club night|soir[ée]e club|ap[ée]ro club|warehouse", "autre"),
     (r"concert|jazz|live music|musique live|orchestre|philharmoni|chorale|r[ée]cital|fanfare|"
-     r"blues|reggae|festival de musique", "concert"),
+     r"blues|reggae|lyrique|art lyrique|chant lyrique|festival de musique", "concert"),
     (r"théâtre|theatre|spectacle|opéra|opera|ballet|one man show|humour|cirque|danse contemporaine", "scene"),
     (r"visite guidée|visite|guided (tour|visit)|parcours patrimoine|balade", "visite"),
     (r"atelier|workshop|stage de|masterclass|initiation|cours\b", "atelier"),
-    (r"conférence|conference|meetup|networking|afterwork|startup|\bai\b|\bia\b|intelligence artificielle|"
+    (r"conférence|conference|networking|afterwork|startup|\bai\b|\bia\b|intelligence artificielle|"
      r"tech\b|pitch|hackathon|business|entrepreneur|coworking|summit|forum|salon professionnel|webinar", "business"),
     (r"expat|language exchange|échange linguistique|apéro|picnic|pique-nique|rencontre|social|hangout|"
      r"jeux de société|board game|quiz|blind test", "social"),
     (r"marché|market|fête|festa|foire|festin|procession|feu d'artifice|carnaval|transhumance", "marche"),
-    (r"course|trail|randonnée|match|tournoi|compétition|marathon|régate|pétanque|yoga|running", "sport"),
+    (r"course|trail|randonnée|match|tournoi|compétition|marathon|régate|pétanque|yoga|running|"
+     r"self.?d[ée]fense|autod[ée]fense|arts martiaux|krav maga|boxe|fitness|pilates", "sport"),
 ]
 
 
