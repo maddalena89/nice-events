@@ -50,6 +50,10 @@ SUPPRESSED: list[tuple] = [
     # town so nothing else is touched. Remove these lines after 2 Aug 2026.
     (None, "21h", "Villefranche-sur-Mer", None),
     (None, "20h", "Villefranche-sur-Mer", None),
+    # Owner confirmed this one is not a real event. The nice.fr API blocks
+    # automated verification (403), so this rests on the owner's local knowledge,
+    # not a bot 404. Fully reversible: delete this line to bring it back.
+    ("https://www.nice.fr/agenda/le-chat-potte/", None, None, None),
 ]
 
 
