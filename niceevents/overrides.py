@@ -41,6 +41,10 @@ OVERRIDES: list[tuple] = [
     # Tagged Concert by the source; the curator files it under Theatre.
     ("https://www.helloasso.com/associations/academie-internationale-d-ete-de-nice/evenements/mercredi-5-aout-20h",
      None, None, "scene"),
+    # A Maracatu trial class; reads as a Concert only because the venue is
+    # "Offjazz". It is a workshop.
+    ("https://www.meetup.com/echanges-linguistiques-de-la-cote-dazur/events/315696611/",
+     None, None, "atelier"),
 ]
 
 
