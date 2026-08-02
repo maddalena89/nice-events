@@ -23,6 +23,7 @@ def _fold(s: str) -> str:
 #: and distinctive so it matches however the source spells the full title.
 CANCELLED: list[tuple] = [
     ("milonga de l amitie", "Nice", "2026-07-25", "Annulée"),
+    ("casita", "Nice", "2026-08-02", "Annulée"),
 ]
 
 
