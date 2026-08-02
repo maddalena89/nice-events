@@ -36,13 +36,6 @@ a{color:var(--accent)}
   letter-spacing:inherit;text-transform:inherit;color:var(--muted);cursor:pointer;
   text-decoration:underline;text-underline-offset:2px}
 .linklike:hover{background:none;color:var(--accent)}
-.bugfab{position:fixed;z-index:50;right:calc(14px + env(safe-area-inset-right));
-  bottom:calc(14px + env(safe-area-inset-bottom));background:var(--paper);color:var(--ink);
-  border:1px solid var(--ink);font:inherit;font-size:11px;font-weight:600;letter-spacing:.1em;
-  text-transform:uppercase;padding:9px 12px;cursor:pointer;box-shadow:2px 2px 0 var(--ink)}
-.bugfab:hover{background:var(--ink);color:var(--paper)}
-.bugfab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-@media print{.bugfab{display:none}}
 /* About dialog reads as prose, not a form. */
 .about-body p{margin:0 0 14px;font-size:15.5px;line-height:1.6;max-width:60ch}
 .about-body p:last-child{margin-bottom:0}
@@ -340,7 +333,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 <div class="hero">
   <div class="eyebrow">
     <span>Alpes-Maritimes · 06</span>
-    <span><button type="button" class="linklike" id="about-open">About</button> · Updated <b>{{ updated }}</b></span>
+    <span><button type="button" class="linklike" id="about-open">About</button> · <button type="button" class="linklike" id="bug-top">Report a bug</button> · Updated <b>{{ updated }}</b></span>
   </div>
   <h1>What's<br>on in <em>Nice</em></h1>
   <div class="standfirst">
@@ -517,8 +510,6 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 </div>
 
 </div>
-
-<button type="button" class="bugfab" id="bug-fab" aria-label="Report a bug">Report a bug</button>
 
 <script id="data" type="application/json">{{ events_json }}</script>
 <script>
@@ -1019,7 +1010,7 @@ function openMsg(kind){
   msgDlg.showModal();
 }
 if ($("bug-open"))   $("bug-open").onclick   = () => openMsg("bug");
-if ($("bug-fab"))    $("bug-fab").onclick    = () => openMsg("bug");
+if ($("bug-top"))    $("bug-top").onclick    = () => openMsg("bug");
 if ($("hello-open")) $("hello-open").onclick = () => { aboutDlg.close(); openMsg("hello"); };
 $("msg-close").onclick = () => msgDlg.close();
 msgDlg.addEventListener("click", e => {
