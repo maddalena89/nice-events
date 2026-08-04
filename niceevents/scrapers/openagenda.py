@@ -67,8 +67,14 @@ def _text(v) -> str:
 
 def _postcode(rec: dict) -> str:
     for k in ("location_postalcode", "location_postal_code", "location_zipcode"):
-        if rec.get(k):
-            return str(rec[k]).strip()
+        v = rec.get(k)
+        if v:
+            # OpenDataSoft often stores this as an integer, which drops the
+            # leading zero: 06000 comes back as 6000. Left-pad the digits to 5
+            # so the "starts with 06" department check below actually holds —
+            # without this, EVERY Alpes-Maritimes event (all 06xxx) is dropped.
+            digits = re.sub(r"\D", "", str(v))
+            return digits.zfill(5) if digits else str(v).strip()
     return ""
 
 

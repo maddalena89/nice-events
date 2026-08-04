@@ -51,19 +51,31 @@ class ExploreNCA(HttpScraper):
     MAX_PAGES = 61
 
     def fetch(self) -> Iterator[Event]:
-        # TEMP DIAGNOSTIC: record the real status/body for the first page into
-        # the runs table (committed), so a silent 0 becomes visible.
+        # TEMP DIAGNOSTIC: dump the real card markup around the first /en/event/
+        # link into the committed runs table, so we can write a correct parser
+        # without 40-min guess-and-check cycles. REMOVE once the parser is fixed.
         import os
+        from selectolax.parser import HTMLParser as _HP
         _px = "on" if os.environ.get("SCRAPER_PROXY") else "off"
         _u = f"{BASE}{FEEDS[0][0]}"
         try:
             _r = self.client.get(_u)
         except Exception as _e:
             raise RuntimeError(f"DIAG proxy={_px} request-error :: {_e}")
+        _h = _r.text or ""
         if _r.status_code != 200:
-            raise RuntimeError(f"DIAG proxy={_px} HTTP {_r.status_code} len={len(_r.text)} :: {_r.text[:180]!r}")
-        if sum(1 for _ in self._parse(_r.text)) == 0:
-            raise RuntimeError(f"DIAG proxy={_px} 200 parse=0 len={len(_r.text)} :: {_r.text[:180]!r}")
+            raise RuntimeError(f"DIAG proxy={_px} HTTP {_r.status_code} len={len(_h)} :: {_h[:180]!r}")
+        _sub = _h.count("/event/")
+        _tree = _HP(_h)
+        _css = len(_tree.css("a[href*='/event/']"))
+        if _sub == 0:
+            # No event links in the raw HTML at all → JS-rendered shell.
+            raise RuntimeError(f"DIAG proxy={_px} 200 no-/event/ len={len(_h)} JS? head={_h[:200]!r}")
+        _idx = _h.find("/event/")
+        _slice = _h[max(0, _idx - 900):_idx + 900]
+        raise RuntimeError(
+            f"DIAG proxy={_px} 200 len={len(_h)} sub={_sub} css={_css} parse={sum(1 for _ in self._parse(_h))} "
+            f"SLICE:: {_slice!r}")
 
         seen: set[str] = set()
         for path, pages in FEEDS:
