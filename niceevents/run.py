@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import re
 import sys
 import traceback
 from datetime import date, datetime, timedelta
@@ -21,6 +23,38 @@ from .models import CATEGORIES, is_nonevent
 from .scrapers import REGISTRY
 
 log = logging.getLogger("niceevents")
+
+
+def _load_proxy_from_supabase() -> None:
+    """Pick up the scrape proxy from Supabase so no workflow edit is needed.
+
+    Editing the GitHub workflow needs a token permission we don't have, so
+    instead the proxy lives in a one-row Supabase table `app_config`
+    (key='scraper_proxy'). We already hold the Supabase service key in the run,
+    so we read it here and set SCRAPER_PROXY for every scraper. An explicit env
+    var still wins; a missing table or row is a silent no-op.
+    """
+    if os.environ.get("SCRAPER_PROXY"):
+        return
+    base = re.sub(r"/rest(/v1)?$", "", (os.environ.get("SUPABASE_URL") or "").rstrip("/"))
+    key = os.environ.get("SUPABASE_SERVICE_KEY") or ""
+    if not base or not key:
+        return
+    try:
+        import httpx
+        r = httpx.get(
+            f"{base}/rest/v1/app_config",
+            params={"key": "eq.scraper_proxy", "select": "value"},
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=15,
+        )
+        rows = r.json() if r.status_code == 200 else []
+        val = (rows[0].get("value") or "").strip() if rows else ""
+        if val:
+            os.environ["SCRAPER_PROXY"] = val
+            log.info("proxy loaded from Supabase app_config")
+    except Exception as e:
+        log.warning("could not read proxy from Supabase: %s", e)
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -33,6 +67,7 @@ def _setup_logging(verbose: bool) -> None:
 
 
 def cmd_scrape(args) -> int:
+    _load_proxy_from_supabase()
     names = args.only or list(REGISTRY)
     unknown = [n for n in names if n not in REGISTRY]
     if unknown:
