@@ -51,6 +51,20 @@ class ExploreNCA(HttpScraper):
     MAX_PAGES = 61
 
     def fetch(self) -> Iterator[Event]:
+        # TEMP DIAGNOSTIC: record the real status/body for the first page into
+        # the runs table (committed), so a silent 0 becomes visible.
+        import os
+        _px = "on" if os.environ.get("SCRAPER_PROXY") else "off"
+        _u = f"{BASE}{FEEDS[0][0]}"
+        try:
+            _r = self.client.get(_u)
+        except Exception as _e:
+            raise RuntimeError(f"DIAG proxy={_px} request-error :: {_e}")
+        if _r.status_code != 200:
+            raise RuntimeError(f"DIAG proxy={_px} HTTP {_r.status_code} len={len(_r.text)} :: {_r.text[:180]!r}")
+        if sum(1 for _ in self._parse(_r.text)) == 0:
+            raise RuntimeError(f"DIAG proxy={_px} 200 parse=0 len={len(_r.text)} :: {_r.text[:180]!r}")
+
         seen: set[str] = set()
         for path, pages in FEEDS:
             for page in range(1, min(pages, self.MAX_PAGES) + 1):
