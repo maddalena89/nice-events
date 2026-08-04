@@ -68,6 +68,7 @@ def _setup_logging(verbose: bool) -> None:
 
 def cmd_scrape(args) -> int:
     _load_proxy_from_supabase()
+    log.info("scrape start · proxy %s", "ON" if os.environ.get("SCRAPER_PROXY") else "off")
     names = args.only or list(REGISTRY)
     unknown = [n for n in names if n not in REGISTRY]
     if unknown:
