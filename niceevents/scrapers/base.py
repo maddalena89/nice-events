@@ -10,6 +10,7 @@ the whole run down.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from abc import ABC, abstractmethod
 from typing import Iterator, Optional
@@ -22,6 +23,19 @@ log = logging.getLogger(__name__)
 
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+
+def _proxy() -> Optional[str]:
+    """A proxy URL to route scraping through, if one is configured.
+
+    Several big French event sites (nice.fr, OpenAgenda, Explore Côte d'Azur…)
+    block requests coming from datacenter IPs like the GitHub Actions runner,
+    returning 403 no matter how browser-like the request is. Routing through a
+    residential/French proxy is the reliable way past that. Set SCRAPER_PROXY
+    (a GitHub secret) to e.g. http://user:pass@host:port and every source uses
+    it; leave it unset and everything works exactly as before, no proxy.
+    """
+    return (os.environ.get("SCRAPER_PROXY") or "").strip() or None
 
 REGISTRY: dict[str, type["Scraper"]] = {}
 
@@ -62,7 +76,7 @@ class HttpScraper(Scraper):
     @property
     def client(self) -> httpx.Client:
         if self._client is None:
-            self._client = httpx.Client(
+            kw = dict(
                 timeout=self._timeout,
                 follow_redirects=True,
                 headers={
@@ -71,6 +85,10 @@ class HttpScraper(Scraper):
                     "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
                 },
             )
+            proxy = _proxy()
+            if proxy:
+                kw["proxy"] = proxy       # route past datacenter-IP blocks
+            self._client = httpx.Client(**kw)
         return self._client
 
     def get(self, url: str, **kw) -> Optional[httpx.Response]:
@@ -110,8 +128,20 @@ class BrowserScraper(Scraper):
         """Render a page and hand back its HTML."""
         from playwright.sync_api import sync_playwright  # noqa: local import on purpose
 
+        launch_kw: dict = {"headless": self.headless}
+        proxy = _proxy()
+        if proxy:
+            from urllib.parse import urlsplit
+            u = urlsplit(proxy)
+            server = f"{u.scheme}://{u.hostname}" + (f":{u.port}" if u.port else "")
+            launch_kw["proxy"] = {"server": server}
+            if u.username:
+                launch_kw["proxy"]["username"] = u.username
+            if u.password:
+                launch_kw["proxy"]["password"] = u.password
+
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=self.headless)
+            browser = p.chromium.launch(**launch_kw)
             ctx = browser.new_context(
                 user_agent=UA,
                 locale="fr-FR",
