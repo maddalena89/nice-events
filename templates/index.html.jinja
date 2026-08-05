@@ -109,6 +109,9 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .exhib-head b{font-size:18px;font-weight:800;letter-spacing:-.02em}
 .exhib-head span{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 .exhib-note{font-size:12px;color:var(--muted);margin:8px 0 2px}
+/* "Show all" control for the exhibitions block. Full width so it reads as the
+   bottom edge of the section rather than a stray button floating beside it. */
+.exhib-toggle{display:block;width:100%;margin:12px 0 0;padding:11px 0;text-align:center}
 /* Cancelled event: red badge + struck-through title, greyed row. */
 .pill.cancel{background:#c8102e;color:#fff}
 .row.cancelled{opacity:.72}
@@ -655,11 +658,62 @@ function occurrences(e, from, to, expand){
   return out.length ? out : [first];
 }
 
+// How much of the exhibitions block is open on arrival. Dozens of shows run for
+// months at a time, so listing them all pushed the day feed off the screen. The
+// ones closing soonest are the ones worth acting on, so those are the preview
+// and the rest wait behind "Show all". The floor stops the section looking empty
+// in a week when nothing is about to close; the ceiling stops a week when a lot
+// is closing from burying the feed again, which is the thing we're fixing.
+const EXHIB_PREVIEW_MIN = 3, EXHIB_PREVIEW_MAX = 8;
+
+// Whether the block was left open, remembered between visits. Safari in private
+// mode throws on localStorage: a remembered preference is a nicety and must
+// never take the page down, so every touch of it is wrapped.
+const EXHIB_OPEN_KEY = "won:exhibs-open";
+function exhibsOpen(){
+  try{ return localStorage.getItem(EXHIB_OPEN_KEY) === "1"; }catch(_){ return false; }
+}
+function rememberExhibsOpen(open){
+  try{ localStorage.setItem(EXHIB_OPEN_KEY, open ? "1" : "0"); }catch(_){}
+}
+
+// One exhibition row. Reuses the .row markup so the calendar / share / card
+// buttons work exactly as in the feed (their click handlers are delegated on
+// document, so they fire here too).
+function exhibRow(e, i, soonCut, newCut){
+  const end=e.end||e.start;
+  const badge = end<=soonCut ? `<span class="pill soon">Ends ${fmtShort(end)}</span>`
+              : (e.start>=newCut&&e.start<=TODAY) ? `<span class="pill new">New</span>${runBadge(e)}`
+              : runBadge(e);
+  const ttl = e.url
+    ? `<a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`
+    : `<span class="tt">${esc(e.title)}</span>`;
+  const desc = e.note?esc(e.note):"";
+  const r=document.createElement("div"); r.className="row"; r.dataset.fp=e.fingerprint;
+  if(e.fingerprint===HL_FP) r.classList.add("hl");
+  r.innerHTML=`
+    <div class="idx">${String(i).padStart(2,"0")}</div>
+    <div>
+      <div class="ttl">
+        ${e.free?'<span class="pill free">Free</span>':""}
+        ${badge}
+        ${ttl}
+        <button class="calbtn" data-fp="${esc(e.fingerprint)}" aria-label="Add to calendar" title="Add to calendar">${CAL_SVG}</button>
+        <button class="sharebtn" data-fp="${esc(e.fingerprint)}" data-title="${esc(e.title)}" aria-label="Share this event" title="Share">${SHARE_SVG}</button>
+        <button class="cardbtn" data-fp="${esc(e.fingerprint)}" aria-label="Get a shareable card" title="Shareable card">${CARD_SVG}</button>
+      </div>
+      ${desc?`<div class="sub">${desc}</div>`:""}
+    </div>
+    <div class="where"><b>${esc(e.town)}</b>
+      <span>${e.venue?esc(e.venue):""}</span></div>
+    <div class="kind">${esc(CATNAME[e.category]||e.category)}</div>`;
+  return r;
+}
+
 // The standing "Exhibitions on now" block: one card per show, soonest to close
 // first, with an "Ends soon" nudge when there's under ~10 days left and a "New"
-// tag for ones that opened this week. Reuses the .row markup so the calendar /
-// share / card buttons work exactly as in the feed (their click handlers are
-// delegated on document, so they fire here too).
+// tag for ones that opened this week. Only the closing-soonest few are open;
+// see EXHIB_PREVIEW_MIN above.
 function renderExhibs(items){
   const box=$("exhibs"); box.innerHTML="";
   if(!items.length) return;
@@ -672,37 +726,36 @@ function renderExhibs(items){
   const note=document.createElement("div"); note.className="exhib-note";
   note.textContent="Running now — visit any day. Sorted by what closes first.";
   box.appendChild(note);
-  let i=0;
-  items.forEach(e=>{
-    i++;
-    const end=e.end||e.start;
-    const badge = end<=soonCut ? `<span class="pill soon">Ends ${fmtShort(end)}</span>`
-                : (e.start>=newCut&&e.start<=TODAY) ? `<span class="pill new">New</span>${runBadge(e)}`
-                : runBadge(e);
-    const ttl = e.url
-      ? `<a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`
-      : `<span class="tt">${esc(e.title)}</span>`;
-    const desc = e.note?esc(e.note):"";
-    const r=document.createElement("div"); r.className="row"; r.dataset.fp=e.fingerprint;
-    if(e.fingerprint===HL_FP) r.classList.add("hl");
-    r.innerHTML=`
-      <div class="idx">${String(i).padStart(2,"0")}</div>
-      <div>
-        <div class="ttl">
-          ${e.free?'<span class="pill free">Free</span>':""}
-          ${badge}
-          ${ttl}
-          <button class="calbtn" data-fp="${esc(e.fingerprint)}" aria-label="Add to calendar" title="Add to calendar">${CAL_SVG}</button>
-          <button class="sharebtn" data-fp="${esc(e.fingerprint)}" data-title="${esc(e.title)}" aria-label="Share this event" title="Share">${SHARE_SVG}</button>
-          <button class="cardbtn" data-fp="${esc(e.fingerprint)}" aria-label="Get a shareable card" title="Shareable card">${CARD_SVG}</button>
-        </div>
-        ${desc?`<div class="sub">${desc}</div>`:""}
-      </div>
-      <div class="where"><b>${esc(e.town)}</b>
-        <span>${e.venue?esc(e.venue):""}</span></div>
-      <div class="kind">${esc(CATNAME[e.category]||e.category)}</div>`;
-    box.appendChild(r);
+
+  // Someone who filtered to Exhibitions came here for exactly this list, so
+  // don't make them ask for it twice.
+  const wantsAll = active.size===1 && active.has("expo");
+  const closing = items.filter(e=>(e.end||e.start)<=soonCut).length;
+  const shown = wantsAll ? items.length : Math.min(items.length,
+    Math.max(EXHIB_PREVIEW_MIN, Math.min(EXHIB_PREVIEW_MAX, closing)));
+
+  const more=document.createElement("div"); more.id="exhib-more";
+  items.forEach((e,idx)=>{
+    (idx < shown ? box : more).appendChild(exhibRow(e, idx+1, soonCut, newCut));
   });
+  if(shown >= items.length) return;             // nothing hidden, so no control
+
+  box.appendChild(more);
+  const btn=document.createElement("button");
+  btn.className="exhib-toggle"; btn.setAttribute("aria-controls","exhib-more");
+  const paint = open => {
+    more.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.textContent = open ? "Show fewer"
+                           : `Show all ${items.length} exhibitions`;
+  };
+  paint(exhibsOpen());
+  btn.addEventListener("click", ()=>{
+    const open = btn.getAttribute("aria-expanded") !== "true";
+    rememberExhibsOpen(open);
+    paint(open);
+  });
+  box.appendChild(btn);
 }
 
 function render(){
