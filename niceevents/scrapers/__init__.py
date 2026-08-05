@@ -18,6 +18,8 @@ from . import seed           # noqa: F401  hand-curated coast & hinterland exhib
 from . import belaprem       # noqa: F401  Belaprem free open-air series at Le 109
 from . import panda          # noqa: F401  Panda Events gigs (109 / Frigo 16 / TLV)
 from . import harvest        # noqa: F401  generic JSON-LD / iCal venue harvester
+from . import swing          # noqa: F401  Swing 06 community calendar (public ICS)
+from . import lazonme        # noqa: F401  La Zonmé venue (own events page)
 
 # JS-rendered — Playwright required
 from . import theatres_nice  # noqa: F401  municipal & partner theatres [browser]

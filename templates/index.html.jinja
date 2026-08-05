@@ -101,6 +101,14 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .pill.out{background:transparent;color:var(--muted);border:1px solid var(--rule)}
 /* Run-length sticker for exhibitions and other multi-day events. */
 .pill.run{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+/* "Ends soon" urgency badge + "New" badge for the exhibitions section. */
+.pill.soon{background:#c8102e;color:#fff}
+.pill.new{background:var(--accent);color:#fff}
+/* Standing "Exhibitions on now" section header — set apart from day marks. */
+.exhib-head{display:flex;align-items:baseline;gap:12px;margin:30px 0 0;padding-bottom:7px;border-bottom:2px solid var(--accent)}
+.exhib-head b{font-size:18px;font-weight:800;letter-spacing:-.02em}
+.exhib-head span{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.exhib-note{font-size:12px;color:var(--muted);margin:8px 0 2px}
 /* Cancelled event: red badge + struck-through title, greyed row. */
 .pill.cancel{background:#c8102e;color:#fff}
 .row.cancelled{opacity:.72}
@@ -368,6 +376,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 
 <div class="cats" id="cats"></div>
 <div class="tally" id="tally"></div>
+<div id="exhibs"></div>
 <div id="list"></div>
 
 <button class="addbtn" id="addbtn" aria-label="Add an event" title="Add an event">
@@ -615,6 +624,10 @@ const fmtYr=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{year:"numeric
 const fmtShort=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"});
 const addDays=(d,n)=>{const x=new Date(d+"T12:00:00");x.setDate(x.getDate()+n);return iso(x);};
 const isMultiDay=e=>e.end&&e.end!==e.start;
+const isExhib=e=>e.category==="expo";
+// A multi-day exhibition is "standing": it belongs in its own section, not
+// stamped onto every day of the feed.
+const isStanding=e=>isExhib(e)&&isMultiDay(e);
 
 // A month-long exhibition should read as one thing that runs for a while — this
 // is the "from here to here" sticker. Ongoing -> "until 31 Aug"; upcoming ->
@@ -642,6 +655,56 @@ function occurrences(e, from, to, expand){
   return out.length ? out : [first];
 }
 
+// The standing "Exhibitions on now" block: one card per show, soonest to close
+// first, with an "Ends soon" nudge when there's under ~10 days left and a "New"
+// tag for ones that opened this week. Reuses the .row markup so the calendar /
+// share / card buttons work exactly as in the feed (their click handlers are
+// delegated on document, so they fire here too).
+function renderExhibs(items){
+  const box=$("exhibs"); box.innerHTML="";
+  if(!items.length) return;
+  const soonCut=addDays(TODAY,10), newCut=addDays(TODAY,-7);
+  items=items.slice().sort((a,b)=>(a.end||a.start).localeCompare(b.end||b.start)||
+    a.town.localeCompare(b.town,"fr")||a.title.localeCompare(b.title));
+  const h=document.createElement("div"); h.className="exhib-head";
+  h.innerHTML=`<b>Exhibitions on now</b><span>${items.length}</span>`;
+  box.appendChild(h);
+  const note=document.createElement("div"); note.className="exhib-note";
+  note.textContent="Running now — visit any day. Sorted by what closes first.";
+  box.appendChild(note);
+  let i=0;
+  items.forEach(e=>{
+    i++;
+    const end=e.end||e.start;
+    const badge = end<=soonCut ? `<span class="pill soon">Ends ${fmtShort(end)}</span>`
+                : (e.start>=newCut&&e.start<=TODAY) ? `<span class="pill new">New</span>${runBadge(e)}`
+                : runBadge(e);
+    const ttl = e.url
+      ? `<a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`
+      : `<span class="tt">${esc(e.title)}</span>`;
+    const desc = e.note?esc(e.note):"";
+    const r=document.createElement("div"); r.className="row"; r.dataset.fp=e.fingerprint;
+    if(e.fingerprint===HL_FP) r.classList.add("hl");
+    r.innerHTML=`
+      <div class="idx">${String(i).padStart(2,"0")}</div>
+      <div>
+        <div class="ttl">
+          ${e.free?'<span class="pill free">Free</span>':""}
+          ${badge}
+          ${ttl}
+          <button class="calbtn" data-fp="${esc(e.fingerprint)}" aria-label="Add to calendar" title="Add to calendar">${CAL_SVG}</button>
+          <button class="sharebtn" data-fp="${esc(e.fingerprint)}" data-title="${esc(e.title)}" aria-label="Share this event" title="Share">${SHARE_SVG}</button>
+          <button class="cardbtn" data-fp="${esc(e.fingerprint)}" aria-label="Get a shareable card" title="Shareable card">${CARD_SVG}</button>
+        </div>
+        ${desc?`<div class="sub">${desc}</div>`:""}
+      </div>
+      <div class="where"><b>${esc(e.town)}</b>
+        <span>${e.venue?esc(e.venue):""}</span></div>
+      <div class="kind">${esc(CATNAME[e.category]||e.category)}</div>`;
+    box.appendChild(r);
+  });
+}
+
 function render(){
   const q=$("q").value.trim().toLowerCase(), town=$("town").value, when=$("when").value;
   // Online events are off unless asked for. This site is about being somewhere;
@@ -664,11 +727,20 @@ function render(){
   // so "42 listings" means 42 events, never 42 × the days they run.
   const matched=base.filter(e=>!active.size||active.has(e.category));
 
+  // Multi-day exhibitions are pulled OUT of the day feed — otherwise every one
+  // that's open today lands on today's date and floods the page day after day.
+  // They live in their own standing section instead (shown when no category is
+  // picked, or when Exhibitions is the filter), and the feed keeps the one-off
+  // things people actually plan an evening around.
+  const showExhibs=!active.size||active.has("expo");
+  const standing = showExhibs ? base.filter(isStanding) : [];
+  const feed = matched.filter(e=>!isStanding(e));
+
   // Expand to (day, event) pairs. Only when a category is being browsed does a
   // multi-day show repeat per day; in the full list each appears once.
   const expand=active.size>0;
   const pairs=[];
-  matched.forEach(e=>occurrences(e,from,to,expand).forEach(day=>pairs.push([day,e])));
+  feed.forEach(e=>occurrences(e,from,to,expand).forEach(day=>pairs.push([day,e])));
   pairs.sort((a,b)=>a[0].localeCompare(b[0])||
     a[1].town.localeCompare(b[1].town,"fr")||a[1].title.localeCompare(b[1].title));
 
@@ -677,8 +749,11 @@ function render(){
   // promises events the page then refuses to show.
   $("s-week").textContent=EVENTS.filter(e=>(showOnline||!e.online)&&
     (!freeOnly||e.free)&&overlaps(e,TODAY,iso(w))).length;
-  $("tally").textContent=`${matched.length} listing${matched.length===1?"":"s"}`+
-    (when?" in range":"")+(town?` · ${town}`:"")+(active.size?" · filtered":"");
+  $("tally").textContent=`${feed.length} listing${feed.length===1?"":"s"}`+
+    (when?" in range":"")+(town?` · ${town}`:"")+(active.size?" · filtered":"")+
+    (standing.length?` · ${standing.length} exhibition${standing.length===1?"":"s"} on now`:"");
+
+  renderExhibs(standing);
 
   const list=$("list"); list.innerHTML="";
   if(!pairs.length){list.innerHTML='<div class="empty">Nothing matches those filters.</div>';return;}
@@ -738,7 +813,7 @@ render();
 
 // Share a single event. Uses the native share sheet on phones; falls back to
 // copying the link on desktop. e.stopPropagation so it never triggers the row.
-$("list").addEventListener("click", async ev => {
+document.addEventListener("click", async ev => {
   const b = ev.target.closest(".sharebtn");
   if(!b) return;
   ev.preventDefault(); ev.stopPropagation();
@@ -786,7 +861,7 @@ function icsFor(e){
     loc?"LOCATION:"+loc:"", desc?"DESCRIPTION:"+desc:"", e.url?"URL:"+e.url:"",
     "END:VEVENT","END:VCALENDAR"].filter(Boolean).join("\r\n");
 }
-$("list").addEventListener("click", ev => {
+document.addEventListener("click", ev => {
   const b = ev.target.closest(".calbtn");
   if(!b) return;
   ev.preventDefault(); ev.stopPropagation();
@@ -945,7 +1020,7 @@ async function shareEventCard(e, btn){
   }catch(_){ /* toBlob unsupported: nothing we can do, stay silent */ }
   finally{ if(btn) btn.removeAttribute("data-busy"); }
 }
-$("list").addEventListener("click", ev=>{
+document.addEventListener("click", ev=>{
   const b=ev.target.closest(".cardbtn"); if(!b) return;
   ev.preventDefault(); ev.stopPropagation();
   const e=FP_MAP.get(b.dataset.fp); if(e) shareEventCard(e,b);

@@ -39,7 +39,15 @@ API = ("https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/"
 # Exact-match filter is the most reliable ODSQL there is. If the field or value
 # ever changes the run returns nothing and warns — it can't silently ship wrong
 # data. The postcode belt-and-braces below is what actually guarantees 06-only.
-WHERE = 'location_department="Alpes-Maritimes"'
+#
+# The date floor is essential: results are ordered by firstdate_begin ASCENDING,
+# and this national dataset holds years of past events. Without a floor the first
+# thousands of rows are all in the past, every one gets dropped as "already over",
+# and the scraper returns 0 while looking healthy. `lastdate_end >= today` keeps
+# still-running exhibitions too, not just events that start in the future.
+def _where(today: date) -> str:
+    return (f'location_department="Alpes-Maritimes" '
+            f"and lastdate_end >= date'{today.isoformat()}'")
 
 
 def _iso_date(s: Optional[str]) -> Optional[date]:
@@ -100,30 +108,10 @@ class OpenAgenda(HttpScraper):
         seen: set[str] = set()
         kept = 0
 
-        # TEMP DIAGNOSTIC: surface what the API actually returns, into the runs
-        # table (committed), instead of a silent 0.
-        import os
-        _u = (f"{API}?where={self._q(WHERE)}&select={self._q(self.SELECT)}"
-              f"&order_by=firstdate_begin&limit={self.PAGE}&offset=0")
-        _px = "on" if os.environ.get("SCRAPER_PROXY") else "off"
-        try:
-            _r = self.client.get(_u)
-        except Exception as _e:
-            raise RuntimeError(f"DIAG proxy={_px} request-error :: {_e}")
-        if _r.status_code != 200:
-            raise RuntimeError(f"DIAG proxy={_px} HTTP {_r.status_code} :: {_r.text[:200]!r}")
-        try:
-            _p = _r.json()
-        except Exception:
-            raise RuntimeError(f"DIAG proxy={_px} 200 non-JSON :: {_r.text[:200]!r}")
-        if not _p.get("results"):
-            raise RuntimeError(
-                f"DIAG proxy={_px} 200 empty keys={list(_p)} "
-                f"total={_p.get('total_count')} :: {_r.text[:200]!r}")
-
+        where = _where(today)
         for page in range(self.MAX_PAGES):
             offset = page * self.PAGE
-            url = (f"{API}?where={self._q(WHERE)}"
+            url = (f"{API}?where={self._q(where)}"
                    f"&select={self._q(self.SELECT)}"
                    f"&order_by=firstdate_begin&limit={self.PAGE}&offset={offset}")
             r = self.get(url)
