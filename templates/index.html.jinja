@@ -54,16 +54,58 @@ h1 em{font-style:normal;color:var(--accent)}
 .marquee span::after{content:"◆";margin-left:32px;color:var(--accent)}
 @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media(prefers-reduced-motion:reduce){.marquee-inner{animation:none}}
-.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+/* stretch, not center: every control in the bar draws a box, so they must share
+   one height. Centering let each box size to its own text and the result was a
+   ragged row — the checkboxes sat visibly shorter than the selects beside them.
+   Stretch makes the tallest control set the line height and everyone matches,
+   with no hardcoded pixel height to drift when a font renders differently. */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-bottom:16px}
 /* "Online too" — a real control, so it gets the same box as the selects rather
-   than floating naked next to them. */
-.chk{display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer;
-     border:1px solid var(--ink);padding:9px 11px;font-size:11px;font-weight:600;
-     letter-spacing:.1em;text-transform:uppercase;user-select:none}
+   than floating naked next to them. The inner align-items:center keeps the tick
+   and its label centred once the outer box has been stretched. */
+/* margin:0 and color are load-bearing, not tidiness. .chk IS a <label>, so the
+   global label{} rule further down was reaching it: margin-bottom:5px made these
+   boxes render 5px shorter than the selects beside them even under stretch, and
+   color:var(--muted) is why the text sat grey while "Any date" sat black. .chk
+   overrides font-size and display but never declared those two, so label won. */
+.chk{display:flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer;
+     margin:0;color:var(--ink);
+     border:1px solid var(--ink);padding:10px 12px;font-size:14.5px;font-weight:400;
+     letter-spacing:normal;text-transform:none;user-select:none}
 .chk:hover{background:#e8e5de}
-.chk input{width:14px;height:14px;margin:0;padding:0;accent-color:var(--accent);cursor:pointer}
+/* Native checkboxes draw themselves rounded on macOS, which fights a site with
+   border-radius:0 on every other edge. appearance:none hands us the box so we
+   can keep it square, then we draw the tick ourselves. */
+.chk input{appearance:none;-webkit-appearance:none;flex:none;position:relative;
+  width:16px;height:16px;margin:0;padding:0;cursor:pointer;
+  border:1px solid var(--ink);border-radius:0;background:transparent}
+.chk input:checked{background:var(--accent);border-color:var(--accent)}
+.chk input:checked::after{content:"";position:absolute;left:4.5px;top:1px;
+  width:4px;height:8.5px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.chk input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 input,select,textarea{font:inherit;font-size:14.5px;padding:10px 12px;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink)}
 input[type=search]{flex:1;min-width:190px}
+/* The native macOS chevron is painted hard against the control's right edge and
+   ignores padding-right. Take it off, draw our own, and reserve 34px for it so
+   long town names stop colliding with the arrow. */
+select{appearance:none;-webkit-appearance:none;padding-right:34px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e0e0e' stroke-width='2.5' stroke-linecap='square'><path d='M5 9l7 7 7-7'/></svg>");
+  background-repeat:no-repeat;background-position:right 12px center;background-size:11px 11px}
+/* A <select> sizes itself to its LONGEST <option>, and the town list carries
+   names like "Saint-Martin-Vésubie" — left alone it ate most of the bar. Cap it:
+   the closed control only ever has to show one town, and the open dropdown is
+   free to be as wide as it likes. */
+#town{flex:0 1 210px;width:210px;min-width:0;text-overflow:ellipsis}
+#when{flex:0 0 auto}
+/* Reset: an eraser glyph, not a word. It's the least-used control in the bar and
+   was the only thing forcing a second row. Square so it reads as an icon button;
+   title + aria-label carry the meaning that the label used to. */
+/* Pinned on all four width properties. flex:0 0 auto alone still let the button
+   resize as the row rebalanced at different viewport widths; min/max nail it. */
+#reset{flex:0 0 40px;width:40px;min-width:40px;max-width:40px;
+       display:inline-flex;align-items:center;justify-content:center;
+       height:auto;padding:0;min-height:0}
+#reset svg{width:17px;height:17px;display:block}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-2px}
 /* Equal columns — NOT flex:1 with flex-wrap. Under flex-wrap each ROW shares the
    width among only the items that landed on it, so the final row of 2 rendered
@@ -254,9 +296,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     one wrapping line was the awkward part. */
  .bar{gap:7px;margin-bottom:12px}
  input[type=search]{flex:1 0 100%;min-width:0}
- #town,#when{flex:1 1 calc(50% - 4px);min-width:0}
+ #town,#when{flex:1 1 calc(50% - 4px);width:auto;min-width:0}
  .chk{flex:1 1 auto;justify-content:center;white-space:nowrap;min-height:44px}
- #reset{flex:0 0 auto}
+ #reset{flex:0 0 44px;width:44px;min-width:44px;max-width:44px;height:auto;min-height:44px}
  input,select,textarea{font-size:16px;padding:11px 12px}   /* 16px: no iOS zoom */
  button{padding:11px 14px;min-height:44px}                  /* 44px touch target */
 
@@ -394,7 +436,14 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   </select>
   <label class="chk"><input type="checkbox" id="online"> Online too</label>
   <label class="chk"><input type="checkbox" id="freeonly"> Free only</label>
-  <button id="reset">Reset</button>
+  <button id="reset" aria-label="Reset all filters" title="Reset all filters">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="m7 21-4.3-4.3a1.9 1.9 0 0 1 0-2.7l9.6-9.6a1.9 1.9 0 0 1 2.7 0l5.6 5.6a1.9 1.9 0 0 1 0 2.7L13.4 21"/>
+      <path d="M22 21H7.5"/>
+      <path d="m5 11 8 8"/>
+    </svg>
+  </button>
 </div>
 
 <div class="cats" id="cats"></div>
