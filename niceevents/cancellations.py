@@ -1,16 +1,34 @@
-"""Flag a specific already-listed event as cancelled.
+"""Mark an event as called off, so it shows struck through instead of vanishing.
 
-Events get called off after we've scraped them (a milonga cancelled, a concert
-postponed). We can't un-scrape them, so instead of quietly dropping them, we mark
-them here and the site shows them struck through with an "Annulé" badge. That way
-someone who saw the poster understands the night is off, rather than turning up.
+Someone who saw the poster needs to be told the night is off. Dropping the event
+silently is worse than useless: they turn up anyway.
 
-A line matches by title (accent- and case-insensitive substring) + town + the
-exact date. Add a line, the next build shows it cancelled. Delete the line once
-the date has passed to keep this tidy.
+Two routes in, and the automatic one should do the work.
+
+1. AUTOMATIC — the source says so in the title. Calendars that are maintained by
+   a human tend to retitle rather than delete, because their own readers need to
+   see the cancellation: "(ANNULEE) MILONGA de la Casita". We read that word and
+   mark the event, then strip the marker so the title stays readable next to the
+   badge the page already draws.
+
+   This exists because of 6 August 2026. The Casita milonga was cancelled, the
+   reference tango agenda said "(ANNULEE)" plainly in the event title, and the
+   site still advertised it as on — because nothing anywhere read that word, and
+   cancellations were only ever the hand-written list below. Three layers (the
+   scraper, the build, the daily health check) and not one of them was looking.
+
+   Title only, never the description. A description saying "en cas d'annulation,
+   remboursement sous 8 jours" is boilerplate, not a cancellation, and marking a
+   live event as cancelled is the same harm in reverse.
+
+2. MANUAL — the list below, for when a cancellation reaches you some other way
+   (an email, a poster, a message from the venue) and no source has said it. A
+   line matches by title (accent- and case-insensitive substring) + town + the
+   exact date. Delete the line once the date has passed, to keep this tidy.
 """
 from __future__ import annotations
 
+import re
 import unicodedata
 
 
@@ -27,8 +45,30 @@ CANCELLED: list[tuple] = [
 ]
 
 
+#: The word, however the source spells it: ANNULEE, Annulée, annulés, CANCELLED.
+#: Matched against the accent-folded title, so the bare stem is enough.
+_SAYS_CANCELLED = re.compile(r"\bannul\w*|\bcancell?ed\b")
+
+#: The same word as it appears in the real title, with the brackets and the
+#: punctuation that usually trails it, so it can be lifted out cleanly:
+#: "(ANNULEE) MILONGA de la Casita" -> "MILONGA de la Casita".
+_MARKER = re.compile(r"^\W*(?:annul\w*|cancell?ed)\W*", re.I)
+
+
+def _strip_marker(title: str) -> str:
+    """Take the cancellation word out of the title; the page draws a badge."""
+    cleaned = _MARKER.sub("", title or "", count=1).strip(" -–—:·,")
+    return cleaned or title
+
+
 def mark_cancelled(events: list[dict]) -> list[dict]:
-    """Set cancelled=True (and a note) on any event dict that matches a line."""
+    """Set cancelled=True (and a note) on anything a source or the list calls off."""
+    for e in events:
+        if _SAYS_CANCELLED.search(_fold(e.get("title"))):
+            e["cancelled"] = True
+            e.setdefault("cancel_note", "Annulé")
+            e["title"] = _strip_marker(e.get("title") or "")
+
     if not CANCELLED:
         return events
     for e in events:

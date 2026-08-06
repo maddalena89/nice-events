@@ -9,7 +9,18 @@ from .base import REGISTRY, Scraper, HttpScraper, BrowserScraper  # noqa: F401
 from . import brocabrac      # noqa: F401  vide-greniers & brocantes
 from . import nice_fr        # noqa: F401  Ville de Nice (incl. Jazz Fest)
 from . import openagenda     # noqa: F401  culture: opera, theatre, festivals (national API)
-from . import tango          # noqa: F401  milongas
+# Tango is NOT scraped from tango-argentin.fr any more. Retired 2026-08-06: on
+# 6 August the Casita milonga was cancelled, the reference agenda said
+# "(ANNULEE)", and tango-argentin.fr still listed it as on — so the site would
+# have sent people to a closed door. Tango now comes from the Agenda Tango
+# Argentin Nice Riviera 06 through `harvest`, which is the only tango source that
+# publishes cancellations, and which also covers Cannes, Antibes and Grasse.
+#
+# Leaving this unregistered (rather than deleting tango.py) is what lets
+# db.prune_retired clear the old rows on the next full run, and keeps the parser
+# around: it is still the only source with milonga START TIMES, so if we ever
+# want to enrich the calendar's all-day entries, it is here.
+# from . import tango        # noqa: F401  retired, see above
 from . import explore_nca    # noqa: F401  Métropole tourist office (50 communes)
 from . import departement06  # noqa: F401  Département 06 agenda (Soirées Estivales, etc.)
 from . import museums        # noqa: F401  MAMAC, Matisse, Chagall…

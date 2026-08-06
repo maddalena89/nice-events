@@ -12,6 +12,7 @@ stale row it is meant to remove.
 from __future__ import annotations
 
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -90,8 +91,29 @@ def test_human_submissions_are_never_touched(conn):
 
 
 def test_only_opt_in_scrapers_reconcile():
-    from niceevents.scrapers import REGISTRY
-    on = {n for n, c in REGISTRY.items() if c.reconciles_dates}
-    assert on == {"tango_argentin", "anthea"}, (
+    """Which sources may delete rows, checked in a CLEAN interpreter.
+
+    Not `from niceevents.scrapers import REGISTRY` in-process: @register fires on
+    import, so any other test that imports a scraper module directly puts it in
+    the registry and this assertion silently passes on something production never
+    loads. That is exactly how it went green while tango was retired.
+    """
+    import subprocess
+    import sys
+
+    r = subprocess.run(
+        [sys.executable, "-c",
+         "from niceevents.scrapers import REGISTRY;"
+         "print(sorted(n for n, c in REGISTRY.items() if c.reconciles_dates));"
+         "print(sorted(REGISTRY))"],
+        capture_output=True, text=True, cwd=str(Path(__file__).resolve().parent.parent),
+    )
+    assert r.returncode == 0, r.stderr
+    reconciling, registered = r.stdout.strip().splitlines()
+
+    assert reconciling == "['anthea']", (
         "reconcile_dates deletes rows: only enable it for a source you have "
-        "checked returns its complete listing every run")
+        f"checked returns its complete listing every run. Got {reconciling}")
+    assert "tango_argentin" not in registered, (
+        "tango-argentin.fr was retired because it does not publish cancellations; "
+        "tango comes from the Agenda Tango Argentin via harvest")

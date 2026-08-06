@@ -22,6 +22,7 @@ Finding feeds (for whoever curates VENUES):
 """
 from __future__ import annotations
 
+import html
 import json
 import logging
 import re
@@ -30,7 +31,7 @@ from typing import Iterator, Optional
 
 from selectolax.parser import HTMLParser
 
-from ..models import Event, canon_town, classify
+from ..models import Event, canon_town, classify, slugify
 from .base import HttpScraper, register
 
 log = logging.getLogger(__name__)
@@ -63,6 +64,23 @@ VENUES: list[tuple] = [
     ("Liste Salsa d'Olivier",
      "https://salsa.faurax.fr/calendrier.php?dpt=06",
      "ics"),
+    # Agenda Tango Argentin Nice Riviera 06 AM — the reference tango calendar for
+    # the department, kept by hand and linked as "le calendrier référence" by the
+    # local associations. This REPLACED the tango-argentin.fr scraper (see
+    # scrapers/__init__.py) because it is the only tango source that publishes
+    # CANCELLATIONS: a called-off milonga is retitled "(ANNULEE) MILONGA …", which
+    # cancellations.py reads. It also carries venues tango-argentin.fr never
+    # listed — Cannes, Antibes, Plascassier, La Trésorerie, Arty Studio.
+    #
+    # Entries are all-day, but they are NOT untimed: the organiser writes the
+    # time, the DJ and the price into the description ("> Milonga de 21h00 à
+    # 01h30 … TARIF : 12€"). _time_from_text and _price_from_text read them, so
+    # nothing is lost against the old tango-argentin.fr scraper.
+    # Every event carries its own address, so the town comes from the LOCATION.
+    ("Agenda Tango Argentin Nice Riviera 06",
+     "https://calendar.google.com/calendar/ical/"
+     "agendatangoam%40gmail.com/public/basic.ics",
+     "ics", "Nice"),
 ]
 
 
@@ -211,6 +229,108 @@ def _split_ics_location(loc: str) -> tuple[Optional[str], Optional[str], Optiona
     city = re.split(r"[,\n]", loc[m.end():])[0].strip(" ,.-") or None
     venue = loc[: m.start()].strip(" ,.-") or None
     return venue, city, postcode
+
+
+# ------------------------------------------------- details hidden in the text
+#
+# An all-day VEVENT is not the same as an event with no time. Hand-kept calendars
+# put the real detail in the DESCRIPTION and leave DTSTART as a plain date:
+#
+#   > Milonga de 21h00 à 01h30   Tdj : Pierre Gabrielli    TARIF : 12€
+#
+# Reading only DTSTART throws that away and publishes a milonga with no time,
+# which on a what's-on is most of the answer missing.
+#
+# _events_from_ics has already turned the feed's "\n" escapes into spaces, so
+# what arrives here is one long line whose logical breaks are runs of two or more
+# spaces and the ">" bullets the authors type.
+_SEGMENT = re.compile(r"\s{2,}|[>•·]")
+
+#: A segment describing something BEFORE the main event. "La milonga sera
+#: précédée d'un cours de tango gratuit de 18h45 à 19h30" is a class, and taking
+#: its time would start the milonga three quarters of an hour early.
+_PRELUDE = re.compile(r"cours|pr[ée]c[ée]d|stage|initiation|atelier|d[ée]butant|workshop", re.I)
+
+_RANGE = re.compile(r"\bde\s*(\d{1,2})\s*h\s*(\d{2})?\s*(?:à|a|au|jusqu|[-–])", re.I)
+_FROM = re.compile(r"(?:à partir de|a partir de|d[èe]s|d[ée]but(?:e)?\s*(?:à|a)?)\s*(\d{1,2})\s*h\s*(\d{2})?", re.I)
+_PRICE_LINE = re.compile(r"\b(?:tarifs?|prix|entr[ée]e)\s*:\s*(.{1,60}?)\s*$", re.I)
+
+
+def _segments(text: str) -> list[str]:
+    raw = html.unescape(re.sub(r"<[^>]+>", " ", text or ""))
+    # Authors pad before the colon ("TARIFS  : 6€"). That padding is not a line
+    # break, and splitting on it strands the label from its value, so the price
+    # line stops being recognisable. Close the gap before splitting.
+    raw = re.sub(r"\s+:", " :", raw)
+    return [s.strip() for s in _SEGMENT.split(raw) if s and s.strip()]
+
+
+def _time_from_text(text: str) -> Optional[str]:
+    """The main event's start time, read out of a free-text description.
+
+    Segments that describe a warm-up class are skipped first, then the earliest
+    remaining segment wins. Only an explicit range ("de 21h00 à 01h30") or an
+    explicit start ("à partir de 19h") counts: a bare "19h" anywhere in prose is
+    just as likely to be a doors time, a deadline or a phone number, and a wrong
+    time is worse than none.
+    """
+    for seg in _segments(text):
+        if _PRELUDE.search(seg):
+            # A class, and there is no safe way to derive the main start from it.
+            # "précédée d'un cours de 18h45 à 19h30" happens to end when the
+            # milonga begins, but plenty of others do not, and there is no way to
+            # tell which from the text. No time at all beats an hour early.
+            continue
+        m = _RANGE.search(seg) or _FROM.search(seg)
+        if m:
+            h, mi = int(m[1]), int(m[2] or 0)
+            if 0 <= h <= 23 and 0 <= mi <= 59:
+                return f"{h:02d}:{mi:02d}"
+    return None
+
+
+#: A price longer than this is a tariff TABLE, not a price. The Cinéma Tango
+#: entry runs "Cours seul 12 € / adhérents 10 € - Milonga seule 15 € / adhérents
+#: 12 € - Cours + Milonga 20 € / adhérents 15 €": there is no single number to
+#: put on a card, and cutting it to fit produces a garbled half-sentence that
+#: reads as a real price. The description already carries the full table, so
+#: leave the field empty and let it be read there.
+_PRICE_MAX = 45
+
+
+def _price_from_text(text: str) -> Optional[str]:
+    """The price as the organiser wrote it: "12€", "6€ (adhérents) / 8€"."""
+    for seg in _segments(text):
+        m = _PRICE_LINE.search(seg)
+        if m:
+            price = m[1].strip(" .:-–")
+            if price and len(price) <= _PRICE_MAX and re.search(r"\d|gratuit|libre", price, re.I):
+                return price
+    return None
+
+
+def _town_from_text(loc: str) -> Optional[str]:
+    """A known 06 commune NAMED in a location that carries no usable postcode.
+
+    Hand-kept calendars write addresses freely: "12ter Place Garibaldi 06 NICE"
+    has the department number but not a postcode, so the postcode split finds
+    nothing and the town falls back to the feed's own name — which is how a
+    calendar called "Agenda Tango Argentin Nice Riviera 06" ends up in the town
+    column. Read the commune out of the text instead.
+
+    Longest name first, so "Saint-Jean-Cap-Ferrat" is not beaten by a stray
+    "Saint", and matched on whole words so "Nice" inside "Nice Riviera" only ever
+    resolves to the commune it actually is.
+    """
+    from ..models import _TOWN_CANON
+
+    words = slugify(loc or "").split("-")
+    for key in sorted(_TOWN_CANON, key=lambda k: -k.count("-")):
+        parts = key.split("-")
+        n = len(parts)
+        if any(words[i:i + n] == parts for i in range(len(words) - n + 1)):
+            return _TOWN_CANON[key]
+    return None
 
 
 def _in_scope(city: Optional[str], postcode: Optional[str], loc: str) -> bool:
@@ -413,7 +533,7 @@ class VenueHarvest(HttpScraper):
 
     # -- mappers -----------------------------------------------------------
     def _emit(self, *, title, start, end, time, venue, city, postcode, url, desc,
-              fallback_venue, today, fallback_town=None) -> Optional[Event]:
+              fallback_venue, today, fallback_town=None, price=None) -> Optional[Event]:
         if not title or not start:
             return None
         if end and end < start:
@@ -436,7 +556,8 @@ class VenueHarvest(HttpScraper):
             title=title, start=start, end=end, time=time,
             town=town, venue=venue,
             category=classify(title, desc or "", venue or ""),
-            url=url or None, note=(desc or None), source=self.name,
+            url=url or None, note=(desc or None), price=price or None,
+            source=self.name,
         )
 
     def _from_jsonld(self, o: dict, venue_name: str, today: date,
@@ -459,13 +580,23 @@ class VenueHarvest(HttpScraper):
         venue, city, postcode = _split_ics_location(loc)
         if not _in_scope(city, postcode, loc):     # a Montpellier / Sweden date
             return None
+        if not postcode and canon_town(city) == "Unknown":
+            city = _town_from_text(loc) or city    # "…Place Garibaldi 06 NICE"
+        # Read the WHOLE description for details, then keep only the first 400
+        # characters as the note. These calendars put the time and price in the
+        # middle of a long entry (after the organiser, before the address), so
+        # parsing the truncated note would find them only by luck.
+        desc = _clean(o.get("DESCRIPTION"))
         return self._emit(
             title=_clean(o.get("SUMMARY")),
             start=_ics_date(o.get("DTSTART", "")),
             end=_ics_date(o.get("DTEND", "")) if o.get("DTEND") else None,
-            time=_ics_time(o.get("DTSTART", "")),
+            # An all-day entry is not an event without a time: it is an event
+            # whose time is written in words.
+            time=_ics_time(o.get("DTSTART", "")) or _time_from_text(desc),
+            price=_price_from_text(desc),
             venue=venue, city=city, postcode=postcode,
-            url=_clean(o.get("URL")), desc=_clean(o.get("DESCRIPTION"))[:400],
+            url=_clean(o.get("URL")), desc=desc[:400],
             fallback_venue=venue_name, today=today, fallback_town=default_town,
         )
 
