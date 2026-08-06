@@ -432,11 +432,10 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   <select id="town"><option value="">All towns</option></select>
   <select id="when">
     <option value="">Any date</option>
-    <option value="3">Next 3 days</option>
-    <option value="7">Next 7 days</option>
-    <option value="14">Next 14 days</option>
-    <option value="30">Next 30 days</option>
+    <option value="today">Today</option>
     <option value="weekend">This weekend</option>
+    <option value="7">Next 7 days</option>
+    <option value="30">Next 30 days</option>
   </select>
   <label class="chk"><input type="checkbox" id="online"> Online too</label>
   <label class="chk"><input type="checkbox" id="freeonly"> Free only</label>
@@ -845,7 +844,14 @@ function render(){
   const showOnline=$("online").checked;
   const freeOnly=$("freeonly").checked;
   let from=TODAY,to="2099-12-31";
+  // "today" is matched BEFORE the numeric branch on purpose: +"today" is NaN, so
+  // falling through would build an Invalid Date, and every comparison against an
+  // Invalid Date is false. The page would just go empty, with nothing logged and
+  // nothing to distinguish it from "genuinely nothing on today".
+  // from===to is correct, not a degenerate case: overlaps() compares two ranges,
+  // so an exhibition that opened in June and is still running today still matches.
   if(when==="weekend") [from,to]=weekendRange();
+  else if(when==="today") to=TODAY;
   else if(when){const e=new Date();e.setDate(e.getDate()+ +when);to=iso(e);}
 
   const base=EVENTS.filter(e=>(!town||e.town===town)&&overlaps(e,from,to)&&
