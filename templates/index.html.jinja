@@ -410,9 +410,13 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   </div>
   <h1>What's<br>on in <em>Nice</em></h1>
   <div class="standfirst">
-    <p>Vide-greniers and brocantes, milongas, jazz, club nights, museum shows,
-       design and AI meetups, village fêtes and pop-ups. Nice and the coast,
-       scraped daily from the sources that actually list them.</p>
+    {# One <p>, never two: .standfirst is a two-column grid whose children are
+       this paragraph and the stats block. A second <p> becomes a third grid item
+       and drops the stats onto a new row. The line break stays a <br>. #}
+    <p>The events you'll wish you'd known about.<br>
+       From café gigs to village fêtes, discover what's happening in Nice and the
+       Côte d'Azur. Hosting an event or spotted a flyer? Add it and help everyone
+       find it.</p>
     <div class="stats">
       <div class="stat"><b id="s-total">{{ stats.total }}</b><span>Listed</span></div>
       <div class="stat"><b id="s-week">0</b><span>Next 7 days</span></div>

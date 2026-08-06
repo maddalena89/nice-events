@@ -119,6 +119,18 @@ SEED: list[tuple] = [
     # NB: the poster spells the artist "Jasmine"; the monthly flyer wrote "Y'asmine".
     ("2026-07-23", "2026-09-07", "Exposition Jasmine", "Nice", "Le Bistrot Poète · 34 rue Tonduti de l'Escarène", "expo", "Vernissage jeu. 23 juil. à partir de 18h · visible jusqu'au 7 septembre", "https://www.instagram.com/bistrotpoete/", True),
     ("2026-07-23", "", "Vernissage de l'artiste Jasmine", "Nice", "Le Bistrot Poète · 34 rue Tonduti de l'Escarène", "expo", "À partir de 18h · expo visible jusqu'au 7 septembre", "https://www.instagram.com/bistrotpoete/", True),
+
+    # ---- talks & conferences: Monaco Méditerranée Foundation ----
+    # Free public lectures at One Monte-Carlo, published only on the foundation's
+    # own site (monaco-mediterranee-foundation.org/programme-des-conferences) —
+    # no aggregator carries them, hence the hand entry.
+    # free=True means no ticket price, NOT walk-in: registration is obligatory and
+    # the note says so, because turning someone away at the door is the same harm
+    # as listing a cancelled event.
+    # Category "business" is the site's own convention — models.py maps
+    # "conférence" to business. Reads oddly for an astronaut talk; pin it
+    # elsewhere via overrides.py if you'd rather it sat in another tab.
+    ("2026-09-11", "", "L'exploration spatiale aujourd'hui et demain", "Monaco", "Salle des Arts · Centre de Conférence One Monte-Carlo", "business", "avec Thomas Pesquet, astronaute ESA · 18h30 · gratuit, inscription obligatoire", "https://monaco-mediterranee-foundation.org/conferences/lexploration-spatiale-aujourdhui-et-demain/", True),
 ]
 
 
