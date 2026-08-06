@@ -39,7 +39,15 @@ API = ("https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/"
 # Exact-match filter is the most reliable ODSQL there is. If the field or value
 # ever changes the run returns nothing and warns — it can't silently ship wrong
 # data. The postcode belt-and-braces below is what actually guarantees 06-only.
-WHERE = 'location_department="Alpes-Maritimes"'
+#
+# The date floor is essential: results are ordered by firstdate_begin ASCENDING,
+# and this national dataset holds years of past events. Without a floor the first
+# thousands of rows are all in the past, every one gets dropped as "already over",
+# and the scraper returns 0 while looking healthy. `lastdate_end >= today` keeps
+# still-running exhibitions too, not just events that start in the future.
+def _where(today: date) -> str:
+    return (f'location_department="Alpes-Maritimes" '
+            f"and lastdate_end >= date'{today.isoformat()}'")
 
 
 def _iso_date(s: Optional[str]) -> Optional[date]:
@@ -67,8 +75,14 @@ def _text(v) -> str:
 
 def _postcode(rec: dict) -> str:
     for k in ("location_postalcode", "location_postal_code", "location_zipcode"):
-        if rec.get(k):
-            return str(rec[k]).strip()
+        v = rec.get(k)
+        if v:
+            # OpenDataSoft often stores this as an integer, which drops the
+            # leading zero: 06000 comes back as 6000. Left-pad the digits to 5
+            # so the "starts with 06" department check below actually holds —
+            # without this, EVERY Alpes-Maritimes event (all 06xxx) is dropped.
+            digits = re.sub(r"\D", "", str(v))
+            return digits.zfill(5) if digits else str(v).strip()
     return ""
 
 
@@ -94,9 +108,10 @@ class OpenAgenda(HttpScraper):
         seen: set[str] = set()
         kept = 0
 
+        where = _where(today)
         for page in range(self.MAX_PAGES):
             offset = page * self.PAGE
-            url = (f"{API}?where={self._q(WHERE)}"
+            url = (f"{API}?where={self._q(where)}"
                    f"&select={self._q(self.SELECT)}"
                    f"&order_by=firstdate_begin&limit={self.PAGE}&offset={offset}")
             r = self.get(url)

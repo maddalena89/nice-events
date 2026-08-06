@@ -24,7 +24,6 @@ from typing import Iterator, Optional
 
 from selectolax.parser import HTMLParser
 
-from ..dom import cards_containing
 from ..models import Event, classify, parse_date
 from .base import HttpScraper, register
 
@@ -73,27 +72,45 @@ class ExploreNCA(HttpScraper):
         today = date.today()
         seen: set[str] = set()
 
-        # v1 climbed N parents from the link until the text "looked big enough"
-        # and returned 0 events against the live site — the heuristic never
-        # found the card. Select the containing card directly instead.
-        for card in cards_containing(tree, {"li", "article", "div"},
-                                     "a[href*='/event/']"):
-            link = card.css_first("a[href*='/event/']")
-            if link is None:
-                continue
+        # The card is split into sibling "content-row" divs — one for the date,
+        # one for the title (which holds the <a>), one for the town/meta. So the
+        # nearest div above the link contains only the title, no date: earlier
+        # versions selected that shallow div, found no date, and dropped every
+        # card (12 links matched, 0 parsed). Climb from each link until the
+        # container's text actually carries BOTH a date and a known town — that
+        # is the real card, whatever its class names happen to be.
+        for link in tree.css("a[href*='/event/']"):
             href = link.attributes.get("href", "")
+            if not href:
+                continue
 
-            # The card's <a> text is sometimes empty (image link); prefer a
-            # heading, fall back to the link text, then the image alt.
-            head = card.css_first("h2, h3, h4")
-            title = re.sub(r"\s+", " ", (head.text() if head else link.text()) or "").strip()
-            if not title:
-                img = card.css_first("img[alt]")
-                title = (img.attributes.get("alt") or "").strip() if img else ""
+            node = link.parent
+            block = ""
+            for _ in range(8):                 # cap the climb; cards are shallow
+                if node is None:
+                    break
+                text = re.sub(r"\s+", " ", node.text() or "").strip()
+                if len(text) > 6000:           # too big — we've left the card
+                    break
+                if _DATE_PAIR.search(text) and _town(text):
+                    block = text
+                    break
+                node = node.parent
+            if not block:
+                continue
+
+            # The <a> wraps the title text directly ("stretched-link"); fall back
+            # to a heading or the image alt if it's an image-only link.
+            title = re.sub(r"\s+", " ", link.text() or "").strip()
+            if not title and node is not None:
+                head = node.css_first("h2, h3, h4")
+                title = re.sub(r"\s+", " ", (head.text() if head else "") or "").strip()
+                if not title:
+                    img = node.css_first("img[alt]")
+                    title = (img.attributes.get("alt") or "").strip() if img else ""
             if not title or len(title) < 3:
                 continue
 
-            block = re.sub(r"\s+", " ", card.text() or "")
             ev = self._event(title, href, block, today)
             if ev and ev.fingerprint not in seen:
                 seen.add(ev.fingerprint)

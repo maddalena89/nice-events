@@ -11,9 +11,16 @@ Notifications:
   - The script exits 1 when problems are found, so a scheduler (e.g. GitHub
     Actions) can also flag the run and email you.
 
-Because the exact field names in events.json may vary, this reads each event
-defensively and tries several common key names. If it can't find the fields it
-expects, it says so in the report instead of silently passing.
+Field names are now known and verified against the live feed (2026-08-04):
+
+    generated, count, events[]
+    events[]: fingerprint, title, start, end?, time, town, venue?, category,
+              url?, note?, free?, source, slug
+
+`note` is the description field; there is no `description`. `free` is only
+present when true, so an absent `free` means "not marked free", not "known to
+cost money". A short fallback list is kept for each field so a rename does not
+silently disable a check, and the report says which checks went inactive.
 """
 
 import json
@@ -123,7 +130,7 @@ def run():
                              "important problem." % (hrs, gen.isoformat())))
 
     # Track whether we ever found the fields we expect, to warn if schema differs.
-    saw_time = saw_date = saw_town = saw_note = False
+    saw_time = saw_date = saw_town = saw_venue = saw_note = False
 
     false_midnight = []
     past = []
@@ -136,12 +143,13 @@ def run():
     for i, ev in enumerate(events):
         if not isinstance(ev, dict):
             continue
-        title = first(ev, "title", "name", "titre") or "(untitled #%d)" % i
-        t = first(ev, "time", "heure", "start_time", "startTime")
-        start = first(ev, "date", "start", "start_date", "startDate", "date_start", "dateDebut")
-        end = first(ev, "end", "end_date", "endDate", "date_end", "dateFin")
-        town = first(ev, "town", "city", "ville", "commune", "location", "lieu")
-        note = first(ev, "note", "description", "desc", "details", "notes")
+        title = first(ev, "title", "name") or "(untitled #%d)" % i
+        t = first(ev, "time")
+        start = first(ev, "start", "date", "start_date")
+        end = first(ev, "end", "end_date")
+        town = first(ev, "town", "city", "ville")
+        venue = first(ev, "venue", "lieu")
+        note = first(ev, "note", "description")
         free_flag = ev.get("free")
         price = first(ev, "price", "prix", "tarif", "cost")
 
@@ -151,6 +159,8 @@ def run():
             saw_date = True
         if town is not None:
             saw_town = True
+        if venue is not None:
+            saw_venue = True
         if note is not None:
             saw_note = True
 
@@ -161,8 +171,11 @@ def run():
         if str(t).strip() == "00:00":
             false_midnight.append((title, start))
 
-        # Past start date still listed
-        if sd is not None and sd < today:
+        # Past start date still listed. A past start with a FUTURE end is an
+        # ongoing run (an exhibition, a festival), not a stale listing, so it is
+        # deliberately not flagged. Without this, every long-running exhibition
+        # is reported as a problem every single day.
+        if sd is not None and sd < today and not (ed is not None and ed >= today):
             past.append((title, sd.isoformat(), town))
 
         # Recurring rendered as one long range
@@ -185,16 +198,23 @@ def run():
                                              and free_flag.lower() in ("true", "yes", "1", "oui"))
         if is_free_flag and has_euro:
             price_conflict.append((title, "marked free but a price is mentioned"))
-        elif (free_flag is False) and says_free_words and not has_euro:
-            price_conflict.append((title, "marked not-free but text says it is free/gratuit"))
+        elif not is_free_flag and says_free_words and not has_euro:
+            # `free` is absent unless true, so testing `free_flag is False` here
+            # never matched anything: this branch was dead. Absent means "not
+            # marked free", which is exactly the case worth flagging.
+            price_conflict.append((title, "not marked free but text says it is free/gratuit"))
 
-        # Duplicate detection
-        key = (norm_title(title), sd.isoformat() if sd else str(start),
-               norm_title(town))
-        if key in seen:
-            dupes.append((title, sd.isoformat() if sd else str(start), town))
-        else:
-            seen[key] = i
+        # Duplicate detection. Title + date + VENUE, never town: two different
+        # vide-greniers in the same town on the same day are not duplicates, and
+        # generic titles at different venues are not either. Events with no venue
+        # are skipped rather than guessed at.
+        if venue:
+            key = (norm_title(title), sd.isoformat() if sd else str(start),
+                   norm_title(venue))
+            if key in seen:
+                dupes.append((title, sd.isoformat() if sd else str(start), venue))
+            else:
+                seen[key] = i
 
     def add(group, items, fmt):
         if items:
@@ -218,7 +238,9 @@ def run():
     if not saw_date:
         warnings.append("no start-date field seen; date-based checks may be inactive.")
     if not saw_town:
-        warnings.append("no town/city field seen; duplicate check is weaker.")
+        warnings.append("no town field seen; past-event reports lose their location.")
+    if not saw_venue:
+        warnings.append("no venue field seen; the duplicate check is inactive.")
     if not saw_note:
         warnings.append("no description/note field seen; empty-note and price checks may be inactive.")
 

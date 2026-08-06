@@ -54,6 +54,12 @@ SUPPRESSED: list[tuple] = [
     # automated verification (403), so this rests on the owner's local knowledge,
     # not a bot 404. Fully reversible: delete this line to bring it back.
     ("https://www.nice.fr/agenda/le-chat-potte/", None, None, None),
+    # A Meetup ad ("ladies_gentlemen" group) using festival hype as clickbait —
+    # not a real event. The actual Soirées Estivales line-up is covered in full by
+    # the departement06 source. Drop the ad by its Meetup URL.
+    ("https://www.meetup.com/ladies_gentlemen/events/315710289/", None, None, None),
+    # Belt-and-braces in case that group reposts the same headline under a new id.
+    (None, "le plus grand festival d ete de la cote d azur", None, None),
 ]
 
 
