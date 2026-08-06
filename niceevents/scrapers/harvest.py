@@ -47,14 +47,20 @@ log = logging.getLogger(__name__)
 VENUES: list[tuple] = [
     # ("Théâtre National de Nice", "https://www.tnn.fr/fr/calendrier", "jsonld"),
     # ("Opéra de Nice",            "https://www.opera-nice.org/fr/agenda", "jsonld"),
-    # La Zonmé — Nice arts collective, programme lives on a public Google Calendar.
-    ("La Zonmé",
-     "https://calendar.google.com/calendar/ical/"
-     "9fc9ae4b740cbf6e2d361a6c959c634e7d025e9412a811bafbac1c8144cd3648"
-     "%40group.calendar.google.com/public/basic.ics",
-     "ics", "Nice"),
-    # Swingin'Nice — lindy hop / swing across the 06. Public Google Calendar,
-    # recurring practices (RRULE) + one-off workshops & the festival.
+    # La Zonmé moved OUT of this list on 2026-08-06. scrapers/lazonme.py now reads
+    # the very same calendar (identical CAL_ID) through GCalICS, and it knows
+    # things this generic entry cannot: the venue name, a link to fall back on,
+    # and that an ambiguous title at a music venue is a concert, not "other".
+    # Two scrapers on one calendar is not a duplicate on the page — they share a
+    # fingerprint and merge — but harvest runs FIRST, so its poorer category and
+    # venue were the ones that stuck, and the dedicated scraper's better values
+    # were silently discarded. One owner per source.
+    #
+    # Swingin'Nice stays for now: scrapers/swing.py reads a DIFFERENT calendar id
+    # (cf05fbae…@group) from the one here (swing06events@gmail.com). They may be
+    # the same programme migrated to a group calendar, or two live calendars.
+    # Until that is confirmed against both feeds, dropping this risks losing the
+    # swing nights outright, and keeping it costs one fetch and a merge.
     ("Swingin'Nice",
      "https://calendar.google.com/calendar/ical/"
      "swing06events%40gmail.com/public/basic.ics",
