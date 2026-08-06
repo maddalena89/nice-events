@@ -20,7 +20,7 @@ import re
 import shutil
 import sqlite3
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -160,19 +160,88 @@ def _fmt_day(iso: str) -> str:
     return f"{int(d)} {_MONTHS_ABBR[int(m)]}"
 
 
-def _collapse_recurring(events: list[dict]) -> list[dict]:
-    """Fold a single event that recurs on many dates at the SAME venue into one row.
+#: How far ahead counts as "what's on now". Inside this window a repeating event
+#: keeps one row per date; beyond it the remaining dates fold into a single row.
+#: Matches the six-week window the site promises.
+#:
+#: This number is the whole trade-off, so it is one edit to tune: raise it and the
+#: page carries more real dates, lower it and the page is shorter but goes back to
+#: hiding dates behind an "Also on" line.
+_NEAR_DAYS = 42
 
-    A guided tour listed on 13 separate dates, a weekly milonga, a monthly brocante
-    at the same square — these are one thing, not fifteen, and listing each date
-    floods the page. We group by title + venue + town and, when a venue is present
-    and the group repeats, merge into one row spanning its first-to-last date.
 
-    Venue is load-bearing: it's what tells "the Musée Matisse tour, on many dates"
-    apart from "two different brocantes that happen to share a generic name". Events
-    with no venue are left exactly as they are — without one we can't tell a genuine
-    repeat from a coincidence, so we don't guess.
+def _adjacent_blocks(evs: list[dict]) -> list[list[dict]]:
+    """Split date-sorted events into blocks of consecutive (or same) nights.
+
+    A theatre run playing Thursday, Friday and Saturday arrives as three rows and
+    is ONE thing playing three nights. A milonga on three consecutive Thursdays is
+    three separate nights out. The gap between dates is what tells them apart.
     """
+    blocks: list[list[dict]] = []
+    for e in evs:
+        s = date.fromisoformat(e["start"])
+        if blocks:
+            last = blocks[-1]
+            last_end = max(date.fromisoformat(x.get("end") or x["start"]) for x in last)
+            if (s - last_end).days <= 1:
+                last.append(e)
+                continue
+        blocks.append([e])
+    return blocks
+
+
+def _run_row(block: list[dict]) -> dict:
+    """One row for a block of consecutive nights: a single date, or a span."""
+    if len(block) == 1:
+        return block[0]
+    start = date.fromisoformat(block[0]["start"])
+    end = max(date.fromisoformat(e.get("end") or e["start"]) for e in block)
+    return _merge_cluster(block, start, end)
+
+
+def _fold_tail(rows: list[dict]) -> dict:
+    """Fold far-future repeats into one row, with the other dates in the note."""
+    first = rows[0]
+    start = date.fromisoformat(first["start"])
+    end = date.fromisoformat(first.get("end") or first["start"])
+    base = _merge_cluster(rows, start, end)
+    others = [r["start"] for r in rows[1:]]
+    if others:
+        shown = others[:4]
+        summ = "Also on " + ", ".join(_fmt_day(x) for x in shown)
+        if len(others) > len(shown):
+            summ += " +%d more" % (len(others) - len(shown))
+        base["note"] = (base["note"] + " · " + summ) if base.get("note") else summ
+    base["recurring"] = True
+    return base
+
+
+def _collapse_recurring(events: list[dict], today: Optional[date] = None) -> list[dict]:
+    """Tidy repeats at the SAME venue without hiding the ones happening soon.
+
+    Grouped by title + venue + town. Venue is load-bearing: it's what tells "the
+    Musée Matisse tour, on many dates" apart from "two different brocantes that
+    happen to share a generic name". Events with no venue are left exactly as they
+    are — without one we can't tell a genuine repeat from a coincidence.
+
+    Each group is then handled in two steps.
+
+    1. Consecutive nights fold into ONE row spanning them. A show playing 10, 11
+       and 12 September is one run, and three identical cards in a row is noise.
+
+    2. Whatever repeats are left keep a row EACH inside the next `_NEAR_DAYS`; only
+       the dates beyond that fold into a single "Also on …" row.
+
+    Step 2 is the fix for a real bug, so please don't collapse it back. This
+    function used to fold every date of a repeat into one row anchored on the
+    first, which meant the published feed carried 6 of the 41 tango milongas the
+    scraper had correctly found: every milonga after the first of its kind simply
+    was not on the site on the night it happened. On a what's-on, an event that
+    does not appear on its own date has been lost, however tidy the page looks.
+    """
+    today = today or date.today()
+    horizon = today + timedelta(days=_NEAR_DAYS)
+
     groups: dict[tuple, list[dict]] = {}
     out: list[dict] = []
     for e in events:
@@ -187,22 +256,12 @@ def _collapse_recurring(events: list[dict]) -> list[dict]:
             out.append(evs[0])
             continue
         evs.sort(key=lambda e: (e["start"], e.get("end") or e["start"]))
-        # Discrete recurrence (a monthly milonga, a tour on set dates) is NOT a
-        # continuous run: anchor it on the NEXT date as a single day and list the
-        # other dates in the note, instead of a span that would wrongly read as
-        # "on every day". (True continuous exhibitions arrive as one row with a
-        # real start+end and never reach this branch.)
-        d0 = date.fromisoformat(evs[0]["start"])
-        base = _merge_cluster(evs, d0, d0)                 # single day, end dropped
-        others = [e["start"] for e in evs[1:] if e.get("start") != evs[0]["start"]]
-        if others:
-            shown = others[:4]
-            summ = "Also on " + ", ".join(_fmt_day(x) for x in shown)
-            if len(others) > len(shown):
-                summ += " +%d more" % (len(others) - len(shown))
-            base["note"] = (base["note"] + " · " + summ) if base.get("note") else summ
-        base["recurring"] = True
-        out.append(base)
+        runs = [_run_row(b) for b in _adjacent_blocks(evs)]
+        near = [r for r in runs if date.fromisoformat(r["start"]) <= horizon]
+        far = [r for r in runs if date.fromisoformat(r["start"]) > horizon]
+        out.extend(near)
+        if far:
+            out.append(_fold_tail(far))
 
     out.sort(key=lambda e: (e["start"], e.get("title", "")))
     return out
@@ -401,6 +460,66 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
     return {k: v for k, v in d.items() if v not in (None, "", 0) or k in ("start", "title", "town")}
 
 
+def _source_report(conn: sqlite3.Connection, events: list[dict]) -> dict:
+    """Per-source health, published next to the feed as dist/sources.json.
+
+    The recurring failure on this site is a scraper going silently to zero: the
+    page still looks full because the healthy sources carry it, and the loss is
+    only noticed days later when someone goes looking for a specific event. The
+    information needed to catch it on the day already existed in two places that
+    nobody could see together — the `runs` table (what the scraper fetched, and
+    whether it raised) lived only inside the Action, and the published counts
+    lived only in the feed. This joins them and publishes the result.
+
+    Every REGISTERED source gets a row, including the ones that produced nothing.
+    A dead source has to appear as a zero, not as an absence: absence is exactly
+    what hid this for a week.
+
+    `status` is the summary worth alerting on:
+      failed  — the scraper raised, the error is in the row
+      empty   — it ran cleanly and found nothing (broken, or genuinely nothing on)
+      stale   — it found events but none of them reached the feed
+      ok      — events published
+    """
+    from .scrapers import REGISTRY
+
+    published: dict[str, int] = {}
+    for e in events:
+        name = (e.get("source") or "unknown").split(":")[0]
+        published[name] = published.get(name, 0) + 1
+
+    runs = db.last_runs(conn)
+    out = []
+    for name in sorted(set(REGISTRY) | set(published) | set(runs)):
+        r = runs.get(name)
+        found = r["found"] if r else None
+        ok = bool(r["ok"]) if r else None
+        count = published.get(name, 0)
+        if r is not None and not ok:
+            status = "failed"
+        elif count:
+            status = "ok"
+        elif found:
+            status = "stale"
+        else:
+            status = "empty"
+        out.append({
+            "name": name,
+            "status": status,
+            "published": count,
+            "found": found,
+            "added": r["added"] if r else None,
+            "last_run": r["started_at"] if r else None,
+            "error": (r["error"] if r else None) or None,
+            "registered": name in REGISTRY,
+        })
+    return {
+        "generated": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "published_total": len(events),
+        "sources": out,
+    }
+
+
 def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     rows = db.upcoming(conn)
     # Remove phantom / dead listings first, before anything else looks at them.
@@ -431,6 +550,13 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
             ensure_ascii=False,
             indent=1,
         ),
+        encoding="utf-8",
+    )
+
+    # Per-source health, published so a dead scraper is visible from outside the
+    # Action on the day it dies. Tiny file, deliberately at a stable path.
+    (out / "sources.json").write_text(
+        json.dumps(_source_report(conn, events), ensure_ascii=False, indent=1),
         encoding="utf-8",
     )
 

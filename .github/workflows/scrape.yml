@@ -62,15 +62,44 @@ jobs:
           # SUBMIT_ENDPOINT: ${{ secrets.SUBMIT_ENDPOINT }}   # if you use Formspree
         run: python -m niceevents.run build --out dist
 
+      # dist/sources.json joins what each scraper FETCHED (the runs table, which
+      # only ever existed inside this runner) to what actually reached the feed.
+      # It ships with the site, so whatsonnice.com/sources.json is a permanent
+      # outside view of source health — the thing that was missing when three
+      # scrapers sat at zero for a week without anyone noticing.
       - name: Report
         if: always()
         run: |
           {
-            echo "### Scrape result"
+            echo "### Source health"
+            if [ -f dist/sources.json ]; then
+              python - <<'PY'
+          import json, pathlib
+          d = json.loads(pathlib.Path("dist/sources.json").read_text())
+          rank = {"failed": 0, "stale": 1, "empty": 2, "ok": 3}
+          rows = sorted(d["sources"], key=lambda s: (rank[s["status"]], -(s["published"] or 0)))
+          print(f'{d["published_total"]} events published\n')
+          print("| source | status | published | found | note |")
+          print("| --- | --- | --- | --- | --- |")
+          for s in rows:
+              mark = {"failed": "🔴", "stale": "🟠", "empty": "⚪️", "ok": "🟢"}[s["status"]]
+              note = (s["error"] or "")[:70] or ("not registered" if not s["registered"] else "")
+              print(f'| {s["name"]} | {mark} {s["status"]} | {s["published"]} | '
+                    f'{s["found"] if s["found"] is not None else "-"} | {note} |')
+          bad = [s["name"] for s in rows if s["status"] in ("failed", "stale")]
+          if bad:
+              print(f'\n⚠️ needs attention: {", ".join(bad)}')
+          PY
+            else
+              echo "no sources.json — the build step did not finish"
+            fi
+            echo ""
+            echo "<details><summary>scrape log</summary>"
+            echo ""
             echo '```'
             tail -25 scrape.log || echo "no log"
             echo '```'
-            grep -iE "FAILED|returned NOTHING" scrape.log && echo "⚠️ some sources need attention" || true
+            echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Saving the db is a nice-to-have (it's what makes "new this week" work).

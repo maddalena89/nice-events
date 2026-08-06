@@ -45,6 +45,11 @@ class TangoArgentin(HttpScraper):
     name = "tango_argentin"
     label = "Tango-Argentin (verified)"
     delay = 1.2
+    #: Each city page prints the venue's whole forward calendar in one go, no
+    #: pagination, so a milonga that disappears from a date really has moved.
+    #: Organisers shuffle these often (Amarras moved Friday -> Saturday in August
+    #: 2026), and a milonga advertised on the wrong night is a wasted evening.
+    reconciles_dates = True
 
     def fetch(self) -> Iterator[Event]:
         seen: set[str] = set()

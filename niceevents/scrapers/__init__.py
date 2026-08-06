@@ -17,6 +17,7 @@ from . import maeght         # noqa: F401  Fondation Maeght (Saint-Paul-de-Vence
 from . import seed           # noqa: F401  hand-curated coast & hinterland exhibitions
 from . import belaprem       # noqa: F401  Belaprem free open-air series at Le 109
 from . import panda          # noqa: F401  Panda Events gigs (109 / Frigo 16 / TLV)
+from . import anthea         # noqa: F401  anthéa, Antipolis Théâtre d'Antibes
 from . import harvest        # noqa: F401  generic JSON-LD / iCal venue harvester
 
 # JS-rendered — Playwright required

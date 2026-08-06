@@ -51,6 +51,15 @@ class Scraper(ABC):
     needs_browser: bool = False
     #: be a good citizen — seconds between requests to the same host
     delay: float = 1.0
+    #: Does every run return this source's COMPLETE listing?
+    #:
+    #: Only then can "the source lists this show on other dates now" be read as
+    #: "the date moved", which is what lets db.reconcile_dates delete the old row
+    #: (see it for why that matters). A paginated or partial source must leave
+    #: this False: there, a missing date means "not in this page", not "moved",
+    #: and sweeping would delete real events. Default off on purpose — turn it on
+    #: only for a source you have checked returns everything, every time.
+    reconciles_dates: bool = False
 
     @abstractmethod
     def fetch(self) -> Iterator[Event]:

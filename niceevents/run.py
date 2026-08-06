@@ -108,6 +108,14 @@ def cmd_scrape(args) -> int:
                 events = kept
 
                 added, merged = db.upsert(conn, events)
+                # Sources that publish a complete listing every run can also tell
+                # us a show has MOVED, which upsert alone cannot: the new date
+                # arrives as a new row and the old one lingers. Opt-in per
+                # scraper — see Scraper.reconciles_dates.
+                if cls.reconciles_dates:
+                    moved = db.reconcile_dates(conn, name, events)
+                    if moved:
+                        log.info("%-16s dropped %d row(s) whose date moved", name, moved)
                 db.log_run(conn, name, ok=True, found=len(events), added=added)
                 total_added += added
                 total_found += len(events)

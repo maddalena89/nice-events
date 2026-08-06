@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
-from .models import Event
+from .models import Event, _title_key, slugify
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -194,6 +194,23 @@ def log_run(conn, scraper: str, ok: bool, found: int = 0,
     )
 
 
+def last_runs(conn) -> dict[str, sqlite3.Row]:
+    """The most recent run of each scraper, keyed by scraper name.
+
+    The `runs` table has always recorded this; nothing outside the CLI ever read
+    it, which is why a source could sit at zero for a week without anyone seeing
+    it. `site.build` publishes this next to the feed so the runner's own view of
+    each source is visible from outside the Action.
+    """
+    rows = conn.execute("""
+        SELECT r.* FROM runs r
+        JOIN (SELECT scraper, MAX(started_at) at, MAX(id) mid
+              FROM runs GROUP BY scraper) last
+          ON r.scraper = last.scraper AND r.id = last.mid
+    """).fetchall()
+    return {r["scraper"]: r for r in rows}
+
+
 def prune_past(conn, keep_days: int = 2) -> int:
     """Drop events that finished more than keep_days ago."""
     cutoff = (date.today() - timedelta(days=keep_days)).isoformat()
@@ -201,6 +218,66 @@ def prune_past(conn, keep_days: int = 2) -> int:
         "DELETE FROM events WHERE COALESCE(end, start) < ? AND submitted_by IS NULL", (cutoff,)
     )
     return cur.rowcount
+
+
+def reconcile_dates(conn, source: str, events: Iterable[Event]) -> int:
+    """Drop rows for a show the source still lists, but has since MOVED.
+
+    The fingerprint is title + date + town, so when a venue corrects a date the
+    corrected listing arrives as a NEW row and the old one survives untouched
+    until its date passes. Nothing prunes it, because `prune_past` only looks at
+    dates and `prune_retired` only at whole sources. Real case, 2026-08-06:
+    tango-argentin moved Amarras from Friday 14 August to Saturday 15 August, and
+    the site would have advertised both — sending someone to a locked door.
+
+    Deliberately narrow. A row is only removed when ALL of these hold:
+
+      * the source still lists that title in that town in THIS run, just on other
+        dates. A title the source stopped mentioning entirely is left alone: that
+        is indistinguishable from a truncated scrape, and a stale extra event is a
+        far smaller harm than silently deleting a whole programme.
+      * no OTHER source also carries the row. If two sources saw it, one of them
+        dropping it is not evidence it is gone.
+      * the date is not one this run returned, and is not already in the past.
+
+    Membership of `events` is the test for "still current", deliberately, rather
+    than a last_seen timestamp: last_seen has one-second resolution, so a row
+    written and reconciled inside the same second reads as fresh, and a guard that
+    only works when the run is slow is not a guard.
+
+    Even so this is opt-in per scraper (`reconciles_dates`), because it is only
+    sound for a source that publishes its COMPLETE listing every run. A paginated
+    source that returns the first N results would read as "these dates moved" and
+    delete the rest. See the flag on Scraper.
+    """
+    events = list(events)
+    if not events:
+        return 0
+
+    listed: dict[tuple, set[str]] = {}
+    for e in events:
+        listed.setdefault(
+            (_title_key(e.title), slugify(e.town)), set()
+        ).add(e.start.isoformat())
+
+    today = date.today().isoformat()
+    dead: list[tuple] = []
+    for r in conn.execute(
+        """SELECT fingerprint, title, town, start, source, sources
+           FROM events WHERE source = ? AND start >= ? AND submitted_by IS NULL""",
+        (source, today),
+    ).fetchall():
+        srcs = {s.strip() for s in (r["sources"] or r["source"] or "").split(",") if s.strip()}
+        if srcs != {source}:
+            continue                                   # another source vouches for it
+        dates = listed.get((_title_key(r["title"]), slugify(r["town"])))
+        if dates is None or r["start"] in dates:
+            continue                                   # not listed, or still on this date
+        dead.append((r["fingerprint"],))
+
+    if dead:
+        conn.executemany("DELETE FROM events WHERE fingerprint = ?", dead)
+    return len(dead)
 
 
 def prune_retired(conn, active_sources) -> int:
