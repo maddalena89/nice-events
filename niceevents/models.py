@@ -313,15 +313,31 @@ def parse_time(text: Optional[str]) -> Optional[str]:
 
 # ------------------------------------------------------------------- event
 
-_NOISE = re.compile(r"\b(gratuit|free|nouveau|new|complet|sold ?out|annulé|cancelled)\b", re.I)
+#: Badges a source bolts onto a title that must not change the event's identity.
+#:
+#: Matched against the SLUG, i.e. after accents are stripped and everything is
+#: lowercased, so one bare stem covers every spelling. That is load-bearing for
+#: the cancellation words: the tango agenda writes "(ANNULEE) MILONGA …", and the
+#: old pattern looked for the accented "annulé" with a closing word boundary, so
+#: it matched neither ANNULEE (no accent) nor Annulée (the trailing e kills the
+#: boundary). It had therefore never matched a real cancellation.
+#:
+#: The cost of that was the Casita incident of 6 August 2026, twice over. A
+#: cancelled event is RETITLED by its calendar rather than deleted, so with the
+#: marker left in the key it fingerprinted as a DIFFERENT event, landed as a
+#: second row, and the original stayed in the feed advertised as on — next to the
+#: struck-through one. cancellations.py can only flag what it is given; if the
+#: two rows never merge, flagging one of them does not help anybody.
+_NOISE = re.compile(
+    r"\b(gratuit|free|nouveau|new|complet|sold ?out|annul\w*|cancell?ed)\b")
 
 
 def _title_key(title: str) -> str:
     """Normalised title for dedup: strip badges, punctuation, accents, articles."""
-    t = _NOISE.sub(" ", title or "")
-    t = slugify(t)
-    t = re.sub(r"\b(le|la|les|l|du|de|des|un|une|the|a|of|at|au|aux)\b", "", t)
-    return re.sub(r"-+", "-", t).strip("-")
+    t = slugify(title or "").replace("-", " ")
+    t = _NOISE.sub(" ", t)
+    t = re.sub(r"\b(le|la|les|l|du|de|des|un|une|the|a|of|at|au|aux)\b", " ", t)
+    return re.sub(r"[\s-]+", "-", t).strip("-")
 
 
 @dataclass

@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Iterator, Optional
+from zoneinfo import ZoneInfo
 
 from ..models import Event, canon_town, classify, slugify
 from ..models import _TOWN_CANON  # noqa: private, but it's the town lookup table
@@ -50,20 +51,39 @@ def split_prop(line: str) -> tuple[str, str]:
     return line[:i].split(";", 1)[0].upper(), line[i + 1:]
 
 
+#: Google Calendar writes a one-off event in UTC and a recurring series in a
+#: named zone, and split_prop has already dropped the TZID, so a trailing Z is
+#: the only signal left that a value needs converting. This function used to
+#: claim it handled that and did not: it read the digits either way, which
+#: published one-off gigs two hours early in summer and one early in winter.
+#: Found on La Zonmé, 2026-08-07.
+PARIS = ZoneInfo("Europe/Paris")
+
+
 def parse_dt(value: str) -> tuple[Optional[date], Optional[str]]:
-    """Return (date, 'HH:MM' or None). Handles date, local datetime, and UTC 'Z'."""
-    m = re.match(r"(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?", value.strip())
+    """Return (date, 'HH:MM' or None). Handles date, local datetime, and UTC 'Z'.
+
+    The date comes back with the time because converting a UTC value can roll
+    it: a 23:30 UTC start is 01:30 the next morning in Nice.
+    """
+    m = re.match(r"(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(?:\d{2})?(Z)?)?",
+                 value.strip())
     if not m:
         return None, None
-    y, mo, d, hh, mm = m.groups()
+    y, mo, d, hh, mm, zulu = m.groups()
     try:
         dt = date(int(y), int(mo), int(d))
     except ValueError:
         return None, None
     if hh is None:
         return dt, None
-    hm = f"{hh}:{mm}"
-    return dt, (None if hm == "00:00" else hm)   # midnight == "no time given"
+    hh, mm = int(hh), int(mm)
+    if zulu:
+        moment = datetime(int(y), int(mo), int(d), hh, mm,
+                          tzinfo=timezone.utc).astimezone(PARIS)
+        dt, hh, mm = moment.date(), moment.hour, moment.minute
+    # midnight == "no time given"
+    return dt, (None if (hh, mm) == (0, 0) else f"{hh:02d}:{mm:02d}")
 
 
 def town_from(loc: str, default: str = "Nice") -> str:
@@ -130,10 +150,18 @@ class GCalICS(HttpScraper):
         if not title or not start:
             return None
 
-        end, _ = parse_dt(ev.get("DTEND", ""))
+        raw_end = ev.get("DTEND", "")
+        end, _ = parse_dt(raw_end)
+        timed_end = "T" in raw_end
         # All-day DTEND is exclusive (the morning after) — pull it back a day.
-        if end and "T" not in ev.get("DTEND", "") and end > start:
+        if end and not timed_end and end > start:
             end = end - timedelta(days=1)
+        # A TIMED end on the following day is a night that runs past midnight,
+        # not a two-day event. Now that a UTC end is converted to Nice time this
+        # is the common case, not the exception: a 20:00 gig to 01:30 ends
+        # "tomorrow" on every clock.
+        if end and timed_end and (end - start).days == 1:
+            end = start
         if end and end <= start:
             end = None
         if (end or start) < today:

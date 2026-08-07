@@ -26,8 +26,9 @@ import html
 import json
 import logging
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Iterator, Optional
+from zoneinfo import ZoneInfo
 
 from selectolax.parser import HTMLParser
 
@@ -168,7 +169,26 @@ def _ics_prop(line: str) -> tuple[str, str]:
     return key.split(";", 1)[0].upper(), val.strip()
 
 
+#: Google Calendar writes a ONE-OFF event in UTC ("…T180000Z") and a RECURRING
+#: series in a named zone ("DTSTART;TZID=Europe/Paris:…T200000"). _ics_prop has
+#: already thrown the TZID parameter away by the time we get here, so a trailing
+#: Z is the only signal left that a value still needs converting.
+#:
+#: Reading the digits and ignoring that Z published every one-off La Zonmé gig
+#: two hours early in summer and one hour early in winter — an offset that
+#: tracked European daylight saving exactly, which is the tell. Doors at 20:00
+#: were advertised as 18:00. Found 2026-08-07.
+PARIS = ZoneInfo("Europe/Paris")
+
+
 def _ics_date(val: str) -> Optional[date]:
+    """The date AS THE CALENDAR WROTE IT, with no timezone conversion.
+
+    Deliberately raw, because _ics_starts materialises an RRULE by walking this
+    date forward and re-attaching the original clock time: that sequence has to
+    stay in the calendar's own frame or every occurrence drifts. For the date a
+    visitor should actually see, use _ics_dt.
+    """
     m = re.match(r"(\d{4})(\d{2})(\d{2})", val)
     if not m:
         return None
@@ -178,11 +198,36 @@ def _ics_date(val: str) -> Optional[date]:
         return None
 
 
+def _ics_dt(val: str) -> tuple[Optional[date], Optional[str]]:
+    """(local date, 'HH:MM' or None) for an ICS value, UTC converted to Nice.
+
+    Returns the pair together because the conversion can roll the DATE as well
+    as the clock: a milonga starting 23:30 UTC is 01:30 the next morning here.
+    Taking the date from one function and the time from another would put those
+    two halves in different timezones.
+    """
+    m = re.match(r"(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(?:\d{2})?(Z)?)?",
+                 val.strip())
+    if not m:
+        return None, None
+    y, mo, d, hh, mi, zulu = m.groups()
+    try:
+        day = date(int(y), int(mo), int(d))
+    except ValueError:
+        return None, None
+    if hh is None:                      # an all-day entry: a date, no clock
+        return day, None
+    hh, mi = int(hh), int(mi)
+    if zulu:
+        moment = datetime(int(y), int(mo), int(d), hh, mi,
+                          tzinfo=timezone.utc).astimezone(PARIS)
+        day, hh, mi = moment.date(), moment.hour, moment.minute
+    # Midnight is how these calendars say "no time given", not a real start.
+    return day, (None if (hh, mi) == (0, 0) else f"{hh:02d}:{mi:02d}")
+
+
 def _ics_time(val: str) -> Optional[str]:
-    m = re.match(r"\d{8}T(\d{2})(\d{2})", val)
-    if m and (m[1], m[2]) != ("00", "00"):
-        return f"{m[1]}:{m[2]}"
-    return None
+    return _ics_dt(val)[1]
 
 
 def _events_from_ics(text: str) -> Iterator[dict]:
@@ -491,7 +536,12 @@ def _ics_starts(raw: dict, today: date) -> list[str]:
     mt = re.search(r"T(\d{6})", dt) or re.search(r"T(\d{4})", dt)
     if mt:
         t = mt.group(1)
-        tsuffix = "T" + (t if len(t) == 6 else t + "00")
+        # Carry the trailing Z through to every occurrence. Drop it and each
+        # materialised date looks like a local time, so a UTC-written series
+        # would be published an hour or two early — the same bug _ics_dt exists
+        # to stop, sneaking back in through the recurrence fan-out.
+        tsuffix = ("T" + (t if len(t) == 6 else t + "00")
+                   + ("Z" if dt.rstrip().endswith("Z") else ""))
     exdates = {d for tok in (raw.get("EXDATE", "") or "").split(",")
                if (d := _ics_date(tok.strip()))}
     win_end = today + timedelta(days=_HORIZON_DAYS)
@@ -593,13 +643,19 @@ class VenueHarvest(HttpScraper):
         # middle of a long entry (after the organiser, before the address), so
         # parsing the truncated note would find them only by luck.
         desc = _clean(o.get("DESCRIPTION"))
+        # One call, so the date and the clock time can never end up in different
+        # timezones — converting a UTC start can move it onto the next day.
+        start, start_time = _ics_dt(o.get("DTSTART", ""))
         return self._emit(
             title=_clean(o.get("SUMMARY")),
-            start=_ics_date(o.get("DTSTART", "")),
+            start=start,
+            # DTEND stays raw on purpose. Its time is never displayed, and a gig
+            # that runs to 01:30 has a UTC end on the following day: converting
+            # it would turn one night out into a two-day event.
             end=_ics_date(o.get("DTEND", "")) if o.get("DTEND") else None,
             # An all-day entry is not an event without a time: it is an event
             # whose time is written in words.
-            time=_ics_time(o.get("DTSTART", "")) or _time_from_text(desc),
+            time=start_time or _time_from_text(desc),
             price=_price_from_text(desc),
             venue=venue, city=city, postcode=postcode,
             url=_clean(o.get("URL")), desc=desc[:400],
