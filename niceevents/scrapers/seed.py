@@ -56,6 +56,20 @@ SEED: list[tuple] = [
     ("2026-09-04", "", "Sheik of Swing", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
     ("2026-09-11", "", "Romano Dandies", "Cagnes-sur-Mer", "Château-Musée Grimaldi", "concert", "Jazz au Château · 21h00", "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/", True),
 
+    # Jazz chez Manu (Nice): free jazz nights at La Cave Romagnan, 22 rue
+    # d'Angleterre. Aug–Sep 2026 off a flyer in the Jazz chez Manu Facebook
+    # group (facebook.com/groups/305891639498276). Event links point at the
+    # venue's own public site (caveromagnan.free.fr) since the group can be
+    # members-only. Entrée libre. Series artist Marie-Jeanne "Tutto fa Arte".
+    # Past-dated lines drop themselves at build.
+    ("2026-08-12", "", "Claudia Fiddicke & Dmitrij Koscheew (Duo Jazz pur & Ko)", "Nice", "La Cave Romagnan", "concert", "Jazz chez Manu · 19h00", "http://caveromagnan.free.fr/", True),
+    ("2026-08-15", "", "Manu Carré 4tet", "Nice", "La Cave Romagnan", "concert", "Jazz chez Manu · 19h00", "http://caveromagnan.free.fr/", True),
+    ("2026-08-22", "", "Franck Taschini 4tet", "Nice", "La Cave Romagnan", "concert", "Jazz chez Manu · 19h00", "http://caveromagnan.free.fr/", True),
+    ("2026-09-08", "", "Atelier d'expression artistique par Lazaza", "Nice", "La Cave Romagnan", "atelier", "Jazz chez Manu", "http://caveromagnan.free.fr/", False),
+    ("2026-09-12", "", "Eric Polchi 4tet", "Nice", "La Cave Romagnan", "concert", "Jazz chez Manu · 19h00", "http://caveromagnan.free.fr/", True),
+    ("2026-09-19", "", "JC Lombardo 4tet", "Nice", "La Cave Romagnan", "concert", "Jazz chez Manu · 19h00", "http://caveromagnan.free.fr/", True),
+    ("2026-09-26", "", "Leila Macavoy 4tet", "Nice", "La Cave Romagnan", "concert", "Jazz chez Manu · 19h00", "http://caveromagnan.free.fr/", True),
+
     # Trinquette Jazz Club (Villefranche): ticketed club nights (18€/12€), read
     # off the club's own monthly programme at trinquettejazzclub.com. Refresh the
     # upcoming block each month; past-dated lines drop themselves at build.
