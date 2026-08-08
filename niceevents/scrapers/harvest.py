@@ -588,6 +588,12 @@ class VenueHarvest(HttpScraper):
     name = "harvest"
     label = "Venue calendars"
     delay = 1.0
+    # Each venue's iCal/JSON-LD feed is complete every run (RRULEs are expanded in
+    # full, no pagination), so a recurring date the calendar no longer returns —
+    # a milonga the organiser cancelled with an EXDATE — is a genuine removal, not
+    # a truncated scrape. Reconcile prunes it (title still listed on later dates,
+    # this date gone) instead of leaving a ghost on the site until the day passes.
+    reconciles_dates = True
 
     def fetch(self) -> Iterator[Event]:
         today = date.today()

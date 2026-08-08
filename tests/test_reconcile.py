@@ -111,9 +111,29 @@ def test_only_opt_in_scrapers_reconcile():
     assert r.returncode == 0, r.stderr
     reconciling, registered = r.stdout.strip().splitlines()
 
-    assert reconciling == "['anthea']", (
+    # harvest reads complete iCal/JSON-LD feeds every run (RRULEs fully expanded,
+    # no pagination), so a recurring date it stops returning is a real removal —
+    # an EXDATE'd milonga — not a truncated scrape. Reconcile prunes those ghosts.
+    assert reconciling == "['anthea', 'harvest']", (
         "reconcile_dates deletes rows: only enable it for a source you have "
         f"checked returns its complete listing every run. Got {reconciling}")
     assert "tango_argentin" not in registered, (
         "tango-argentin.fr was retired because it does not publish cancellations; "
         "tango comes from the Agenda Tango Argentin via harvest")
+
+
+def test_a_cancelled_recurring_date_is_pruned_when_the_title_survives(conn):
+    """El Gato Tanguero: the organiser removes (EXDATEs) one milonga; the title
+    still runs on later dates. The dropped date must not linger as a ghost — the
+    real 2026-08-08 Amarras case."""
+    from datetime import timedelta
+    d1, d2, d3 = SOON, SOON + timedelta(days=7), SOON + timedelta(days=14)
+    db.upsert(conn, [_ev("Milonga El Gato Tanguero aux Amarras", d) for d in (d1, d2, d3)])
+
+    survivors = [_ev("Milonga El Gato Tanguero aux Amarras", d) for d in (d2, d3)]
+    db.upsert(conn, survivors)                       # next run: d1 gone from the calendar
+    db.reconcile_dates(conn, "tango_argentin", survivors)
+
+    starts = {r["start"] for r in conn.execute("SELECT start FROM events").fetchall()}
+    assert d1.isoformat() not in starts             # the ghost is pruned
+    assert {d2.isoformat(), d3.isoformat()} <= starts
