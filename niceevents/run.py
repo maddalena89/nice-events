@@ -141,6 +141,12 @@ def cmd_scrape(args) -> int:
                 if retired:
                     log.info("pruned %d event(s) from retired sources", retired)
 
+        # Fold away same-night, same-venue duplicates a submission created (its
+        # title dodged the fingerprint). Runs every scrape, cheap, submission-scoped.
+        collapsed = db.collapse_venue_duplicates(conn)
+        if collapsed:
+            log.info("collapsed %d duplicate submission(s) into an existing listing", collapsed)
+
         s = db.stats(conn)
 
     print()

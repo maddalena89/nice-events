@@ -196,6 +196,71 @@ def upsert(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]
     return added, merged
 
 
+def _venue_core(venue: Optional[str]) -> str:
+    """Venue identity for near-duplicate detection: the name before any address,
+    slugged. 'La Cave Romagnan, 22 rue d'Angleterre' and 'La Cave Romagnan' both
+    key to the same thing."""
+    if not venue:
+        return ""
+    return slugify(venue.split(",")[0])
+
+
+def collapse_venue_duplicates(conn: sqlite3.Connection) -> int:
+    """Merge same-night, same-venue events whose titles differ too much to share a
+    fingerprint — the "two people submitted the same gig" case (e.g. a submission
+    titled 'Jazz chez Manu' sitting next to a row that names the actual act).
+
+    Scoped on purpose: a group is only collapsed if it contains a community
+    submission, so two genuinely different scraped events that happen to share a
+    venue on one night are never merged. Keeps the established (non-submission)
+    row where there is one, folds in the richer fields from the rest, and unions
+    the source list. Returns how many rows were removed."""
+    rows = conn.execute(
+        "SELECT * FROM events WHERE venue IS NOT NULL AND venue != ''"
+    ).fetchall()
+
+    groups: dict[tuple, list] = {}
+    for r in rows:
+        core = _venue_core(r["venue"])
+        if not core:
+            continue
+        groups.setdefault((r["start"], slugify(r["town"]), core), []).append(r)
+
+    removed = 0
+    for grp in groups.values():
+        if len(grp) < 2 or not any(r["submitted_by"] for r in grp):
+            continue
+        keeper = next((r for r in grp if not r["submitted_by"]), grp[0])
+        others = [r for r in grp if r["fingerprint"] != keeper["fingerprint"]]
+
+        venue, note, url, time_ = keeper["venue"], keeper["note"], keeper["url"], keeper["time"]
+        price, image = keeper["price"], keeper["image"]
+        free, outdoor = keeper["free"], keeper["outdoor"]
+        srcs = set((keeper["sources"] or keeper["source"] or "").split(","))
+        for o in others:
+            venue = _richer(o["venue"], venue)
+            note = _richer(o["note"], note)
+            url = url or o["url"]
+            time_ = time_ or o["time"]
+            price = price or o["price"]
+            image = image or o["image"]
+            free = free or o["free"]
+            outdoor = outdoor or o["outdoor"]
+            srcs |= set((o["sources"] or o["source"] or "").split(","))
+        srcs.discard("")
+
+        conn.execute(
+            """UPDATE events SET venue=?, note=?, url=?, time=?, price=?, image=?,
+                 free=?, outdoor=?, sources=? WHERE fingerprint=?""",
+            (venue, note, url, time_, price, image, int(bool(free)), int(bool(outdoor)),
+             ",".join(sorted(srcs)), keeper["fingerprint"]),
+        )
+        conn.executemany("DELETE FROM events WHERE fingerprint=?",
+                         [(o["fingerprint"],) for o in others])
+        removed += len(others)
+    return removed
+
+
 def log_run(conn, scraper: str, ok: bool, found: int = 0,
             added: int = 0, error: Optional[str] = None) -> None:
     conn.execute(
