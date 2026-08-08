@@ -565,7 +565,11 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
        a poster, just snap it and the site will try to fill in the details for you.</p>
     <p>A weekly email of what's new is on the way. Want to be first to get it?
        <button type="button" class="linklike" id="hello-open">Say hi</button> and
-       you're on the list.</p>
+       you're on the list. One email a week, nothing else, unsubscribe in a click.</p>
+    <p>Run one of the sites or venues listed here and would rather not be included?
+       <button type="button" class="linklike" id="source-open2">Just say so</button>
+       and you're out, same day, no explanation needed. What little data this site
+       holds, and why, is in the <a href="/privacy.html">privacy notice</a>.</p>
     <p class="sign">Made with love in Nice. 💙</p>
   </div>
 </dialog>
@@ -606,8 +610,11 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   museum &amp; art-space calendars.
   <br>Listings link back to their source and belong to it.
   <br><br>Not affiliated with any venue or organiser. Always check the source before turning up.
+  <br><br><b>Are you one of these sources?</b> If you'd rather your events weren't listed here,
+  <button type="button" class="linklike" id="source-open">tell me</button> and they're gone the same day.
   <br><br><button type="button" class="linklike" id="about-open2">About this project</button>
   · <button type="button" class="linklike" id="bug-open">Report a bug</button>
+  · <a href="/privacy.html">Privacy &amp; legal</a>
 </div>
 
 </div>
@@ -1222,10 +1229,22 @@ const msgDlg = $("msg-dlg");
 const MSG_MODES = {
   bug:   {title:"Report a bug", sub:"Something off on the site? Tell me here.",
           bodyLab:"What's wrong? *", bodyPh:"What's wrong, and which event (name or link)?",
-          emailLab:"Your email <i>(optional)</i>", bodyRequired:true, send:"Send report"},
+          emailLab:"Your email <i>(optional)</i>", bodyRequired:true, send:"Send report",
+          hint:'Only if you\'d like a reply. Never shown on the site. <a href="/privacy.html">Privacy</a>'},
   hello: {title:"Say hi", sub:"Want the weekly email of what's new? Leave your address.",
           bodyLab:"A note <i>(optional)</i>", bodyPh:"Anything you'd like to say…",
-          emailLab:"Your email *", bodyRequired:false, send:"Count me in"},
+          emailLab:"Your email *", bodyRequired:false, send:"Count me in",
+          // Consent has to be informed to count, so the what/how-often/how-to-stop
+          // lives here, at the moment of asking — not only in the privacy notice.
+          hint:'By leaving your address you agree to receive the weekly round-up of ' +
+               'what\'s new. One email a week, nothing else, never shared, and every ' +
+               'one has an unsubscribe link. <a href="/privacy.html">Privacy</a>'},
+  source:{title:"Are you a source?", sub:"Want your events out? Say so and they're gone.",
+          bodyLab:"Which site, venue or events? *",
+          bodyPh:"Tell me the site or venue, and whether it's one event or everything.",
+          emailLab:"Your email *", bodyRequired:true, send:"Request removal",
+          hint:'So I can confirm it\'s done. Removals are honoured the same day, ' +
+               'no explanation needed. <a href="/privacy.html">Privacy</a>'},
 };
 let msgKind = "bug";
 function openMsg(kind){
@@ -1236,6 +1255,7 @@ function openMsg(kind){
   $("m-body-lab").innerHTML  = m.bodyLab;
   $("m-body").placeholder    = m.bodyPh;
   $("m-email-lab").innerHTML = m.emailLab;
+  if ($("m-email-hint") && m.hint) $("m-email-hint").innerHTML = m.hint;
   $("m-send").textContent    = m.send;
   $("m-body").value = ""; $("m-email").value = ""; $("mmsg").textContent = "";
   msgDlg.showModal();
@@ -1243,6 +1263,8 @@ function openMsg(kind){
 if ($("bug-open"))   $("bug-open").onclick   = () => openMsg("bug");
 if ($("bug-top"))    $("bug-top").onclick    = () => openMsg("bug");
 if ($("hello-open")) $("hello-open").onclick = () => { aboutDlg.close(); openMsg("hello"); };
+if ($("source-open"))  $("source-open").onclick  = () => openMsg("source");
+if ($("source-open2")) $("source-open2").onclick = () => { aboutDlg.close(); openMsg("source"); };
 $("msg-close").onclick = () => msgDlg.close();
 msgDlg.addEventListener("click", e => {
   const r = msgDlg.getBoundingClientRect();
