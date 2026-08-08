@@ -180,7 +180,12 @@ def upsert(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]
                 ev.end.isoformat() if ev.end else (None if owns else row["end"]),
                 ev.time or row["time"],
                 _richer(ev.venue, row["venue"]),
-                row["url"] or ev.url,              # first url wins: it's the one people clicked
+                # First url normally wins (it's the one people clicked), but the
+                # source that OWNS the row may correct its own link — otherwise a
+                # dead permalink nice_fr later learns to replace (Madagascar ->
+                # /mon-ete-cinema/) would stick forever. Other sources still can't
+                # override the stored url.
+                (ev.url or row["url"]) if owns else (row["url"] or ev.url),
                 _richer(ev.note, row["note"]),
                 ev.price or row["price"],
                 int(ev.free) if owns else int(ev.free or row["free"]),
