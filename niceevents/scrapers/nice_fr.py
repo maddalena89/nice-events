@@ -162,10 +162,22 @@ class NiceFr(HttpScraper):
 
         link = item.get("link")
         slug = item.get("slug") or ""
-        if link and (self._live is None or slug in self._live):
-            return link
-
-        return self._page_link(acf.get("pages"))
+        # Only trust the raw /agenda/<slug>/ permalink when the sitemap POSITIVELY
+        # confirms it is served. When the sitemap is unavailable (self._live is
+        # None — the normal case in CI, where nice.fr 403s the runner on the
+        # front-end) or the slug is absent, the permalink is unverified and may
+        # 404: that is exactly the Madagascar case, an event with no page of its
+        # own, only an acf.pages redirect to /mon-ete-cinema/. A programme page is
+        # always really served, so prefer it; keep the permalink only when there
+        # is no such fallback (best available beats nothing).
+        if link and self._live is not None and slug in self._live:
+            return link                      # sitemap confirms it is served
+        page = self._page_link(acf.get("pages"))
+        if page:
+            return page                      # a real programme page beats an unverified permalink
+        if self._live is None and link:
+            return link                      # sitemap unavailable: unverified, but best available
+        return None                          # sitemap says NOT served and no fallback -> no link
 
     # -------------------------------------------------------------- fetch
     def fetch(self) -> Iterator[Event]:

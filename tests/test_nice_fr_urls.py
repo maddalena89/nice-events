@@ -107,3 +107,13 @@ def test_events_from_uses_the_picked_url():
     evs = list(s._events_from(item, date(2026, 8, 1)))
     assert len(evs) == 1
     assert evs[0].url == "https://www.nice.fr/la-farandole/"
+
+
+def test_dead_permalink_with_no_sitemap_uses_the_programme_page():
+    """The Madagascar case: sitemap unavailable (self._live is None), the raw
+    /agenda/<slug>/ permalink 404s, but acf.pages points at the real programme
+    page. The fail-open path must NOT republish the dead permalink when a real
+    page is available."""
+    s = _scraper(live=None, pages={8997: "https://www.nice.fr/mon-ete-cinema/"})
+    it = _item("madagascar", pages=[8997])
+    assert s._url_for(it, it["acf"], {}) == "https://www.nice.fr/mon-ete-cinema/"
