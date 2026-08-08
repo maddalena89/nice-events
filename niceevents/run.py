@@ -219,14 +219,38 @@ def cmd_reject(args) -> int:
 
 
 def cmd_digest(args) -> int:
-    """Preview the email digest — events first seen in the last N days."""
-    since = (datetime.utcnow() - timedelta(days=args.days)).isoformat(timespec="seconds")
+    """Preview — or, with --send, actually send — the weekly email.
+
+    Sending is opt-in on purpose. Every other command here can be re-run after a
+    mistake; this one puts something in other people's inboxes, so the default
+    stays a dry run and the real thing needs saying out loud.
+    """
+    from . import digest
+
     with db.connect(args.db) as conn:
-        rows = db.new_since(conn, since)
-    print(f"\n  {len(rows)} new since {since[:10]}\n")
-    for r in rows:
-        print(f"    {r['start']}  {r['town']:<22} {r['title'][:60]}")
-    return 0
+        events = digest.collect(conn, days=args.days)
+
+    print(f"\n  {len(events)} new in the last {args.days} days\n")
+    for e in events:
+        print(f"    {e['start']}  {e['town']:<22} {e['title'][:60]}")
+
+    if not args.send and not args.to:
+        print("\n  (--send to email the list, --to you@example.com to test on yourself)\n")
+        return 0
+
+    if args.to:
+        # A test send to one address, using a fake token. The unsubscribe link
+        # will land on the "that link looks broken" page, which is correct: this
+        # address is not on the list and has nothing to unsubscribe from.
+        people = [{"email": args.to, "token": "00000000-0000-0000-0000-000000000000"}]
+        print(f"\n  Test send to {args.to}")
+    else:
+        people = digest.recipients()
+        print(f"\n  Sending to {len(people)} subscriber(s)")
+
+    sent, failed = digest.send(events, people, dry_run=False, force=args.force)
+    print(f"  {sent} sent, {failed} failed\n")
+    return 1 if failed and not sent else 0
 
 
 def main(argv=None) -> int:
@@ -263,8 +287,14 @@ def main(argv=None) -> int:
     a = add("approve"); a.add_argument("fingerprint"); a.set_defaults(func=cmd_approve)
     j = add("reject");  j.add_argument("fingerprint"); j.set_defaults(func=cmd_reject)
 
-    d = add("digest", help="preview the email digest")
+    d = add("digest", help="preview (or send) the weekly email")
     d.add_argument("--days", type=int, default=7)
+    d.add_argument("--send", action="store_true",
+                   help="actually email the subscriber list (default is a dry run)")
+    d.add_argument("--to", metavar="EMAIL",
+                   help="send one test copy to this address instead of the list")
+    d.add_argument("--force", action="store_true",
+                   help="send even if the digest is suspiciously large")
     d.set_defaults(func=cmd_digest)
 
     args = p.parse_args(argv)
