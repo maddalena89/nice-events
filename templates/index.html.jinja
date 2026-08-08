@@ -448,11 +448,10 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   <input type="search" id="q" placeholder="Search title, venue, town, artist, DJ…">
   <select id="town"><option value="">All towns</option></select>
   <select id="when">
-    <option value="">Any date</option>
     <option value="today">Today</option>
     <option value="weekend">This weekend</option>
     <option value="7">Next 7 days</option>
-    <option value="30">Next 30 days</option>
+    <option value="30" selected>Next 30 days</option>
   </select>
   <label class="chk"><input type="checkbox" id="online"> Online too</label>
   <label class="chk"><input type="checkbox" id="freeonly"> Free only</label>
@@ -966,7 +965,7 @@ function render(){
 
 $("q").oninput=render; $("town").onchange=render; $("when").onchange=render;
 $("online").onchange=render; $("freeonly").onchange=render;
-$("reset").onclick=()=>{$("q").value="";$("town").value="";$("when").value="";
+$("reset").onclick=()=>{$("q").value="";$("town").value="";$("when").value="30";
   $("online").checked=false; $("freeonly").checked=false;
   active.clear();
   document.querySelectorAll("#cats .cat").forEach(c=>c.classList.remove("on"));
