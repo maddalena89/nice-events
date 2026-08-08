@@ -616,6 +616,157 @@ def _source_report(conn: sqlite3.Connection, events: list[dict]) -> dict:
     }
 
 
+#: How far ahead to describe events to search engines, and how many at most.
+#: Structured data is a summary for a crawler, not a second copy of the feed:
+#: the whole page is already inlined once, and repeating 2,000 events in JSON-LD
+#: would roughly double the page weight to describe things nobody is searching
+#: for yet. Sixty days and 150 events covers everything anyone is realistically
+#: googling this week while adding ~60KB, not ~600KB.
+_LD_DAYS = 60
+_LD_MAX = 150
+
+
+def _paris_offset(d: date) -> str:
+    """UTC offset for Europe/Paris on a given date, as +HH:MM.
+
+    Times on this site are local wall-clock times ("20:30" means half past eight
+    in Nice). schema.org wants an offset or it is free to guess UTC, which would
+    silently shift every evening event to a different day for readers abroad.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        off = datetime(d.year, d.month, d.day, 12, tzinfo=ZoneInfo("Europe/Paris")).utcoffset()
+        total = int(off.total_seconds()) // 60
+        return f"{'+' if total >= 0 else '-'}{abs(total) // 60:02d}:{abs(total) % 60:02d}"
+    except Exception:
+        # No tz database (rare, some slim containers). Europe/Paris is CEST from
+        # the last Sunday in March to the last Sunday in October, CET otherwise.
+        # March and October both have 31 days, so 25..31 always holds a Sunday.
+        def last_sunday(year: int, month: int) -> date:
+            end = date(year, month, 31)          # weekday(): Mon=0 … Sun=6
+            return end - timedelta(days=(end.weekday() - 6) % 7)
+        summer = last_sunday(d.year, 3) <= d < last_sunday(d.year, 10)
+        return "+02:00" if summer else "+01:00"
+
+
+def _ld_datetime(day: str, time_: Optional[str]) -> str:
+    """ISO 8601 for one event date. Date only when the source gave no time —
+    inventing 00:00 would claim a midnight start we do not actually know."""
+    d = date.fromisoformat(day)
+    if not time_:
+        return day
+    return f"{day}T{time_}:00{_paris_offset(d)}"
+
+
+def _event_ld(e: dict, base: str) -> dict:
+    """One schema.org/Event object.
+
+    Only facts the database actually holds. Nothing is inferred to make the
+    markup look richer: a wrong price or a made-up organiser is worse than an
+    absent one, both for the reader and for the site's standing with Google.
+    """
+    ld: dict = {
+        "@type": "Event",
+        "name": e.get("title", ""),
+        "startDate": _ld_datetime(e["start"], e.get("time")),
+        "eventStatus": "https://schema.org/EventCancelled" if e.get("cancelled")
+                       else "https://schema.org/EventScheduled",
+    }
+    # Only a genuinely LATER end date. Some rows carry end == start, and emitting
+    # that as a bare date next to a timed start ("…T17:30+02:00" ending
+    # "2026-08-06") reads as an event finishing at midnight before it began —
+    # invalid, and Search Console rejects the item for it.
+    if e.get("end") and e["end"] > e["start"]:
+        ld["endDate"] = _ld_datetime(e["end"], None)
+
+    if e.get("online"):
+        ld["eventAttendanceMode"] = "https://schema.org/OnlineEventAttendanceMode"
+        ld["location"] = {"@type": "VirtualLocation", "url": e.get("url") or base + "/"}
+    else:
+        ld["eventAttendanceMode"] = "https://schema.org/OfflineEventAttendanceMode"
+        ld["location"] = {
+            "@type": "Place",
+            "name": e.get("venue") or e.get("town", ""),
+            "address": {
+                "@type": "PostalAddress",
+                "addressLocality": e.get("town", ""),
+                "addressRegion": "Alpes-Maritimes",
+                "addressCountry": "FR",
+            },
+        }
+
+    if e.get("note"):
+        ld["description"] = e["note"]
+    if e.get("slug"):
+        # Where this event lives on THIS site. Deliberately the resolved query
+        # form rather than the pretty /slug short link: the short link is served
+        # by 404.html and bounces via JavaScript, and pointing a crawler at a
+        # redirect chain is a good way to have the markup quietly ignored.
+        ld["url"] = f"{base}/?e={e['slug']}"
+    img = e.get("image")
+    if isinstance(img, str) and img.startswith("http"):
+        ld["image"] = img
+    if e.get("free"):
+        ld["isAccessibleForFree"] = True
+    return ld
+
+
+def _events_jsonld(events: list[dict], base: str, today: Optional[date] = None) -> str:
+    """The <script type="application/ld+json"> payload, or "" if there's nothing
+    to say. Returns a JSON array — the documented shape for several events living
+    on one page."""
+    if not base:
+        return ""
+    today = today or date.today()
+    horizon = today + timedelta(days=_LD_DAYS)
+    soon = [
+        e for e in events
+        if e.get("start") and today <= date.fromisoformat(e["start"]) <= horizon
+    ]
+    soon.sort(key=lambda e: (e["start"], e.get("title", "")))
+    if not soon:
+        return ""
+    out = [_event_ld(e, base) for e in soon[:_LD_MAX]]
+    for o in out:
+        o["@context"] = "https://schema.org"
+    blob = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+    # This string is dropped inside a <script> element, so any "</script>" that
+    # ever appears in a scraped title would end the block early and spill the
+    # rest of the JSON onto the page. json.dumps does not escape these, so do it
+    # here. The escapes are still valid JSON and parse back to the same text.
+    return blob.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+
+def _sitemap(base: str, updated: date) -> str:
+    """A deliberately tiny sitemap.
+
+    Only real, crawlable URLs go in. The per-event short links
+    (whatsonnice.com/<slug>) are NOT listed: they have no file behind them, they
+    are served by 404.html and redirected with JavaScript, and filling a sitemap
+    with 2,000 soft-404s is actively harmful. When events get their own real
+    pages, that is the moment to list them here.
+    """
+    pages = [
+        ("/", "daily", "1.0"),
+        ("/privacy.html", "yearly", "0.3"),
+    ]
+    urls = "\n".join(
+        f"  <url>\n"
+        f"    <loc>{base}{path}</loc>\n"
+        f"    <lastmod>{updated.isoformat()}</lastmod>\n"
+        f"    <changefreq>{freq}</changefreq>\n"
+        f"    <priority>{pri}</priority>\n"
+        f"  </url>"
+        for path, freq, pri in pages
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{urls}\n"
+        "</urlset>\n"
+    )
+
+
 def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     rows = db.upcoming(conn)
     # Remove phantom / dead listings first, before anything else looks at them.
@@ -655,6 +806,14 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         json.dumps(_source_report(conn, events), ensure_ascii=False, indent=1),
         encoding="utf-8",
     )
+
+    # Sitemap. Written here rather than kept in static/ so <lastmod> is the day
+    # the site was actually built, which is the only part of it search engines
+    # really act on. robots.txt (in static/) points at this file.
+    host = _canonical_host()
+    base = f"https://{host}" if host else ""
+    if base:
+        (out / "sitemap.xml").write_text(_sitemap(base, date.today()), encoding="utf-8")
 
     env = Environment(
         loader=FileSystemLoader(TPL_DIR),
@@ -697,7 +856,14 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         github_repo=GITHUB_REPO,
         supabase_url=SUPABASE_URL,
         supabase_anon_key=SUPABASE_ANON_KEY,
-        canonical_host=_canonical_host(),
+        canonical_host=host,
+        canonical_url=f"{base}/" if base else "",
+        # Structured data for search engines. Built here, in Python, on purpose:
+        # baked into the served HTML it is read on the first crawl, whereas
+        # anything assembled by JavaScript depends on the crawler choosing to
+        # render the page, which is slower and not guaranteed.
+        events_jsonld=_events_jsonld(events, base),
+        cf_analytics_token=os.environ.get("CF_ANALYTICS_TOKEN", ""),
         poster_ai_url=poster_ai_url,
         poster_ai_key=poster_ai_key,
         source_count=len({(r["source"] or "").split(":")[0] for r in rows}),

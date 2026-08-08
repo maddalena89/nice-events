@@ -20,6 +20,23 @@
 <meta property="og:title" content="{{ title }}">
 <meta property="og:description" content="Everything on in Nice and the 06, updated daily.">
 <meta property="og:type" content="website">
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">
+<meta property="og:url" content="{{ canonical_url }}">{% endif %}
+{%- if events_jsonld %}
+<!-- Structured data: the same events the page already shows, described in the
+     vocabulary search engines read (schema.org/Event). This is what makes an
+     event eligible to appear as a date-and-venue card in search results rather
+     than as a line of blue text. Generated in niceevents/site.py from the same
+     rows that render below, so it can never drift from what a reader sees.
+     Covers the next 60 days, capped at 150 events — see _LD_DAYS / _LD_MAX. -->
+<script type="application/ld+json">{{ events_jsonld|safe }}</script>
+{%- endif %}
+{%- if cf_analytics_token %}
+<!-- Cloudflare Web Analytics: no cookies, no cross-site tracking, no consent
+     banner needed. Set CF_ANALYTICS_TOKEN in the workflow to switch it on. -->
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon='{"token": "{{ cf_analytics_token }}"}'></script>
+{%- endif %}
 <style>
 :root{color-scheme:light;--ink:#0e0e0e;--paper:#f4f2ed;--accent:#1f3bff;--muted:#7d7970;--rule:#d8d4cb}
 *{box-sizing:border-box;margin:0;padding:0}

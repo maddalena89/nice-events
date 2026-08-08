@@ -1,0 +1,46 @@
+# What's on in Nice — https://whatsonnice.com
+#
+# The whole site is one public page and we want it read. Nothing here is
+# private, so nothing is disallowed.
+#
+# Copied verbatim into dist/ by niceevents/site.py, alongside sitemap.xml,
+# which is generated on every build so its <lastmod> is the real build date.
+
+User-agent: *
+Allow: /
+
+# Note on the /?e=<slug> URLs — deliberately NOT blocked.
+#
+# They serve the same page with one event highlighted, so they look like
+# duplicates, and the tempting move is "Disallow: /*?e=". Don't. The structured
+# data in the page points at exactly these URLs as the home of each event, and a
+# blocked URL is one Google cannot read, cannot verify, and may drop the event
+# for. Duplication is handled the correct way instead, by the <link rel=canonical>
+# in the page, which tells Google these all consolidate to "/".
+#
+# The pretty short links (whatsonnice.com/<slug>) are a different thing: no file
+# behind them, served by 404.html and bounced with JavaScript. Nothing on the
+# site links to one, so nothing crawls into them. They exist for humans arriving
+# from a QR code or a shared card.
+
+Sitemap: https://whatsonnice.com/sitemap.xml
+
+# ---------------------------------------------------------------------------
+# AI training crawlers.
+#
+# Left ALLOWED on purpose, and it is worth knowing why rather than inheriting
+# the default. This site exists so people can find out what is on in Nice; if a
+# model can answer "what's on in Nice this weekend" because it read this page,
+# that serves the same end. It is also hard to argue for scraping other people's
+# public listings while forbidding anyone to read ours.
+#
+# To change your mind, uncomment the block below. It costs nothing and is
+# reversible.
+#
+# User-agent: GPTBot
+# User-agent: ClaudeBot
+# User-agent: Google-Extended
+# User-agent: CCBot
+# User-agent: PerplexityBot
+# User-agent: Bytespider
+# Disallow: /
