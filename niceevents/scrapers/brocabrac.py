@@ -127,6 +127,19 @@ class Brocabrac(HttpScraper):
             if current is None:
                 continue
 
+            # brocabrac wraps each day in <div class="ev-section"> that holds
+            # the date heading AND that day's cards. The walk reaches the
+            # section before it reaches the heading inside it, so `current` is
+            # still YESTERDAY's date, and a section holding a single card
+            # published that card a day early: Vide grenier du vieux nice is
+            # Sunday 9 August and went out as 8 to 9 August. Sections holding
+            # two or more cards were already caught by the link-count guard
+            # below, which is why this only ever hit the quiet days. A node
+            # that carries its own date heading is a section, never a card.
+            if any(_DATE_HEAD.match((h.text() or "").strip())
+                   for h in node.css("h2, h3")):
+                continue
+
             link = node.css_first("a[href*='/06/']")
             if link is None:
                 continue

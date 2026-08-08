@@ -160,6 +160,16 @@ def upsert(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]
         srcs.discard("")
         srcs.add(ev.source)
 
+        # A scraper correcting itself has to be able to take a value BACK.
+        # `end` and `free` were both "keep whatever we have", so a stored wrong
+        # value could never be cleared: the harvest fix for milongas that run
+        # past midnight, and the Meetup fix for events wrongly tagged free,
+        # would both have been invisible on the site because every bad row was
+        # already in the database. Only the source that first published the
+        # row may retract, so a second source that simply knows less cannot
+        # wipe a real end date or a real free tag.
+        owns = ev.source == row["source"]
+
         conn.execute(
             """UPDATE events SET
                  title=?, end=?, time=?, venue=?, url=?, note=?, price=?,
@@ -167,13 +177,13 @@ def upsert(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]
                WHERE fingerprint=?""",
             (
                 _better_title(ev.title, row["title"]),
-                ev.end.isoformat() if ev.end else row["end"],
+                ev.end.isoformat() if ev.end else (None if owns else row["end"]),
                 ev.time or row["time"],
                 _richer(ev.venue, row["venue"]),
                 row["url"] or ev.url,              # first url wins: it's the one people clicked
                 _richer(ev.note, row["note"]),
                 ev.price or row["price"],
-                int(ev.free or row["free"]),
+                int(ev.free) if owns else int(ev.free or row["free"]),
                 ev.image or row["image"],
                 int(ev.outdoor or row["outdoor"]),
                 ",".join(sorted(srcs)),

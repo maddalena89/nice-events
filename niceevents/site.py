@@ -183,7 +183,17 @@ def _adjacent_blocks(evs: list[dict]) -> list[list[dict]]:
         if blocks:
             last = blocks[-1]
             last_end = max(date.fromisoformat(x.get("end") or x["start"]) for x in last)
-            if (s - last_end).days <= 1:
+            # A theatre run is one production across several nights and every
+            # night links to the same page. A bar crawl that runs every Friday
+            # AND every Saturday is two separate bookings that happen to be
+            # next to each other, and merging them published "7 - 8 August"
+            # for a tour whose link only covers the 7th. Same listing, one
+            # run; different listings, different nights out.
+            same_listing = (
+                not e.get("url")
+                or any(x.get("url") == e.get("url") for x in last)
+            )
+            if (s - last_end).days <= 1 and same_listing:
                 last.append(e)
                 continue
         blocks.append([e])
@@ -316,8 +326,94 @@ def _tidy_text(t: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
+# Promoters shout and decorate. Neither reaches the page: one editorial voice
+# runs through the whole listing, whatever the source did.
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F000-\U0001FAFF"      # pictographs, emoticons, symbols
+    "\U00002600-\U000027BF"      # miscellaneous symbols and dingbats
+    "\U00002B00-\U00002BFF"      # arrows and shapes
+    "\U00002190-\U000021FF"      # arrows
+    "\U00002300-\U000023FF"      # technical, clocks, hourglasses
+    "\U0001F1E6-\U0001F1FF"      # regional indicators (flags)
+    "\U0000FE0F\U0000200D\U000020E3"
+    "]"
+)
+
+# Capitals that are meant to be capitals.
+_KEEP_CAPS = {
+    "DJ", "MC", "VIP", "AI", "IA", "EDM", "NFT", "XXL", "B2B", "VO", "VF",
+    "MAMAC", "TNN", "OGC", "FC", "PACA", "MJC", "CCAS", "SNCF", "CNRS",
+    "UNESCO", "LGBT", "LGBTQ", "UK", "USA", "CD", "DVD", "EP", "BD",
+}
+_ROMAN_RE = re.compile(r"^[IVXLCDM]+$")
+_VOWEL_RE = re.compile(r"[AEIOUYÀÂÄÉÈÊËÎÏÔÖÙÛÜ]", re.I)
+
+# Joiners stay lowercase inside a de-shouted title, so "LA NUIT DES MUSEES"
+# reads "La Nuit des Musées" and not "La Nuit Des Musées". Never applied to the
+# first word. Deliberately only joiners: putting real words like "festival" in
+# here would quietly lowercase them mid-title.
+_TITLE_JOINERS = {
+    "a", "à", "au", "aux", "d", "de", "des", "du", "l", "la", "le", "les",
+    "et", "en", "un", "une", "sur", "sous", "pour", "avec", "dans", "par",
+    "the", "of", "at", "in", "on", "and", "with", "for", "to", "from",
+}
+
+
+def _deshout(t: str) -> str:
+    """Give a shouted title its case back.
+
+    Only fires when the title really is shouted, 60 percent or more of its
+    letters in capitals, so "MILONGA de la Liberté" and every ordinary title
+    are left exactly as they are. Acronyms, roman numerals and two-letter
+    words keep their capitals: the point is to stop the page being yelled at,
+    not to rewrite names.
+    """
+    letters = [c for c in t if c.isalpha()]
+    if len(letters) < 6:
+        return t
+    if sum(1 for c in letters if c.isupper()) / len(letters) < 0.6:
+        return t
+
+    def fix(word: str, first: bool) -> str:
+        core = word.strip(".,!?:;\"'()[]«»")
+        if not core.isalpha():
+            return word
+        if core.upper() in _KEEP_CAPS or _ROMAN_RE.match(core):
+            return word
+        # No vowel means it is not a word: PSG, OGC, TNN, SNCF, CRS. This
+        # catches the acronyms nobody thought to list, which matters because
+        # "OGC NICE / PSG" turning into "Ogc Nice / Psg" is worse than
+        # leaving the whole title shouted.
+        if len(core) <= 5 and not _VOWEL_RE.search(core):
+            return word
+        if not first and core.lower() in _TITLE_JOINERS:
+            return word.lower()
+        if not first and len(core) <= 2:   # initials
+            return word
+        # The capital is at the first LETTER, not the first character, or a
+        # quoted word comes back as "la Nueva".
+        i = next(j for j, ch in enumerate(word) if ch.isalpha())
+        return word[:i] + word[i].upper() + word[i + 1:].lower()
+
+    # A word after an opening quote or bracket starts a phrase, so it is
+    # capitalised like a first word: MILONGA "LA NUEVA" -> Milonga "La Nueva".
+    words = t.split()
+    return " ".join(
+        fix(w, i == 0 or w[:1] in "\"'(«[")
+        for i, w in enumerate(words)
+    )
+
+
 def _clean_title(t: str) -> str:
-    return _DASH_RE.sub(" - ", _tidy_text(t))
+    t = _DASH_RE.sub(" - ", _tidy_text(t))
+    t = _EMOJI_RE.sub(" ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    # A title that ended in an emoji otherwise keeps a dangling separator.
+    # Only a separator standing on its own goes: "... | 2/-" keeps its hyphen.
+    t = re.sub(r"^[-–—·|]+\s*", "", t)
+    t = re.sub(r"\s+[-–—·|]+$", "", t)
+    return _deshout(t.strip())
 
 
 # The note column is a grab-bag: many scrapers prefix it with the time and a

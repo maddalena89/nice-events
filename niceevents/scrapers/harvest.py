@@ -230,6 +230,40 @@ def _ics_time(val: str) -> Optional[str]:
     return _ics_dt(val)[1]
 
 
+def _ics_end_date(dtstart: str, dtend: str) -> Optional[date]:
+    """The last date a visitor should see, in Nice time, or None for one day.
+
+    The same two traps gcal already handles, so this reads the end the same way
+    rather than inventing a second rule.
+
+    A date-only DTEND is EXCLUSIVE by spec, so a genuine one day entry carries
+    the following date. And a TIMED end on the day after the start is a night
+    that runs past midnight: a milonga from 21:00 to 01:00 is one night out,
+    not a two-day event.
+
+    Reading DTEND raw dodged the second trap only while a calendar happened to
+    write local time. The tango feeds write it plainly, so 26 evening events,
+    nearly all milongas, were published as two day ranges.
+    """
+    if not dtend:
+        return None
+    start, _ = _ics_dt(dtstart)
+    end, _ = _ics_dt(dtend)
+    if not start or not end:
+        return None
+    if "T" not in dtend.upper():        # date-only: DTEND is exclusive
+        end -= timedelta(days=1)
+    elif (end - start).days == 1:
+        hm = _ics_dt(dtend)[1]
+        # Anything finishing before dawn belongs to the night it started on.
+        # A real two-day event ending at 18:00 tomorrow keeps its second day.
+        # (gcal collapses every timed next-day end without checking the hour;
+        # this cutoff is the finer version and gcal is worth aligning to it.)
+        if hm is None or hm < "06:00":
+            end = start
+    return None if end <= start else end
+
+
 def _events_from_ics(text: str) -> Iterator[dict]:
     cur: Optional[dict] = None
     for line in _unfold_ics(text):
@@ -649,10 +683,11 @@ class VenueHarvest(HttpScraper):
         return self._emit(
             title=_clean(o.get("SUMMARY")),
             start=start,
-            # DTEND stays raw on purpose. Its time is never displayed, and a gig
-            # that runs to 01:30 has a UTC end on the following day: converting
-            # it would turn one night out into a two-day event.
-            end=_ics_date(o.get("DTEND", "")) if o.get("DTEND") else None,
+            # Read in the same frame as the start, and collapse a night that
+            # runs past midnight back onto the day it started. See
+            # _ics_end_date: reading DTEND raw kept one night out looking like
+            # a two-day event whenever the calendar wrote a plain local time.
+            end=_ics_end_date(o.get("DTSTART", ""), o.get("DTEND", "")),
             # An all-day entry is not an event without a time: it is an event
             # whose time is written in words.
             time=start_time or _time_from_text(desc),

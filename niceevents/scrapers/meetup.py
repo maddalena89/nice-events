@@ -166,7 +166,11 @@ class Meetup(BrowserScraper):
             category=classify(title, gname, desc),
             url=url,
             note=" · ".join(bits)[:400] or None,
-            free=bool(obj.get("isFree") or obj.get("feeSettings") in (None, {})),
+            # An absent feeSettings is missing information, not proof the event
+            # is free. Trusting it tagged 82 of 95 Meetup events free, including
+            # a bar crawl selling four bars, four shots and VIP entry. A missing
+            # free tag is harmless; a wrong one misleads someone about money.
+            free=bool(obj.get("isFree")),
             online=online,
             source=self.name,
         )
