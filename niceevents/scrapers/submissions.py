@@ -27,6 +27,8 @@ import re
 from datetime import date
 from typing import Iterator, Optional
 
+import httpx
+
 # Strip a trailing /rest or /rest/v1 that someone may have pasted onto
 # SUPABASE_URL. Without this we'd build ".../rest/v1/rest/v1/submissions", which
 # PostgREST rejects (the request comes back 401/404 and no submissions load).
@@ -48,6 +50,7 @@ class Submissions(HttpScraper):
     name = "submissions"
     label = "Community submissions"
     delay = 0.0          # our own database; no politeness delay needed
+    use_proxy = False    # Supabase is our backend — never route it through SCRAPER_PROXY
 
     def _cfg(self) -> tuple[Optional[str], Optional[str]]:
         url = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
@@ -62,20 +65,42 @@ class Submissions(HttpScraper):
             return
 
         headers = {"apikey": key, "Authorization": f"Bearer {key}"}
-        r = self.get(
-            f"{base}/rest/v1/submissions"
-            f"?approved=eq.true&select={_COLS}&order=created_at.asc",
-            headers=headers,
-        )
-        if not r:
-            log.warning("%s: could not read submissions", self.name)
-            return
+        url = (f"{base}/rest/v1/submissions"
+               f"?approved=eq.true&select={_COLS}&order=created_at.asc")
 
+        # Call Supabase directly (use_proxy=False) and surface the real status.
+        # A silent skip here is what hid a non-working SUPABASE_SERVICE_KEY for
+        # weeks: the read came back "0 rows, no error" and nobody could tell a
+        # bad key from an empty queue. Raise loudly instead — the run isolates a
+        # failing source, and the message lands in sources.json's `error` field.
+        try:
+            r = self.client.get(url, headers=headers)
+        except httpx.HTTPError as e:
+            raise RuntimeError(f"{self.name}: request to Supabase failed: {e}") from e
+        if r.status_code != 200:
+            hint = (" — the key was rejected; SUPABASE_SERVICE_KEY must be the "
+                    "service_role / sb_secret_ key" if r.status_code in (401, 403) else "")
+            raise RuntimeError(
+                f"{self.name}: Supabase HTTP {r.status_code} reading approved rows{hint}"
+                f": {r.text[:120]}")
         try:
             rows = r.json()
         except Exception:
-            log.warning("%s: submissions response wasn't JSON", self.name)
-            return
+            raise RuntimeError(f"{self.name}: submissions response wasn't JSON: {r.text[:120]}")
+
+        # An anon/publishable key authenticates fine (HTTP 200) but Row Level
+        # Security then hides every row, so an empty result is ambiguous: no
+        # approved events, or a key that can't see the table at all? Probe for a
+        # single row of ANY kind to tell them apart, so a mis-set key can never
+        # masquerade as "nothing to publish" again.
+        if not rows:
+            probe = self.client.get(f"{base}/rest/v1/submissions?select=id&limit=1",
+                                    headers=headers)
+            if probe.status_code == 200 and not probe.json():
+                raise RuntimeError(
+                    f"{self.name}: the key sees 0 rows in the submissions table — it is "
+                    f"not a service_role / sb_secret_ key (RLS is hiding everything). "
+                    f"Fix SUPABASE_SERVICE_KEY.")
 
         today = date.today()
         published: list[str] = []

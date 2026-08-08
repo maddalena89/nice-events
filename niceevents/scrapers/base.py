@@ -77,6 +77,13 @@ class HttpScraper(Scraper):
     with the code under test.)
     """
 
+    #: Route this source's requests through SCRAPER_PROXY when one is set. On by
+    #: default — public venue sites need it to dodge datacenter-IP 403s. Turn it
+    #: OFF for a source that talks to our OWN backend (Supabase): proxying our own
+    #: authenticated API adds nothing but a failure surface, and doing so silently
+    #: broke the submissions read for weeks.
+    use_proxy: bool = True
+
     def __init__(self, timeout: float = 30.0):
         self._timeout = timeout
         self._client: Optional[httpx.Client] = None
@@ -95,7 +102,7 @@ class HttpScraper(Scraper):
                 },
             )
             proxy = _proxy()
-            if proxy:
+            if proxy and self.use_proxy:
                 kw["proxy"] = proxy       # route past datacenter-IP blocks
             self._client = httpx.Client(**kw)
         return self._client
