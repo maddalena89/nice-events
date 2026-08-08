@@ -42,6 +42,13 @@ def _fold(s: str) -> str:
 CANCELLED: list[tuple] = [
     ("milonga de l amitie", "Nice", "2026-07-25", "Annulée"),
     ("casita", "Nice", "2026-08-02", "Annulée"),
+    # 2026-08-08 health check. Panda deleted the event page — the url 404s and
+    # it is gone from their agenda and their own search — and Songkick marks the
+    # concert "Canceled". Two independent signals, but neither is the venue, so
+    # if La Siesta or REF confirm the night is on, delete this line.
+    # Nothing in the feed says ANNULE, because the promoter removed the page
+    # instead of retitling it, so the automatic route above cannot see this one.
+    ("tini gessler", "Antibes", "2026-08-13", "Annulée"),
 ]
 
 

@@ -35,6 +35,12 @@ log = logging.getLogger(__name__)
 
 API = "https://www.nice.fr/wp-json/wp/v2"
 
+#: The city's own event sitemap. Used to tell a real event page from a permalink
+#: the API advertises but the front end does not serve — see _url_for.
+SITEMAP = "https://www.nice.fr/event-sitemap1.xml"
+
+_LOC = re.compile(r"<loc>\s*https://www\.nice\.fr/agenda/([^<\s/]+)/?\s*</loc>", re.I)
+
 # Repetitive municipal filler that drowns the listing. Skipped unless it's the
 # only thing on. (Seniors' "cool down" drop-ins, ~15 identical entries a day.)
 _FILLER = re.compile(r"pause fra[îi]cheur", re.I)
@@ -63,6 +69,10 @@ class NiceFr(HttpScraper):
         super().__init__(*a, **kw)
         self._places: dict[int, str] = {}
         self._types: dict[int, str] = {}
+        self._pages: dict[int, Optional[str]] = {}
+        #: Slugs whose /agenda/ page the front end actually serves. None until
+        #: loaded, and left None if the sitemap can't be read — see _url_for.
+        self._live: Optional[set[str]] = None
 
     # ---------------------------------------------------------- taxonomies
     def _load_types(self) -> None:
@@ -93,9 +103,74 @@ class NiceFr(HttpScraper):
         self._places[pid] = name
         return name
 
+    # ----------------------------------------------------------------- urls
+    def _load_live_slugs(self) -> None:
+        """Which /agenda/<slug>/ pages the public site really serves.
+
+        nice.fr hands out permalinks it does not honour: on 2026-08-08 six
+        in-window events came back from the API as `status: publish` with an
+        `/agenda/<slug>/` link that 404s on the site itself. The sitemap is the
+        one place that lists the pages that exist, so it is the oracle here.
+        """
+        r = self.get(SITEMAP)
+        if not r:
+            # Fail open. A missing sitemap must not strip every url on the site.
+            log.warning("%s: sitemap unreadable, keeping API links unchecked", self.name)
+            return
+        self._live = set(_LOC.findall(r.text))
+        if not self._live:
+            log.warning("%s: sitemap parsed to zero slugs, ignoring it", self.name)
+            self._live = None
+
+    def _page_link(self, pids) -> Optional[str]:
+        """First resolving programme page for an event, e.g. Mon été Cinéma.
+
+        `acf.pages` is the event's parent page on nice.fr. When the event's own
+        permalink is dead this is the nearest thing the city publishes: the
+        programme the event belongs to, which does carry its date and venue.
+        """
+        for pid in pids or []:
+            if pid not in self._pages:
+                r = self.get(f"{API}/pages/{pid}?_fields=link")
+                link = None
+                if r:
+                    try:
+                        link = r.json().get("link") or None
+                    except Exception:
+                        pass
+                self._pages[pid] = link
+            if self._pages[pid]:
+                return self._pages[pid]
+        return None
+
+    def _url_for(self, item: dict, acf: dict, slot: dict) -> Optional[str]:
+        """Best working link for one event, or None rather than a 404.
+
+        A dead link is worse than no link: the page renders fine without one,
+        and a visitor who clicks through to a 404 assumes the event is off.
+        """
+        ticketing = (slot.get("ticketing") or "").strip()
+        if ticketing:
+            return ticketing
+
+        # An external_link means nice.fr serves /agenda/<slug>/ purely as a
+        # redirect to the museum, library or venue that actually owns the page.
+        # Prefer the destination and skip the hop.
+        external = ((acf.get("external_link") or {}).get("url") or "").strip()
+        if external:
+            return external
+
+        link = item.get("link")
+        slug = item.get("slug") or ""
+        if link and (self._live is None or slug in self._live):
+            return link
+
+        return self._page_link(acf.get("pages"))
+
     # -------------------------------------------------------------- fetch
     def fetch(self) -> Iterator[Event]:
         self._load_types()
+        self._load_live_slugs()
         today = date.today()
         seen: set[str] = set()
 
@@ -139,7 +214,6 @@ class NiceFr(HttpScraper):
             return
 
         acf = item.get("acf") or {}
-        link = item.get("link")
         note_base = _clean(item.get("excerpt", {}).get("rendered"))
         venue = self._place(acf.get("place"))
         free = bool(acf.get("free"))
@@ -173,7 +247,7 @@ class NiceFr(HttpScraper):
                 town="Nice",
                 venue=venue,
                 category=cat,
-                url=slot.get("ticketing") or link,
+                url=self._url_for(item, acf, slot),
                 note=" · ".join(bits)[:400] or None,
                 free=free,
                 source=self.name,
