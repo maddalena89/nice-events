@@ -64,7 +64,17 @@ class Submissions(HttpScraper):
             log.info("%s: SUPABASE_URL / SUPABASE_SERVICE_KEY not set — skipping", self.name)
             return
 
-        headers = {"apikey": key, "Authorization": f"Bearer {key}"}
+        # Supabase refuses the new sb_secret_ keys when the request looks like a
+        # browser ("Forbidden use of secret API key in browser"). HttpScraper's
+        # shared client sends a Chrome UA + text/html Accept to get past venue
+        # blocks, which trips that guard — so present as a plain server client
+        # here. Request headers override the client's for the same name in httpx.
+        headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "User-Agent": "niceevents-submissions/1.0",
+            "Accept": "application/json",
+        }
         url = (f"{base}/rest/v1/submissions"
                f"?approved=eq.true&select={_COLS}&order=created_at.asc")
 
