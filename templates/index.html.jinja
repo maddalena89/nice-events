@@ -1525,6 +1525,34 @@ function friendlySubmitError(text, status){
   return "Sorry, that didn't go through. Please double-check the fields and try again.";
 }
 
+// --- Duplicate guard ---------------------------------------------------------
+// The page already holds every live event in EVENTS, so the commonest mistake —
+// adding something that's already listed — can be caught right here, before it
+// ever reaches the review queue. Deliberately fuzzy (accents, punctuation and
+// support-act suffixes vary between a flyer and our feed), so it WARNS and lets
+// the submitter override, rather than hard-blocking a real new event that just
+// happens to share a night and a name with something else.
+const _dupNorm = s => (s||"").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu,"")
+  .replace(/[^a-z0-9]+/g," ").trim();
+function _titleSim(a,b){
+  const na=_dupNorm(a), nb=_dupNorm(b);
+  if(!na||!nb) return 0;
+  if(na.includes(nb)||nb.includes(na)) return 1;            // one title contains the other
+  const A=new Set(na.split(" ")), B=new Set(nb.split(" "));
+  let inter=0; A.forEach(t=>{ if(B.has(t)) inter++; });
+  return inter/(A.size+B.size-inter);                       // Jaccard over the word sets
+}
+function findDuplicate(title, start, town){
+  return EVENTS.find(e=>{
+    const onDay = start >= e.start && start <= (e.end||e.start);          // submitted day within the event's run
+    if(!onDay) return false;
+    if(town && e.town && _dupNorm(town)!==_dupNorm(e.town)) return false; // a different town is not a duplicate
+    return _titleSim(title, e.title) >= 0.6;
+  });
+}
+const _subBtn = $("sform").querySelector("button[type=submit]");
+const _subLabel = _subBtn ? _subBtn.textContent : "Submit for review";
+
 $("sform").addEventListener("submit", async ev => {
   ev.preventDefault();
   const g = id => $(id).value.trim();
@@ -1563,6 +1591,24 @@ $("sform").addEventListener("submit", async ev => {
     if (u.protocol !== "https:" && u.protocol !== "http:") { bad("The link must start with http:// or https://."); return; }
   }
 
+  // Duplicate guard: if this looks already listed, warn once and turn the button
+  // into "Add anyway". A second submit (dupok set) goes through — the submitter
+  // knows their event better than a fuzzy match does.
+  const form = $("sform");
+  if (!form.dataset.dupok) {
+    const dup = findDuplicate(g("s-title"), g("s-date"), townCanon);
+    if (dup) {
+      const when = (!dup.end || dup.end === dup.start)
+        ? fmtShort(dup.start) : fmtShort(dup.start) + " – " + fmtShort(dup.end);
+      bad('This looks like it\'s already listed: <b>' + esc(dup.title) + '</b> · ' + esc(when) +
+          (dup.venue ? ' · ' + esc(dup.venue) : '') +
+          '.<br>If yours is genuinely different, tap <b>Add anyway</b>.');
+      form.dataset.dupok = "1";
+      if (btn) btn.textContent = "Add anyway";
+      return;
+    }
+  }
+
   btn.disabled = true;
   msg.innerHTML = "Sending…";
   try {
@@ -1596,6 +1642,7 @@ $("sform").addEventListener("submit", async ev => {
                      time:g("s-time")||null, town:townCanon, venue:g("s-venue")||null,
                      category:$("s-cat").value };
       $("sform").reset();
+      form.removeAttribute("data-dupok"); if (btn) btn.textContent = _subLabel;
       msg.innerHTML = '<span class="ok">Thank you! It\'s queued for review.</span> ';
       if (card.title && card.start) {
         const cb=document.createElement("button");
@@ -1615,6 +1662,16 @@ $("sform").addEventListener("submit", async ev => {
   } finally {
     btn.disabled = false;
   }
+});
+
+// If they change the event after a duplicate warning, re-arm the check so the
+// override doesn't silently carry over to what is now a different event.
+["s-title","s-date"].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener("input", () => {
+    const f = $("sform");
+    if (f.dataset.dupok) { f.removeAttribute("data-dupok"); if (_subBtn) _subBtn.textContent = _subLabel; }
+  });
 });
 {% endif %}
 
