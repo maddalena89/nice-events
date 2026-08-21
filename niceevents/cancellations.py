@@ -37,6 +37,23 @@ def _fold(s: str) -> str:
     return "".join(c for c in s if not unicodedata.combining(c)).lower().strip()
 
 
+def _loose(s: str) -> str:
+    """`_fold`, plus every run of punctuation flattened to one space.
+
+    For the hand-maintained list below only. That list is written by a person
+    reading a poster, and nobody transcribes "MILONGA de l'Amitié" as
+    "milonga de l'amitie" with the apostrophe in the right place; they type
+    "milonga de l amitie". Matching on the folded title alone kept the
+    apostrophe, so the needle never matched and the line sat there looking like
+    it worked. The 25 July 2026 entry had been dead on arrival for that reason.
+
+    Flattening both sides makes the list forgiving of punctuation without making
+    it match more loosely in any way that matters: word order and spelling still
+    have to be right.
+    """
+    return re.sub(r"[^0-9a-z]+", " ", _fold(s)).strip()
+
+
 #: (title contains, town, YYYY-MM-DD, note shown). Keep the title fragment short
 #: and distinctive so it matches however the source spells the full title.
 CANCELLED: list[tuple] = [
@@ -49,6 +66,15 @@ CANCELLED: list[tuple] = [
     # Nothing in the feed says ANNULE, because the promoter removed the page
     # instead of retitling it, so the automatic route above cannot see this one.
     ("tini gessler", "Antibes", "2026-08-13", "Annulée"),
+    # 2026-08-21 health check. Both are marked "(ANNULÉE)" on the agendatangoam
+    # calendar and the automatic route should have caught them: harvest resolves
+    # the RECURRENCE-ID override and yields the marked title. _better_title threw
+    # the marker away during the merge, so the stored row stayed clean. Fixed in
+    # db.py the same day — these two lines are a belt-and-braces stopgap because
+    # the 22 Aug night is tomorrow, and a stored row only picks up the fix on the
+    # next scrape. SAFE TO DELETE once both dates have passed.
+    ("milonga de l amitie", "Nice", "2026-08-22", "Annulée"),
+    ("jeudi c est permis", "Nice", "2026-08-27", "Annulée"),
 ]
 
 
@@ -79,11 +105,11 @@ def mark_cancelled(events: list[dict]) -> list[dict]:
     if not CANCELLED:
         return events
     for e in events:
-        t = _fold(e.get("title"))
+        t = _loose(e.get("title"))
         town = (e.get("town") or "").strip()
         start = (e.get("start") or "").strip()
         for needle, ctown, cdate, note in CANCELLED:
-            if _fold(needle) in t and town == ctown and start == cdate:
+            if _loose(needle) in t and town == ctown and start == cdate:
                 e["cancelled"] = True
                 if note:
                     e["cancel_note"] = note
