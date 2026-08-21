@@ -277,7 +277,7 @@ def _events_from_ics(text: str) -> Iterator[dict]:
         elif cur is not None and ":" in line:
             key, val = _ics_prop(line)
             if key in ("SUMMARY", "DTSTART", "DTEND", "LOCATION", "URL",
-                       "DESCRIPTION", "RRULE"):
+                       "DESCRIPTION", "RRULE", "RECURRENCE-ID"):
                 # ICS escapes commas/semicolons/newlines with backslashes.
                 cur[key] = (val.replace("\\,", ",").replace("\\;", ";")
                                .replace("\\n", " ").replace("\\N", " "))
@@ -610,16 +610,50 @@ class VenueHarvest(HttpScraper):
         if not r:
             return
         if kind == "ics":
+            # Collected before yielding, because the cancellation of a date can
+            # arrive LATER IN THE FILE than the date it cancels, and first-wins
+            # would throw it away. See the RECURRENCE-ID note below.
+            picked: dict[str, Event] = {}
+            overridden: set[str] = set()
             for raw in _events_from_ics(r.text):
+                # A single date of a recurring series is cancelled by publishing
+                # a replacement VEVENT for it — same UID, a RECURRENCE-ID naming
+                # the date, and the title retitled "(ANNULEE) …". The series
+                # itself keeps its RRULE and its clean title, and gets NO EXDATE,
+                # because the override is what is supposed to replace it.
+                #
+                # Both therefore reach us for the same night, and _title_key
+                # strips "annulee" on purpose (models.py), so both fingerprint
+                # identically and only one survives. Whichever we keep is the one
+                # the site shows, and the series is written near the top of the
+                # file while the overrides are appended at the bottom — so
+                # first-wins kept the clean one and the cancellation was
+                # discarded, silently, every time.
+                #
+                # That is the Casita incident of 6 August 2026 in its second
+                # form: on 18 August the calendar plainly said "(ANNULÉE)" for
+                # 20 and 22 August and the site advertised both as on. An
+                # override replaces the occurrence it names.
+                override = bool(raw.get("RECURRENCE-ID"))
                 # A recurring event fans out into its upcoming occurrences.
                 for start_str in _ics_starts(raw, today):
                     inst = dict(raw, DTSTART=start_str)
                     if raw.get("RRULE"):
                         inst.pop("DTEND", None)     # per-occurrence: no stale end
                     ev = self._from_ics(inst, name, today, default_town)
-                    if ev and ev.fingerprint not in seen:
-                        seen.add(ev.fingerprint)
-                        yield ev
+                    if not ev or ev.fingerprint in seen:
+                        continue
+                    if ev.fingerprint in picked and (
+                            not override or ev.fingerprint in overridden):
+                        continue                    # first-wins, as before
+                    picked[ev.fingerprint] = ev
+                    if override:
+                        overridden.add(ev.fingerprint)
+            # dict preserves insertion order, and replacing a key keeps its
+            # original position, so the feed order is the same as before.
+            for ev in picked.values():
+                seen.add(ev.fingerprint)
+                yield ev
             return
         for raw in _events_from_jsonld(r.text):
             ev = self._from_jsonld(raw, name, today, default_town)

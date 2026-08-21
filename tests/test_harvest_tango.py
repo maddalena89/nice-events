@@ -79,6 +79,55 @@ def test_cancelled_milonga_is_flagged_not_advertised():
     assert d["title"].startswith("MILONGA")
 
 
+def test_recurrence_override_cancels_the_date_it_names():
+    """The 18 August 2026 case: the cancellation is written AFTER the series.
+
+    Google cancels one night of a weekly milonga by appending a replacement
+    VEVENT with a RECURRENCE-ID and an "(ANNULEE)" title. The series keeps its
+    RRULE, its clean title and NO EXDATE, so both reach the scraper for the same
+    night and — because _title_key strips "annulee" — they fingerprint the same.
+    First-wins kept the clean one and the site advertised a cancelled milonga.
+    """
+    weekly = SOON + timedelta(days=7)      # inside the horizon, and a 2nd occurrence
+    feed = (
+        "BEGIN:VCALENDAR\n"
+        # the series, written first, clean title, no EXDATE for the cancelled date
+        "BEGIN:VEVENT\n"
+        "UID:casita\n"
+        f"DTSTART;VALUE=DATE:{SOON:%Y%m%d}\n"
+        f"RRULE:FREQ=WEEKLY;BYDAY={'MO TU WE TH FR SA SU'.split()[SOON.weekday()]}\n"
+        "SUMMARY:MILONGA a la Casita\n"
+        "LOCATION:La Casita\\, 8 Rue Gaston Charbonnier\\, 06300 Nice\\, France\n"
+        "END:VEVENT\n"
+        # the cancellation, appended at the bottom, as the real calendar writes it
+        "BEGIN:VEVENT\n"
+        "UID:casita\n"
+        f"RECURRENCE-ID;VALUE=DATE:{SOON:%Y%m%d}\n"
+        f"DTSTART;VALUE=DATE:{SOON:%Y%m%d}\n"
+        "SUMMARY:(ANNULEE) MILONGA a la Casita\n"
+        "LOCATION:La Casita\\, 8 Rue Gaston Charbonnier\\, 06300 Nice\\, France\n"
+        "END:VEVENT\n"
+        "END:VCALENDAR\n"
+    )
+
+    h = VenueHarvest()
+    h.get = lambda url: type("R", (), {"text": feed})()
+    events = list(h._one(FEED, "x", "ics", date.today(), set(), "Nice"))
+
+    by_date = {e.start: e for e in events}
+    assert SOON in by_date, "the cancelled night must stay listed, not vanish"
+
+    cancelled = mark_cancelled([{"title": by_date[SOON].title, "town": "Nice",
+                                 "start": SOON.isoformat()}])[0]
+    assert cancelled["cancelled"] is True
+    assert cancelled["title"].startswith("MILONGA")
+
+    # The override replaces exactly one night. The rest of the series is untouched.
+    assert len([e for e in events if e.start == SOON]) == 1
+    if weekly in by_date:
+        assert not by_date[weekly].title.upper().startswith("(ANNUL")
+
+
 def test_category_is_dance():
     e = _event("MILONGA de la Estacion", "35\\, avenue Malaussena - 06000 NICE")
     assert e.category == "danse"
