@@ -187,6 +187,7 @@ _TOWN_CANON = {
     "falicon": "Falicon", "aspremont": "Aspremont", "isola": "Isola", "isola-2000": "Isola 2000",
     "auron": "Auron", "la-colmiane": "La Colmiane", "roquebilliere": "Roquebillière",
     "saint-jeannet": "Saint-Jeannet", "le-broc": "Le Broc", "belvedere": "Belvédère",
+    "tende": "Tende", "saint-dalmas-de-tende": "Tende",   # hamlet of Tende
 }
 
 # Postcode -> town, used when a source gives us a code but a vague place name.
