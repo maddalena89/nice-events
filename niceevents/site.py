@@ -29,7 +29,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from . import db
 from .cancellations import mark_cancelled
 from .suppress import drop_suppressed
-from .models import CATEGORIES, _title_key, classify, slugify
+from . import landing
+from .models import DISPLAY_CATEGORIES, _title_key, classify, slugify
 from .overrides import apply_override
 
 TPL_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -435,18 +436,6 @@ _CAT_LABELS = frozenset((
 _FREE_POS = re.compile(r"(gratuit\w*|entr[ée]es?\s+libres?|acc[eè]s\s+libres?|free\s+entry)", re.I)
 _PRICE = re.compile(r"(\d+[\.,]?\d*\s*(€|euros?)|\btarif|\bpayant|prix\s*:\s*\d)", re.I)
 
-# The chips the page shows. "brocante" (Brocantes & vide-greniers) is folded into
-# the "marche" chip, renamed "Brocantes & fêtes" and surfaced first, so those
-# events live with the markets and fêtes. "brocante" stays a valid scraper/DB
-# category; we remap it to "marche" only at build time (in _row_to_dict) so the
-# events group under the merged chip. The page then prepends an "All the events"
-# chip in front of these (see the template).
-_DISPLAY_CATEGORIES = {
-    "marche": "Brocantes & fêtes",
-    **{k: v for k, v in CATEGORIES.items() if k not in ("brocante", "marche")},
-}
-
-
 def _ascii_fold(w: str) -> str:
     w = unicodedata.normalize("NFD", w)
     return "".join(c for c in w if not unicodedata.combining(c)).lower()
@@ -499,8 +488,15 @@ def _card_slug(title: str) -> str:
 
 def _assign_slugs(events: list[dict]) -> None:
     """Give every event a unique `slug` in place. Collisions get -2, -3, … in a
-    stable order (by start then title) so a given event keeps its slug run to run."""
-    seen: dict[str, int] = {}
+    stable order (by start then title) so a given event keeps its slug run to run.
+
+    Landing-page paths are seeded as already-taken. They are real directories at
+    the site root, so a file always wins over the 404.html short-link redirect:
+    an event that slugified to "concerts" would have its short link silently
+    swallowed by the category page. Pre-claiming the name pushes that event to
+    "concerts-2" instead, which still works.
+    """
+    seen: dict[str, int] = {k: 1 for k in landing.RESERVED_SLUGS}
     for e in sorted(events, key=lambda e: (e.get("start", ""), e.get("title", ""))):
         base = _card_slug(e.get("title", "")) or (e.get("fingerprint", "") or "event")[:8]
         n = seen.get(base, 0) + 1
@@ -734,27 +730,105 @@ def _events_jsonld(events: list[dict], base: str, today: Optional[date] = None) 
     out = [_event_ld(e, base) for e in soon[:_LD_MAX]]
     for o in out:
         o["@context"] = "https://schema.org"
-    blob = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
-    # This string is dropped inside a <script> element, so any "</script>" that
-    # ever appears in a scraped title would end the block early and spill the
-    # rest of the JSON onto the page. json.dumps does not escape these, so do it
-    # here. The escapes are still valid JSON and parse back to the same text.
+    return _ld_escape(json.dumps(out, ensure_ascii=False, separators=(",", ":")))
+
+
+def _ld_escape(blob: str) -> str:
+    """Make a JSON blob safe to drop inside <script>…</script>.
+
+    Any "</script>" that ever appears in a scraped title would end the block
+    early and spill the rest of the JSON onto the page. json.dumps does not
+    escape these, so do it here. The escapes are still valid JSON and parse back
+    to exactly the same text.
+    """
     return blob.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
-def _sitemap(base: str, updated: date) -> str:
-    """A deliberately tiny sitemap.
+def _site_jsonld(base: str) -> str:
+    """schema.org for the site itself, not its events.
 
-    Only real, crawlable URLs go in. The per-event short links
-    (whatsonnice.com/<slug>) are NOT listed: they have no file behind them, they
-    are served by 404.html and redirected with JavaScript, and filling a sitemap
-    with 2,000 soft-404s is actively harmful. When events get their own real
-    pages, that is the moment to list them here.
+    Two things in one graph. WebSite gives the site a name, so a result can say
+    "What's on in Nice" instead of the bare domain. Organization is what an
+    engine reads to answer "what is whatsonnice.com" at all — without it the
+    site is an anonymous list of dates.
+
+    No SearchAction: that markup promises a URL template a crawler can send a
+    query to and get a results PAGE back. This site filters in the browser, so
+    there is no such URL, and declaring one that does not work is worse than
+    declaring nothing.
+    """
+    doc = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebSite",
+                "@id": f"{base}/#website",
+                "url": f"{base}/",
+                "name": SITE_TITLE,
+                "description": (
+                    "Events across Nice and the Alpes-Maritimes — concerts, brocantes, "
+                    "milongas, exhibitions, markets and meetups, gathered daily."
+                ),
+                "inLanguage": "en-GB",
+                "publisher": {"@id": f"{base}/#org"},
+            },
+            {
+                "@type": "Organization",
+                "@id": f"{base}/#org",
+                "name": SITE_TITLE,
+                "url": f"{base}/",
+                "logo": f"{base}/icon-512.png",
+                "areaServed": {
+                    "@type": "AdministrativeArea",
+                    "name": "Alpes-Maritimes",
+                    "address": {
+                        "@type": "PostalAddress",
+                        "addressRegion": "Alpes-Maritimes",
+                        "addressCountry": "FR",
+                    },
+                },
+            },
+        ],
+    }
+    return _ld_escape(json.dumps(doc, ensure_ascii=False, separators=(",", ":")))
+
+
+#: Fields the page never reads. They belong in events.json — that feed is a
+#: public API and should stay complete — but shipping them inline costs every
+#: visitor parse time and memory for data no code path touches. Checked against
+#: the template: "source" appears there only as an element id, and "recurring"
+#: and "price" not at all.
+_PAGE_DROP_FIELDS = ("source", "recurring", "price")
+
+
+def _page_events(events: list[dict]) -> list[dict]:
+    """The event list as the page needs it — copies, so events.json keeps
+    everything and nothing downstream sees a mutated dict."""
+    return [
+        {k: v for k, v in e.items() if k not in _PAGE_DROP_FIELDS}
+        for e in events
+    ]
+
+
+def _sitemap(base: str, updated: date, extra: list[str] | None = None) -> str:
+    """Every real, crawlable URL on the site.
+
+    The per-event short links (whatsonnice.com/<slug>) are still NOT listed:
+    they have no file behind them, they are served by 404.html and redirected
+    with JavaScript, and filling a sitemap with 2,000 soft-404s is actively
+    harmful. The town and category pages in `extra` ARE real files, so they
+    belong here — they are the only way a search engine finds them, since they
+    are two clicks down from a page whose links a crawler has to run JavaScript
+    to see.
+
+    Landing pages get 0.8: clearly below the home page, clearly above privacy.
+    changefreq daily is honest — the whole site rebuilds every morning.
     """
     pages = [
         ("/", "daily", "1.0"),
         ("/privacy.html", "yearly", "0.3"),
     ]
+    pages += [(path, "daily", "0.8") for path in (extra or [])]
     urls = "\n".join(
         f"  <url>\n"
         f"    <loc>{base}{path}</loc>\n"
@@ -817,8 +891,6 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     # really act on. robots.txt (in static/) points at this file.
     host = _canonical_host()
     base = f"https://{host}" if host else ""
-    if base:
-        (out / "sitemap.xml").write_text(_sitemap(base, date.today()), encoding="utf-8")
 
     env = Environment(
         loader=FileSystemLoader(TPL_DIR),
@@ -848,14 +920,32 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         poster_ai_url = f"{SUPABASE_URL}/functions/v1/read-poster"
         poster_ai_key = SUPABASE_ANON_KEY
 
+    updated = (date.today().strftime("%-d %B %Y") if os.name != "nt"
+               else date.today().strftime("%d %B %Y"))
+
+    # Worked out before the home page renders, because the home page links to
+    # these: without a real link from the one page search engines already know,
+    # every landing page is an orphan that only the sitemap mentions.
+    town_pages, cat_pages = landing.collect(events)
+    town_links, cat_links = landing.nav_links(town_pages, cat_pages)
+
     html = tpl.render(
         title=SITE_TITLE,
-        events_json=json.dumps(events, ensure_ascii=False, separators=(",", ":")),
-        categories=_DISPLAY_CATEGORIES,
-        cat_json=json.dumps(_DISPLAY_CATEGORIES, ensure_ascii=False),
+        # _ld_escape, not a bare json.dumps: this blob sits inside a <script>
+        # element, so a title containing "</script>" — from a scraped page or a
+        # public submission — would close it early and spill the rest of the feed
+        # into the document as markup. The escapes are still valid JSON and
+        # JSON.parse gives back exactly the same text.
+        events_json=_ld_escape(
+            json.dumps(_page_events(events), ensure_ascii=False, separators=(",", ":"))
+        ),
+        # The category chips. "brocante" stays a valid scraper/DB category and is
+        # remapped to "marche" in _row_to_dict, so events group under the merged
+        # chip; the template prepends an "All the events" chip in front of these.
+        categories=DISPLAY_CATEGORIES,
+        cat_json=json.dumps(DISPLAY_CATEGORIES, ensure_ascii=False),
         stats=stats,
-        updated=date.today().strftime("%-d %B %Y") if os.name != "nt"
-                else date.today().strftime("%d %B %Y"),
+        updated=updated,
         submit_mode=submit_mode,
         submit_endpoint=SUBMIT_ENDPOINT,
         github_repo=GITHUB_REPO,
@@ -868,6 +958,10 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         # anything assembled by JavaScript depends on the crawler choosing to
         # render the page, which is slower and not guaranteed.
         events_jsonld=_events_jsonld(events, base),
+        site_jsonld=_site_jsonld(base) if base else "",
+        town_links=town_links,
+        cat_links=cat_links,
+        og_image=f"{base}/og.png" if base else "",
         cf_analytics_token=os.environ.get("CF_ANALYTICS_TOKEN", ""),
         poster_ai_url=poster_ai_url,
         poster_ai_key=poster_ai_key,
@@ -883,5 +977,22 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         for f in static.iterdir():
             if f.is_file():
                 shutil.copy2(f, out / f.name)
+
+    # Town and category landing pages — the only URLs on this site that can rank
+    # for "brocante Antibes" or "que faire à Nice". See niceevents/landing.py.
+    extra = landing.render_all(
+        TPL_DIR, town_pages, cat_pages, base, updated,
+        og_image=f"{base}/og.png" if base else "",
+        out=out,
+    )
+
+    # Sitemap last: it has to name the landing pages, so it cannot be written
+    # until they exist. Written here rather than kept in static/ so <lastmod> is
+    # the day the site was actually built, which is the only part of it search
+    # engines really act on. robots.txt (in static/) points at this file.
+    if base:
+        (out / "sitemap.xml").write_text(
+            _sitemap(base, date.today(), extra), encoding="utf-8"
+        )
 
     return len(events), str(out)

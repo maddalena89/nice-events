@@ -1,7 +1,10 @@
 # What's on in Nice — https://whatsonnice.com
 #
-# The whole site is one public page and we want it read. Nothing here is
-# private, so nothing is disallowed.
+# Everything here is public and we want it read. Nothing is disallowed.
+#
+# The site is the home page plus a town page per commune (/in/<town>/) and a
+# page per category (/concerts/, /brocantes-and-fetes/, …), all generated at
+# build time and all listed in the sitemap below.
 #
 # Copied verbatim into dist/ by niceevents/site.py, alongside sitemap.xml,
 # which is generated on every build so its <lastmod> is the real build date.

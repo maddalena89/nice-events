@@ -15,22 +15,36 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Nice Events">
-<title>{{ title }} · events in Nice &amp; the 06</title>
-<meta name="description" content="Vide-greniers, milongas, concerts, exhibitions, meetups and pop-ups across Nice and the Alpes-Maritimes. Updated daily.">
-<meta property="og:title" content="{{ title }}">
-<meta property="og:description" content="Everything on in Nice and the 06, updated daily.">
+{# Title and description carry the French words people round here actually
+   search ("que faire à Nice", "vide-greniers", "brocante") alongside the English
+   voice of the site. Same words a reader sees, in the places a reader sees them
+   — not a hidden keyword list. Kept under ~60 / ~155 characters so neither gets
+   clipped mid-phrase in a result. #}
+<title>{{ title }} · events, concerts &amp; brocantes in the 06</title>
+<meta name="description" content="Que faire à Nice ? Vide-greniers, milongas, concerts, expos and meetups across Nice and the Alpes-Maritimes — gathered daily, always linked to the source.">
+<meta property="og:site_name" content="{{ title }}">
+<meta property="og:title" content="{{ title }} · events in Nice &amp; the 06">
+<meta property="og:description" content="Que faire à Nice ? Concerts, brocantes, milongas, expos and meetups across Nice and the Alpes-Maritimes. Updated daily.">
 <meta property="og:type" content="website">
+<meta property="og:locale" content="en_GB">
+<meta property="og:locale:alternate" content="fr_FR">
 {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">
 <meta property="og:url" content="{{ canonical_url }}">{% endif %}
-{%- if events_jsonld %}
-<!-- Structured data: the same events the page already shows, described in the
-     vocabulary search engines read (schema.org/Event). This is what makes an
-     event eligible to appear as a date-and-venue card in search results rather
-     than as a line of blue text. Generated in niceevents/site.py from the same
-     rows that render below, so it can never drift from what a reader sees.
-     Covers the next 60 days, capped at 150 events — see _LD_DAYS / _LD_MAX. -->
-<script type="application/ld+json">{{ events_jsonld|safe }}</script>
+{%- if og_image %}
+{# Without an og:image every share of this site — WhatsApp, Messages, Slack,
+   Facebook — renders as a bare blue link. The card is a static file in static/,
+   not generated per build, so it costs nothing and never goes stale. Absolute
+   URL is required: the scrapers that read these tags do not resolve relative
+   paths. #}
+<meta property="og:image" content="{{ og_image }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="What's on in Nice — events across Nice and the Alpes-Maritimes">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ og_image }}">
 {%- endif %}
+<meta name="twitter:title" content="{{ title }} · events in Nice &amp; the 06">
+<meta name="twitter:description" content="Que faire à Nice ? Concerts, brocantes, milongas, expos and meetups across Nice and the 06.">
 {%- if cf_analytics_token %}
 <!-- Cloudflare Web Analytics: no cookies, no cross-site tracking, no consent
      banner needed. Set CF_ANALYTICS_TOKEN in the workflow to switch it on. -->
@@ -46,7 +60,7 @@ a{color:var(--accent)}
 .hero{padding:44px 0 0}
 /* padding-right clears the fixed add-event button (52px wide at right:24px = 76px
    of occupied gutter). Without it the button sits on top of "· 5 SOURCES". */
-.eyebrow{display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:10px;padding-right:76px}
+.eyebrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:10px;padding-right:76px}
 .eyebrow b{color:var(--ink);font-weight:600}
 /* A button that reads as a text link — for "About" in the eyebrow and footer. */
 .linklike{border:0;background:none;padding:0;margin:0;min-height:0;font:inherit;
@@ -112,8 +126,60 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
    names like "Saint-Martin-Vésubie" — left alone it ate most of the bar. Cap it:
    the closed control only ever has to show one town, and the open dropdown is
    free to be as wide as it likes. */
-#town{flex:0 1 210px;width:210px;min-width:0;text-overflow:ellipsis}
+#town-wrap{position:relative;flex:0 1 210px;width:210px;min-width:0}
 #when{flex:0 0 auto}
+/* The town filter is a checkbox panel, not a <select>: an evening out is rarely
+   confined to one commune, and the old single-choice control made "Nice or
+   Villefranche" impossible to ask for. The trigger is styled to match the
+   selects beside it -- same box, same hand-drawn chevron -- so the bar still
+   reads as one row of like controls rather than a button gatecrashing it.
+   Every declaration here that looks redundant is overriding the global
+   button{} rule (11px uppercase 600, and a hover that inverts to solid ink). */
+#town-btn{display:flex;align-items:center;width:100%;
+  font-size:14.5px;font-weight:400;letter-spacing:normal;text-transform:none;text-align:left;
+  padding:10px 34px 10px 12px;background-color:transparent;color:var(--ink);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e0e0e' stroke-width='2.5' stroke-linecap='square'><path d='M5 9l7 7 7-7'/></svg>");
+  background-repeat:no-repeat;background-position:right 12px center;background-size:11px 11px}
+#town-btn:hover{background-color:#e8e5de;color:var(--ink)}
+#town-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#town-btn[aria-expanded=true]{outline:2px solid var(--accent);outline-offset:-2px}
+/* The panel hangs off the trigger rather than pushing the page around. It is
+   wider than the 210px trigger because commune names are long -- but capped to
+   the viewport so it can never run off a narrow screen. z-index sits under the
+   floating add button (50) and over everything else. */
+.multi-panel{position:absolute;top:calc(100% - 1px);left:0;z-index:30;
+  width:max-content;min-width:100%;max-width:min(320px,calc(100vw - 32px));
+  background:var(--paper);border:1px solid var(--ink);
+  box-shadow:0 10px 26px rgba(0,0,0,.13)}
+.multi-panel[hidden]{display:none}
+.multi-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:9px 12px;border-bottom:1px solid var(--ink);
+  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+/* 109 communes will not fit on a phone screen, so the list scrolls inside the
+   panel. Capped in vh as well as px so a short viewport never gets a panel
+   taller than the window it is drawn in. */
+.multi-list{max-height:min(330px,50vh);overflow-y:auto;padding:4px 0}
+.opt{display:flex;align-items:center;gap:9px;margin:0;padding:7px 12px;cursor:pointer;
+  font-size:14px;font-weight:400;letter-spacing:normal;text-transform:none;color:var(--ink)}
+.opt:hover{background:#e8e5de}
+.opt span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The count is the whole point of the ordering -- it shows why Grasse outranks
+   Villefranche -- so it is dimmed but never hidden. */
+.opt i{font-style:normal;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+/* Same square tick as the "Online too" checkboxes in the bar. */
+.opt input{appearance:none;-webkit-appearance:none;flex:none;position:relative;
+  width:15px;height:15px;margin:0;padding:0;cursor:pointer;
+  border:1px solid var(--ink);border-radius:0;background:transparent}
+.opt input:checked{background:var(--accent);border-color:var(--accent)}
+.opt input:checked::after{content:"";position:absolute;left:4px;top:.5px;
+  width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.opt input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Divider between the handful of towns that carry the listings and the long
+   alphabetical tail. Labelled, because an unexplained rule in a sorted list
+   just looks like the sort broke. */
+.multi-div{display:flex;align-items:center;gap:9px;margin:5px 12px;
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.multi-div::after{content:"";flex:1;border-top:1px solid var(--rule)}
 /* Reset: an eraser glyph, not a word. It's the least-used control in the bar and
    was the only thing forcing a second row. Square so it reads as an icon button;
    title + aria-label carry the meaning that the label used to. */
@@ -144,7 +210,13 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .daymark{display:flex;align-items:baseline;gap:14px;margin:34px 0 0;padding-bottom:7px;border-bottom:2px solid var(--ink)}
 .daymark b{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .daymark span{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-.row{display:grid;grid-template-columns:46px 1fr 210px 120px;gap:18px;align-items:baseline;padding:15px 0;border-bottom:1px solid var(--rule)}
+/* A wide filter can put well over a thousand rows in the list. content-visibility
+   lets the browser skip layout and paint for the ones scrolled out of view, and
+   contain-intrinsic-size gives it a height to reserve for them so the scrollbar
+   still behaves and does not jump as they are realised. Rows are a near-uniform
+   height, so one estimate fits. Purely a rendering hint: nothing about the
+   markup, find-in-page or scroll-to-event changes. */
+.row{content-visibility:auto;contain-intrinsic-size:auto 62px;display:grid;grid-template-columns:46px 1fr 210px 120px;gap:18px;align-items:baseline;padding:15px 0;border-bottom:1px solid var(--rule)}
 .row:hover{background:#e9e6df}
 .idx{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 .ttl{font-size:19px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
@@ -265,8 +337,42 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 @media(max-width:860px){.addbtn{top:12px;right:12px;width:46px;height:46px}}
 .err{color:#b00020;font-size:12.5px;margin-top:8px}
 .ok{color:#0a7a3f;font-size:12.5px;margin-top:8px}
+/* "New listings" nudge, shown only when the service worker reports that the
+   cached page it served has since changed on the server. Fixed to the bottom so
+   it never displaces the listings, and clear of the iOS home indicator. */
+#freshbar{position:fixed;left:50%;transform:translateX(-50%);z-index:60;
+  bottom:max(16px,env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:12px;
+  background:var(--ink);color:var(--paper);padding:10px 12px 10px 16px;
+  font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.22);max-width:calc(100vw - 32px)}
+#freshbar button{border:0;background:var(--accent);color:#fff;font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:8px 12px;min-height:36px}
+#freshbar button:hover{background:#fff;color:var(--ink)}
+#freshbar #freshno{background:transparent;color:var(--paper);padding:8px 4px;font-size:13px;letter-spacing:0}
+#freshbar #freshno:hover{background:transparent;color:var(--accent)}
+/* NOTE the space after the opening brace, and keep it there. A brace followed
+   immediately by a hash is how Jinja opens a comment, so a CSS rule that puts
+   an id selector straight after the brace silently swallows the whole rest of
+   this template and the page renders blank. Jinja scans the raw text: being
+   inside a CSS comment does not save you, so do not write the two characters
+   together even in prose. */
+@media(max-width:600px){ #freshbar{left:16px;right:16px;transform:none;max-width:none} }
+
 .foot{margin-top:70px;border-top:1px solid var(--ink);padding-top:16px;font-size:11.5px;color:var(--muted)}
 .foot a{color:var(--muted)}
+/* Browse-by links to the town and category pages. Rendered server-side as real
+   anchors, not built by the filter JS: a crawler has to be able to follow them
+   without running anything, and they are the only route from here to those
+   pages. Visitors get a use out of them too — a bookmarkable /in/antibes/ is
+   easier to send someone than "open the site and tick two boxes". */
+.browse{margin-top:52px;border-top:1px solid var(--ink);padding-top:16px}
+.browse h2{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin:0 0 10px}
+.browse ul{list-style:none;display:flex;flex-wrap:wrap;gap:7px 8px;margin:0 0 20px;padding:0}
+.browse a{display:inline-block;border:1px solid var(--rule);padding:6px 10px;font-size:12.5px;
+  color:var(--ink);text-decoration:none}
+.browse a:hover{border-color:var(--ink);background:#e8e5de}
+.browse a i{font-style:normal;color:var(--muted);font-size:11px}
 .empty{padding:60px 0;text-align:center;color:var(--muted)}
 /* ---------------- tablet ---------------- */
 @media(max-width:860px){
@@ -313,7 +419,11 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     one wrapping line was the awkward part. */
  .bar{gap:7px;margin-bottom:12px}
  input[type=search]{flex:1 0 100%;min-width:0}
- #town,#when{flex:1 1 calc(50% - 4px);width:auto;min-width:0}
+ #town-wrap,#when{flex:1 1 calc(50% - 4px);width:auto;min-width:0}
+ /* 16px on the trigger for the same reason as the inputs: anything smaller and
+    iOS Safari zooms the page and never zooms back. */
+ #town-btn{font-size:16px;padding:11px 34px 11px 12px;min-height:44px}
+ .opt{padding:10px 12px;min-height:44px}
  .chk{flex:1 1 auto;justify-content:center;white-space:nowrap;min-height:44px}
  #reset{flex:0 0 44px;width:44px;min-width:44px;max-width:44px;height:auto;min-height:44px}
  input,select,textarea{font-size:16px;padding:11px 12px}   /* 16px: no iOS zoom */
@@ -423,7 +533,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 <div class="hero">
   <div class="eyebrow">
     <span>Alpes-Maritimes · 06</span>
-    <span><button type="button" class="linklike" id="about-open">About</button> · <button type="button" class="linklike" id="bug-top">Report a bug</button> · Updated <b>{{ updated }}</b></span>
+    <span><button type="button" class="linklike" id="about-open">About</button> · <button type="button" class="linklike" id="bug-top">Report a bug</button> · <button type="button" class="linklike" id="add-top">Add your event for free</button> · Updated <b>{{ updated }}</b></span>
   </div>
   <h1>What's<br>on in <em>Nice</em></h1>
   <div class="standfirst">
@@ -446,12 +556,28 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 
 <div class="bar">
   <input type="search" id="q" placeholder="Search title, venue, town, artist, DJ…">
-  <select id="town"><option value="">All towns</option></select>
+  {# Town: a checkbox panel so several communes can be picked at once. The
+     button carries the summary ("Nice", "3 towns", "All towns"); the list
+     itself is built in JS from the live data, biggest-first then A-Z. #}
+  <div id="town-wrap">
+    <button type="button" id="town-btn" aria-expanded="false" aria-haspopup="true"
+            aria-controls="town-panel"><span id="town-label">All towns</span></button>
+    <div class="multi-panel" id="town-panel" role="group" aria-label="Filter by town" hidden>
+      <div class="multi-head">
+        <span id="town-count">All towns</span>
+        <button type="button" class="linklike" id="town-clear">Clear</button>
+      </div>
+      <div class="multi-list" id="town-list"></div>
+    </div>
+  </div>
   <select id="when">
     <option value="today">Today</option>
     <option value="weekend">This weekend</option>
     <option value="7">Next 7 days</option>
     <option value="30" selected>Next 30 days</option>
+    {# Restored: without this there is no way to reach the ~1400 events that
+       start more than a month out, and they are the ones worth planning for. #}
+    <option value="">Any date</option>
   </select>
   <label class="chk"><input type="checkbox" id="online"> Online too</label>
   <label class="chk"><input type="checkbox" id="freeonly"> Free only</label>
@@ -595,6 +721,23 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   </div>
 </dialog>
 
+{%- if town_links or cat_links %}
+<nav class="browse" aria-label="Browse by town or category">
+  <h2>Browse by town</h2>
+  <ul>
+    {%- for l in town_links %}
+    <li><a href="{{ l.path }}">{{ l.name }} <i>{{ l.count }}</i></a></li>
+    {%- endfor %}
+  </ul>
+  <h2>Browse by what's on</h2>
+  <ul>
+    {%- for l in cat_links %}
+    <li><a href="{{ l.path }}">{{ l.name }} <i>{{ l.count }}</i></a></li>
+    {%- endfor %}
+  </ul>
+</nav>
+{%- endif %}
+
 <div class="foot">
   <strong>Sources:</strong>
   <a href="https://brocabrac.fr/06/">Brocabrac</a> ·
@@ -617,6 +760,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 </div>
 
 </div>
+
 
 <script id="data" type="application/json">{{ events_json }}</script>
 <script>
@@ -701,12 +845,71 @@ const TOWNS = [...new Set(EVENTS.filter(e=>!e.online).map(e=>e.town))]
   .sort((a,b)=>a.localeCompare(b,"fr"));
 const TOWN_CANON = new Map(TOWNS.map(t=>[t.toLowerCase(), t]));  // typed -> canonical
 
-TOWNS.forEach(t=>{
-  const o=document.createElement("option"); o.value=o.textContent=t;
-  $("town").appendChild(o);
-});
-// Start focused on Nice itself; "All towns" and every commune stay one click away.
-if (TOWNS.includes("Nice")) $("town").value = "Nice";
+// How many upcoming listings each town carries. Drives both the ordering of the
+// panel and the count shown beside each name.
+const TOWN_N = new Map();
+EVENTS.filter(e=>!e.online).forEach(e=>TOWN_N.set(e.town,(TOWN_N.get(e.town)||0)+1));
+// Nice and Antibes hold most of the catalogue and a hundred communes hold a
+// handful each, so a single A-Z list buries the towns nearly everyone wants
+// behind a scroll. The busiest few go on top; the rest stay alphabetical, which
+// is the only order that helps when you already know the name you're after.
+const TOP_TOWNS = [...TOWN_N.entries()]
+  .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"fr")).slice(0,5).map(x=>x[0]);
+const REST_TOWNS = TOWNS.filter(t=>!TOP_TOWNS.includes(t));   // TOWNS is already A-Z
+
+// Selected towns. EMPTY MEANS ALL, not "none" — a filter nobody has touched must
+// not hide the whole site. Every read of this set has to honour that.
+const townSel = new Set();
+if (TOWNS.includes("Nice")) townSel.add("Nice");   // where most people start
+
+// Built with DOM calls rather than innerHTML because esc() is declared further
+// down this script and would still be in its temporal dead zone up here.
+function townOption(t){
+  const l=document.createElement("label"); l.className="opt";
+  const i=document.createElement("input");
+  i.type="checkbox"; i.value=t; i.checked=townSel.has(t);
+  i.onchange=()=>{ i.checked?townSel.add(t):townSel.delete(t); syncTown(); render(); };
+  const n=document.createElement("span"); n.textContent=t;
+  const c=document.createElement("i");   c.textContent=TOWN_N.get(t)||0;
+  l.append(i,n,c);
+  return l;
+}
+function divider(text){
+  const d=document.createElement("div"); d.className="multi-div"; d.textContent=text;
+  return d;
+}
+{
+  const box=$("town-list");
+  TOP_TOWNS.forEach(t=>box.appendChild(townOption(t)));
+  if (REST_TOWNS.length){
+    box.appendChild(divider("All towns A\u2013Z"));
+    REST_TOWNS.forEach(t=>box.appendChild(townOption(t)));
+  }
+}
+
+// Keep the trigger label, the panel header and the tick marks agreeing with the
+// set. Called after any change to townSel, wherever it came from.
+function syncTown(){
+  const n=townSel.size;
+  $("town-label").textContent = n===0 ? "All towns" : n===1 ? [...townSel][0] : n+" towns";
+  $("town-count").textContent = n===0 ? "All towns" : n+" selected";
+  // The trigger only has room for "3 towns"; the tooltip names them.
+  $("town-btn").title = n>1 ? [...townSel].join(", ") : "";
+  document.querySelectorAll("#town-list input").forEach(i=>{i.checked=townSel.has(i.value);});
+}
+{
+  const wrap=$("town-wrap"), btn=$("town-btn"), panel=$("town-panel");
+  const open = v => { panel.hidden=!v; btn.setAttribute("aria-expanded",String(v)); };
+  btn.onclick = e => { e.stopPropagation(); open(panel.hidden); };
+  $("town-clear").onclick = () => { townSel.clear(); syncTown(); render(); };
+  // Click-away and Escape both close it. Without these the panel sits open over
+  // the listings and there is no obvious way to dismiss it.
+  document.addEventListener("click", e => { if(!wrap.contains(e.target)) open(false); });
+  document.addEventListener("keydown", e => {
+    if(e.key==="Escape" && !panel.hidden){ open(false); btn.focus(); }
+  });
+}
+syncTown();
 {
   const dl=$("townlist");
   if(dl) TOWNS.forEach(t=>{const o=document.createElement("option");o.value=t;dl.appendChild(o);});
@@ -861,7 +1064,7 @@ function renderExhibs(items){
 }
 
 function render(){
-  const q=$("q").value.trim().toLowerCase(), town=$("town").value, when=$("when").value;
+  const q=$("q").value.trim().toLowerCase(), when=$("when").value;
   // Online events are off unless asked for. This site is about being somewhere;
   // a Zoom call that surfaced under "near Nice" is noise until someone opts in.
   const showOnline=$("online").checked;
@@ -877,7 +1080,7 @@ function render(){
   else if(when==="today") to=TODAY;
   else if(when){const e=new Date();e.setDate(e.getDate()+ +when);to=iso(e);}
 
-  const base=EVENTS.filter(e=>(!town||e.town===town)&&overlaps(e,from,to)&&
+  const base=EVENTS.filter(e=>(!townSel.size||townSel.has(e.town))&&overlaps(e,from,to)&&
     (showOnline||!e.online)&&
     (!freeOnly||e.free)&&
     (!q||`${e.title} ${e.town} ${e.venue||""} ${e.note||""}`.toLowerCase().includes(q)));
@@ -912,7 +1115,9 @@ function render(){
   $("s-week").textContent=EVENTS.filter(e=>(showOnline||!e.online)&&
     (!freeOnly||e.free)&&overlaps(e,TODAY,iso(w))).length;
   $("tally").textContent=`${feed.length} listing${feed.length===1?"":"s"}`+
-    (when?" in range":"")+(town?` · ${town}`:"")+(active.size?" · filtered":"")+
+    (when?" in range":"")+
+    (townSel.size===1?` · ${[...townSel][0]}`:townSel.size?` · ${townSel.size} towns`:"")+
+    (active.size?" · filtered":"")+
     (standing.length?` · ${standing.length} exhibition${standing.length===1?"":"s"} on now`:"");
 
   renderExhibs(standing);
@@ -920,17 +1125,20 @@ function render(){
   const list=$("list"); list.innerHTML="";
   if(!pairs.length){list.innerHTML='<div class="empty">Nothing matches those filters.</div>';return;}
 
+  // Built as ONE string and parsed once, rather than createElement +
+  // innerHTML + appendChild per row. The old loop did that ~420 times on a
+  // default view, which is ~420 separate HTML parses and ~420 insertions into a
+  // live, already-styled tree. Same markup, a third of the time.
   let last=null,i=0;
+  const html=[];
   pairs.forEach(([slot,e])=>{
     const ongoing=e.start<slot;
     if(slot!==last){
-      const h=document.createElement("div"); h.className="daymark";
-      h.innerHTML=`<b>${fmtDay(slot)}</b><span>${fmtYr(slot)}</span>`;
-      list.appendChild(h); last=slot;
+      html.push(`<div class="daymark"><b>${fmtDay(slot)}</b><span>${fmtYr(slot)}</span></div>`);
+      last=slot;
     }
     i++;
-    const r=document.createElement("div"); r.className="row"+(e.cancelled?" cancelled":""); r.dataset.fp=e.fingerprint;
-    if(e.fingerprint===HL_FP) r.classList.add("hl");
+    const cls="row"+(e.cancelled?" cancelled":"")+(e.fingerprint===HL_FP?" hl":"");
     const ttl = (e.url && !e.cancelled)
       ? `<a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`
       : `<span class="tt">${esc(e.title)}</span>`;
@@ -940,7 +1148,7 @@ function render(){
     const desc = e.cancelled ? esc(e.cancel_note||"Annulé") : (e.note?esc(e.note):"");
     const tm = (!e.cancelled && e.time) ? `<span class="etime">${esc(e.time)}</span>` : "";
     const sub = (tm && desc) ? `${tm} · ${desc}` : (tm || desc);
-    r.innerHTML=`
+    html.push(`<div class="${cls}" data-fp="${esc(e.fingerprint)}">
       <div class="idx">${String(i).padStart(2,"0")}</div>
       <div>
         <div class="ttl">
@@ -958,14 +1166,17 @@ function render(){
       </div>
       <div class="where"><b>${esc(e.town)}</b>
         <span>${e.venue?esc(e.venue):""}</span></div>
-      <div class="kind">${esc(CATNAME[e.category]||e.category)}</div>`;
-    list.appendChild(r);
+      <div class="kind">${esc(CATNAME[e.category]||e.category)}</div></div>`);
   });
+  list.innerHTML=html.join("");
 }
 
-$("q").oninput=render; $("town").onchange=render; $("when").onchange=render;
+$("q").oninput=render; $("when").onchange=render;
 $("online").onchange=render; $("freeonly").onchange=render;
-$("reset").onclick=()=>{$("q").value="";$("town").value="";$("when").value="30";
+// Reset returns to the page's opening state, which includes Nice — not to a
+// blank slate. Landing on all 109 communes is not what "reset" means here.
+$("reset").onclick=()=>{$("q").value="";$("when").value="30";
+  townSel.clear(); if(TOWNS.includes("Nice")) townSel.add("Nice"); syncTown();
   $("online").checked=false; $("freeonly").checked=false;
   active.clear();
   document.querySelectorAll("#cats .cat").forEach(c=>c.classList.remove("on"));
@@ -1197,6 +1408,7 @@ if(HL_FP){
 // ---- add-event dialog ----
 const dlg = $("dlg");
 $("addbtn").onclick = () => dlg.showModal();
+if ($("add-top")) $("add-top").onclick = () => dlg.showModal();
 $("dlg-close").onclick = () => dlg.close();
 // Click the backdrop to dismiss — the dialog element itself fills the whole
 // viewport, so compare against its content box.
@@ -1716,8 +1928,73 @@ if ("serviceWorker" in navigator) {
       setInterval(() => reg.update(), 60 * 60 * 1000);  // and hourly while open
     }).catch(() => {});
   });
+
+  // The worker now serves the cached page first, so a return visit paints at
+  // once — which means what you are reading may be yesterday's listings. When
+  // the worker finds the copy it handed over is out of date, we say so and
+  // offer a refresh, rather than reloading underneath someone mid-scroll.
+  //
+  // Asked repeatedly rather than waited for, because the timing is a genuine
+  // race and either side can win it. The worker revalidates in the background:
+  // if that finishes before this script has parsed, its push lands in an empty
+  // room; if it finishes after we ask, our question arrives too early. Neither
+  // is predictable — it depends on how fast the network answers versus how long
+  // ~880KB of HTML takes to parse. So ask a few times across the first few
+  // seconds and stop at the first yes. The worker only ever answers yes once.
+  const askIfStale = () => {
+    const sw = navigator.serviceWorker.controller;
+    if (sw) sw.postMessage({ type: "is-stale", url: location.href });
+  };
+  let asks = 0;
+  const asking = setInterval(() => {
+    askIfStale();
+    if (++asks >= 6 || document.getElementById("freshbar")) clearInterval(asking);
+  }, 500);
+  askIfStale();
+
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (!e.data || e.data.type !== "content-updated") return;
+    if (document.getElementById("freshbar")) return;      // only ever one
+    const bar = document.createElement("div");
+    bar.id = "freshbar";
+    bar.innerHTML = '<span>New listings since you last looked.</span>' +
+                    '<button type="button" id="freshgo">Refresh</button>' +
+                    '<button type="button" id="freshno" aria-label="Dismiss">\u2715</button>';
+    document.body.appendChild(bar);
+    document.getElementById("freshgo").onclick = () => location.reload();
+    document.getElementById("freshno").onclick = () => bar.remove();
+  });
 }
 </script>
+{#- ---------------------------------------------------------------------------
+    Structured data lives at the END of the document, not in <head>.
+
+    It is ~80KB, and in <head> it sat between the meta tags and the <style>
+    block — so a browser could not begin styling the page until 84KB had
+    arrived, which on a phone is several round trips of blank screen.
+
+    Last, rather than merely out of <head>: everything above this point is what
+    a reader needs — the CSS, the markup, the event data, and the code that
+    draws it. Anywhere earlier and this block delays the listings behind 80KB
+    that only a crawler reads. JSON-LD is position-independent; Google reads it
+    wherever it sits, and nothing executes it, so nothing waits on it.
+--------------------------------------------------------------------------- #}
+{%- if site_jsonld %}
+{# Describes the SITE, where the Event blocks below describe its contents. This
+   is what lets a result show "What's on in Nice" as a named site rather than a
+   bare domain. #}
+<script type="application/ld+json">{{ site_jsonld|safe }}</script>
+{%- endif %}
+{%- if events_jsonld %}
+<!-- Structured data: the same events the page already shows, described in the
+     vocabulary search engines read (schema.org/Event). This is what makes an
+     event eligible to appear as a date-and-venue card in search results rather
+     than as a line of blue text. Generated in niceevents/site.py from the same
+     rows that render below, so it can never drift from what a reader sees.
+     Covers the next 60 days, capped at 150 events — see _LD_DAYS / _LD_MAX. -->
+<script type="application/ld+json">{{ events_jsonld|safe }}</script>
+{%- endif %}
+
 <!-- Cloudflare Web Analytics — privacy-first, cookieless, no consent banner needed -->
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "30d8a66e7b9144aea404368523a798e1"}'></script>
 <!-- End Cloudflare Web Analytics -->

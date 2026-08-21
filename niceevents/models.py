@@ -29,6 +29,18 @@ CATEGORIES = {
     "autre": "Clubs & other",
 }
 
+# What the SITE calls each category, as opposed to what the scrapers store.
+# "brocante" is folded into "marche" at build time and the merged chip is named
+# for the brocantes rather than the markets — that is the word people search for
+# and the bigger half of what lands in it. Lives here, not in site.py, because
+# the landing pages name the same categories and two copies of this map would
+# drift into calling one category two different things on two pages.
+DISPLAY_CATEGORIES = {
+    "marche": "Brocantes & fêtes",
+    **{k: v for k, v in CATEGORIES.items() if k not in ("brocante", "marche")},
+}
+
+
 # Ordered: FIRST MATCH WINS — order is load-bearing, read before reshuffling.
 #   * expo is ABOVE concert on purpose: nice.fr tags some museum shows with a
 #     hidden "music" type, so "Africa Pop" / "Exposition Lévitation" were landing
