@@ -18,8 +18,10 @@ Listing item shape:
 """
 from __future__ import annotations
 
+import json
 import re
 from datetime import date
+from html import unescape
 from typing import Iterator, Optional
 
 from selectolax.parser import HTMLParser
@@ -28,6 +30,10 @@ from ..models import Event, classify, parse_date
 from .base import HttpScraper, register
 
 BASE = "https://www.explorenicecotedazur.com"
+
+#: The detail page carries what the listing card omits.
+_LD_RE = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
+_ADDR_RE = re.compile(r'itemprop="address"[^>]*>(.*?)</p>', re.S)
 
 FEEDS = [
     ("/en/events/all-events/", 61),
@@ -114,7 +120,88 @@ class ExploreNCA(HttpScraper):
             ev = self._event(title, href, block, today)
             if ev and ev.fingerprint not in seen:
                 seen.add(ev.fingerprint)
+                extra = self._detail(ev.url, ev.start)
+                if extra:
+                    ev.venue = extra.get("venue") or ev.venue
+                    ev.time = extra.get("time") or ev.time
+                    ev.note = extra.get("note") or ev.note
                 yield ev
+
+    def _detail(self, url: str, start: date) -> dict:
+        """Venue, start time and description, read off the event's own page.
+
+        The listing card carries only a title, a date range, a town and a couple
+        of type labels, so until now every one of these ~420 events reached the
+        site with no venue, no time and a description like "Theme evenings DJ".
+        On the page all three are right there, and in structured form: the
+        JSON-LD block has `description`, a `PostalAddress`, and an
+        `openingHoursSpecification` per date with real opening and closing times.
+
+        Costs one request per event. That is the price of the data existing only
+        on the detail page; `delay` still applies, so the crawl stays polite.
+        Anything that fails here degrades to the listing-only event rather than
+        losing it.
+        """
+        r = self.get(url)
+        if not r:
+            return {}
+        html = r.text
+        ld: dict = {}
+        for raw in _LD_RE.findall(html):
+            try:
+                obj = json.loads(raw.strip())
+            except Exception:
+                continue
+            if isinstance(obj, dict) and obj.get("name"):
+                ld = obj
+                break
+
+        out: dict = {}
+        desc = re.sub(r"\s+", " ", (ld.get("description") or "")).strip()
+        if len(desc) >= 15:
+            out["note"] = desc
+
+        addr = ld.get("address") if isinstance(ld.get("address"), dict) else {}
+        street = (addr.get("streetAddress") or "").strip()
+        # The visible address line is "<venue name> <street> <postcode> <town>",
+        # and only the venue name is missing from the JSON-LD. Subtract the parts
+        # we already know and whatever leads is the name.
+        venue = ""
+        m = _ADDR_RE.search(html)
+        if m:
+            txt = unescape(re.sub(r"<[^>]+>", " ", m.group(1)))
+            txt = re.sub(r"\s+", " ", txt).strip()
+            for known in (street, addr.get("postalCode") or "", addr.get("addressLocality") or ""):
+                if known:
+                    txt = txt.replace(known, " ")
+            venue = re.sub(r"\s+", " ", txt).strip(" ,-")
+            # Some pages carry no streetAddress in the JSON-LD, so nothing was
+            # subtracted and the whole address survives as the "venue":
+            # "Plage Bocca Mar 15 Promenade des Anglais 06000 Nice". A postcode
+            # is the tell that an address is still attached; cut at the street
+            # number ahead of it. Guarded on the postcode so a venue that is
+            # legitimately numbered ("Le 109", "Isola 2000") is left alone.
+            if re.search(r"\b\d{5}\b", venue):
+                num = re.search(r"\s+\d+\s+\S", venue)
+                cut = num.start() if num else re.search(r"\s*\b\d{5}\b", venue).start()
+                venue = venue[:cut].strip(" ,-")
+        if venue or street:
+            out["venue"] = (venue or street)[:120]
+
+        # One spec per date. Pick the one covering this event's start, so a
+        # summer-long run gets the hours for the night being listed.
+        spec = ld.get("openingHoursSpecification")
+        specs = spec if isinstance(spec, list) else ([spec] if isinstance(spec, dict) else [])
+        iso = start.isoformat()
+        for s in specs:
+            if not isinstance(s, dict):
+                continue
+            opens = (s.get("opens") or "")[:5]
+            vf, vt = s.get("validFrom"), s.get("validThrough")
+            if opens and (not vf or not vt or vf <= iso <= vt):
+                out["time"] = opens
+                break
+        return out
 
     def _event(self, title: str, href: str, block: str, today: date) -> Optional[Event]:
         m = _DATE_PAIR.search(block)
