@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from niceevents.models import Event
 from niceevents.scrapers.explore_nca import ExploreNCA
 
 
@@ -78,3 +79,52 @@ def test_a_page_that_fails_to_load_loses_nothing():
 
 def test_junk_json_ld_does_not_raise():
     assert _detail('<script type="application/ld+json">{ not json </script>') == {}
+
+
+# ------------------------------------------------------------ the crawl budget
+#
+# Enriching all ~420 events blew the job's 45 minute timeout on 2026-08-21 and
+# GitHub cancelled the run. The detail crawl is bounded two ways now.
+
+from datetime import timedelta
+
+
+def _harness(starts, monkeypatch):
+    """Run fetch() over a fake listing and record which events got enriched."""
+    from niceevents.scrapers import explore_nca as mod
+    s = ExploreNCA.__new__(ExploreNCA)
+    evs = [Event(title=f"E{i}", start=d, town="Nice",
+                 url=f"https://x.invalid/{i}", source="explore_nca")
+           for i, d in enumerate(starts)]
+    s.get = lambda url, **kw: _Resp("")
+    monkeypatch.setattr(mod, "FEEDS", [("/p/", 1)])
+    monkeypatch.setattr(ExploreNCA, "_parse", lambda self, html: iter(evs))
+    hit = []
+    monkeypatch.setattr(ExploreNCA, "_detail",
+                        lambda self, url, start: hit.append(url) or {})
+    out = list(s.fetch())
+    return out, hit
+
+
+def test_far_future_events_are_published_but_not_enriched(monkeypatch):
+    from niceevents.models import Event as _E
+    today = date.today()
+    starts = [today + timedelta(days=5), today + timedelta(days=400)]
+    out, hit = _harness(starts, monkeypatch)
+    assert len(out) == 2, "everything is still published"
+    assert len(hit) == 1, "only the near one costs a request"
+
+
+def test_the_hard_cap_holds_even_inside_the_horizon(monkeypatch):
+    today = date.today()
+    starts = [today + timedelta(days=i % 100) for i in range(400)]
+    out, hit = _harness(starts, monkeypatch)
+    assert len(out) == 400
+    assert len(hit) == ExploreNCA.MAX_DETAIL
+
+
+def test_the_budget_goes_to_the_soonest_events(monkeypatch):
+    today = date.today()
+    starts = [today + timedelta(days=d) for d in (90, 1, 45)]
+    out, hit = _harness(starts, monkeypatch)
+    assert hit == ["https://x.invalid/1", "https://x.invalid/2", "https://x.invalid/0"]

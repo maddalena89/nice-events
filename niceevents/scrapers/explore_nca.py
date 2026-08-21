@@ -19,8 +19,9 @@ Listing item shape:
 from __future__ import annotations
 
 import json
+import logging
 import re
-from datetime import date
+from datetime import date, timedelta
 from html import unescape
 from typing import Iterator, Optional
 
@@ -28,6 +29,8 @@ from selectolax.parser import HTMLParser
 
 from ..models import Event, classify, parse_date
 from .base import HttpScraper, register
+
+log = logging.getLogger(__name__)
 
 BASE = "https://www.explorenicecotedazur.com"
 
@@ -54,9 +57,33 @@ class ExploreNCA(HttpScraper):
     delay = 1.2
     #: hard cap so a pagination bug can't spider the whole site
     MAX_PAGES = 61
+    #: Only events starting within this many days get a detail fetch.
+    DETAIL_DAYS = 120
+    #: And never more than this many per run, whatever the horizon says.
+    #: 200 x 1.2s delay is about 4 minutes of the job's 45 minute budget.
+    MAX_DETAIL = 200
 
     def fetch(self) -> Iterator[Event]:
+        """Crawl the listings, then enrich a BOUNDED slice of them.
+
+        Enriching every event cost one request each and killed the run: with
+        ~420 events at `delay`, the scrape job blew its 45 minute budget and
+        GitHub cancelled it (which it reports as "cancelled", not a timeout).
+        That would have failed the same way at 04:00 every morning.
+
+        So the detail crawl is capped two ways, and both matter:
+
+        * a horizon, because an event ten months out does not need its venue
+          today and will be enriched on some later run as it comes closer;
+        * a hard cap, so a listing that suddenly doubles cannot re-break the
+          build.
+
+        Soonest first, so the budget always goes to the events on the page
+        people are actually looking at. Everything else is still published,
+        just with listing-only fields until its turn comes.
+        """
         seen: set[str] = set()
+        events: list[Event] = []
         for path, pages in FEEDS:
             for page in range(1, min(pages, self.MAX_PAGES) + 1):
                 url = f"{BASE}{path}" if page == 1 else f"{BASE}{path}page/{page}/"
@@ -69,9 +96,21 @@ class ExploreNCA(HttpScraper):
                     if ev.fingerprint in seen:
                         continue
                     seen.add(ev.fingerprint)
-                    yield ev
+                    events.append(ev)
                 if found == 0:
                     break  # ran past the last page
+
+        horizon = date.today() + timedelta(days=self.DETAIL_DAYS)
+        near = sorted((e for e in events if e.start <= horizon),
+                      key=lambda e: e.start)[: self.MAX_DETAIL]
+        for ev in near:
+            extra = self._detail(ev.url, ev.start)
+            if extra:
+                ev.venue = extra.get("venue") or ev.venue
+                ev.time = extra.get("time") or ev.time
+                ev.note = extra.get("note") or ev.note
+        log.info("%s: enriched %d of %d events", self.name, len(near), len(events))
+        yield from events
 
     def _parse(self, html: str) -> Iterator[Event]:
         tree = HTMLParser(html)
@@ -120,11 +159,6 @@ class ExploreNCA(HttpScraper):
             ev = self._event(title, href, block, today)
             if ev and ev.fingerprint not in seen:
                 seen.add(ev.fingerprint)
-                extra = self._detail(ev.url, ev.start)
-                if extra:
-                    ev.venue = extra.get("venue") or ev.venue
-                    ev.time = extra.get("time") or ev.time
-                    ev.note = extra.get("note") or ev.note
                 yield ev
 
     def _detail(self, url: str, start: date) -> dict:
