@@ -88,3 +88,87 @@ def test_the_stem_is_deliberately_broad():
     # somebody to a closed door. cancellations.py made the same call, and the two
     # must agree or the marker gets flagged in one place and kept in the other.
     assert _fp("Expo Annulaire") == _fp("Expo")
+
+
+# --------------------------------------------------------------- the merge step
+#
+# 21 August 2026. harvest resolved the RECURRENCE-ID overrides correctly and
+# yielded both Casita nights with "(ANNULÉE)" in the title, and the site still
+# advertised both as on. The marker was thrown away one layer further down, by
+# the title merge in db.upsert: _better_title scores titles for readability, and
+# a cancellation retitle loses that contest. Two different ways, which is why
+# raising the caps threshold alone would not have fixed it.
+
+from niceevents.db import _better_title
+
+
+def test_a_shouted_cancellation_beats_a_tidy_live_title():
+    """75% caps, so the SHOUTING rule scored it +10 and the clean title won."""
+    assert _better_title(
+        "(ANNULÉE) MILONGA DE L'AMITIE à la Casita",
+        "Milonga de L'AMITIE à la Casita",
+    ).startswith("(ANNULÉE)")
+
+
+def test_a_cancellation_that_ties_still_beats_the_incumbent():
+    """Both score 0, and on a tie the incumbent wins. The 27 Aug Casita."""
+    assert _better_title(
+        '(ANNULÉE) MILONGA précédée d\'une Pràctica "Jeudi c\'est permis !" à la Casita',
+        'MILONGA précédée d\'une Pràctica "Jeudi c\'est permis !" à la Casita',
+    ).startswith("(ANNULÉE)")
+
+
+def test_dropping_the_marker_is_not_forced():
+    """A calendar removing (ANNULÉE) means the night is back on. Leaving a live
+    event struck through is the same harm as advertising a cancelled one, so
+    this direction falls through to ordinary scoring."""
+    assert _better_title(
+        "Milonga de L'AMITIE à la Casita",
+        "(ANNULÉE) MILONGA DE L'AMITIE à la Casita",
+    ) == "Milonga de L'AMITIE à la Casita"
+
+
+def test_readability_scoring_still_applies_when_neither_is_cancelled():
+    assert _better_title(
+        "BROCANTE DU COURS SALEYA (Gratuit)", "Brocante du Cours Saleya"
+    ) == "Brocante du Cours Saleya"
+
+
+# --------------------------------------------------- the hand-maintained list
+#
+# The list is written by a person reading a poster, who types "milonga de l
+# amitie", not "milonga de l'amitie". Matching on the folded title kept the
+# apostrophe, so such a line never matched anything and looked like it worked.
+# The 25 July 2026 entry had been dead on arrival.
+
+from niceevents.cancellations import CANCELLED, mark_cancelled as mc
+
+
+def _row(title, town="Nice", start="2026-08-22"):
+    return {"title": title, "town": town, "start": start}
+
+
+def test_a_needle_written_without_apostrophes_matches():
+    got = mc([_row("Milonga de L'AMITIE à la Casita")])[0]
+    assert got["cancelled"] is True
+
+
+def test_the_list_still_needs_the_right_town_and_date():
+    assert "cancelled" not in mc([_row("Milonga de L'AMITIE à la Casita", town="Cannes")])[0]
+    assert "cancelled" not in mc([_row("Milonga de L'AMITIE à la Casita", start="2026-09-26")])[0]
+
+
+def test_a_later_repeat_of_a_cancelled_series_stays_live():
+    """Only the named date is off. 3 Sept is the same weekly milonga, still on."""
+    t = 'MILONGA précédée d\'une Pràctica "Jeudi c\'est permis !" à la Casita'
+    assert mc([_row(t, start="2026-08-27")])[0]["cancelled"] is True
+    assert "cancelled" not in mc([_row(t, start="2026-09-03")])[0]
+
+
+def test_every_line_in_the_list_is_reachable():
+    """A needle that matches nothing is a typo, and a silent one. Assert each
+    line can still match the title it was written for."""
+    from niceevents.cancellations import _loose
+    for needle, town, cdate, _note in CANCELLED:
+        assert _loose(needle), f"empty needle for {town} {cdate}"
+        assert _loose(needle) in _loose(f"prefix {needle} suffix"), needle

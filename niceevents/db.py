@@ -16,6 +16,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
+from .cancellations import _fold, _SAYS_CANCELLED
 from .models import Event, _title_key, slugify
 
 SCHEMA = """
@@ -113,7 +114,31 @@ def _better_title(new: str, old: str) -> str:
     "Brocante du Cours Saleya" on length while being clearly worse. Score on
     shoutiness and badge noise instead, and keep the incumbent on a tie so
     titles don't churn between runs.
+
+    EXCEPT when the new title says the event is cancelled and the stored one
+    does not. Readability is a preference; that is a fact, and it is the only
+    signal the site ever gets, because a calendar cancels a night by RETITLING
+    it. Scoring ate both halves of the Casita pair on 21 August 2026 and neither
+    was the shouting rule alone:
+
+        "(ANNULÉE) MILONGA DE L'AMITIE à la Casita"     75% caps -> +10, lost
+        "(ANNULÉE) MILONGA précédée d'une Pràctica …"   29% caps -> tie, lost
+
+    The second is why raising the caps threshold would not have been enough: on
+    a tie the incumbent wins, so the marker lost to a rule meant to stop titles
+    churning. The scraper had done its job (harvest resolves the RECURRENCE-ID
+    override correctly and yields the marked title); this function threw the
+    marker away on every run, so the row could never become cancelled once it
+    had been stored clean.
+
+    Only in that direction. A title that DROPS the marker is a calendar saying
+    the night is back on, and the same reasoning that forbids advertising a
+    cancelled event forbids leaving a live one struck through, so that case
+    falls through to normal scoring.
     """
+    if _SAYS_CANCELLED.search(_fold(new)) and not _SAYS_CANCELLED.search(_fold(old)):
+        return new
+
     def penalty(t: str) -> int:
         letters = [c for c in t if c.isalpha()]
         upper_ratio = sum(c.isupper() for c in letters) / max(len(letters), 1)
