@@ -100,9 +100,22 @@ class ExploreNCA(HttpScraper):
                 if found == 0:
                     break  # ran past the last page
 
-        horizon = date.today() + timedelta(days=self.DETAIL_DAYS)
-        near = sorted((e for e in events if e.start <= horizon),
-                      key=lambda e: e.start)[: self.MAX_DETAIL]
+        today = date.today()
+        horizon = today + timedelta(days=self.DETAIL_DAYS)
+        # Order matters as much as the cap. Sorting on `start` alone spent the
+        # whole budget on exhibitions: a run that opened in March sorts ahead of
+        # a concert next Tuesday, and a run has opening hours rather than a
+        # start time, so those requests bought venues and descriptions but no
+        # times at all (8 of 152 on the first live run).
+        #
+        # So: single-day events first, because they are the ones carrying a
+        # start time and the ones that are gone if you miss them; then by when
+        # the event is next actually on, which for something already running is
+        # today rather than the date it opened.
+        near = sorted(
+            (e for e in events if e.start <= horizon),
+            key=lambda e: (bool(e.end), max(e.start, today)),
+        )[: self.MAX_DETAIL]
         for ev in near:
             extra = self._detail(ev.url, ev.start)
             if extra:

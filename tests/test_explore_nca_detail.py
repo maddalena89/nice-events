@@ -128,3 +128,26 @@ def test_the_budget_goes_to_the_soonest_events(monkeypatch):
     starts = [today + timedelta(days=d) for d in (90, 1, 45)]
     out, hit = _harness(starts, monkeypatch)
     assert hit == ["https://x.invalid/1", "https://x.invalid/2", "https://x.invalid/0"]
+
+
+def test_single_day_events_get_the_budget_before_long_runs(monkeypatch):
+    """A run that opened in March has opening hours, not a start time, and used
+    to sort ahead of a concert next week purely because it started earlier."""
+    from niceevents.scrapers import explore_nca as mod
+    today = date.today()
+    s = ExploreNCA.__new__(ExploreNCA)
+    run = Event(title="Expo", start=today - timedelta(days=150),
+                end=today + timedelta(days=30), town="Nice",
+                url="https://x.invalid/run", source="explore_nca")
+    gig = Event(title="Gig", start=today + timedelta(days=7), town="Nice",
+                url="https://x.invalid/gig", source="explore_nca")
+    s.get = lambda url, **kw: _Resp("")
+    monkeypatch.setattr(mod, "FEEDS", [("/p/", 1)])
+    monkeypatch.setattr(ExploreNCA, "_parse", lambda self, html: iter([run, gig]))
+    monkeypatch.setattr(ExploreNCA, "MAX_DETAIL", 1)
+    hit = []
+    monkeypatch.setattr(ExploreNCA, "_detail",
+                        lambda self, url, start: hit.append(url) or {})
+    out = list(s.fetch())
+    assert len(out) == 2
+    assert hit == ["https://x.invalid/gig"]
