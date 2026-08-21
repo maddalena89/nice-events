@@ -41,6 +41,10 @@ _SKIP_CHIPS = {"accessible pmr", "gratuit"}
 _VENUE_COMMUNE = {
     "maison departementale de l'environnement": "Nice",  # the DOME, Parc Phoenix
     "dome": "Nice",
+    # 50 bd Saint-Roch, 06300 Nice — confirmed against the departement's own
+    # directory. The agenda page for these events names the hall and no commune,
+    # so without this its ~9 events land under a town called "Espace Laure Ecard".
+    "espace laure ecard": "Nice",
 }
 
 
