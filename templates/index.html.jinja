@@ -224,6 +224,9 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .ttl a:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .sub{font-size:12.5px;color:var(--muted);margin-top:4px}
 .sub .etime{font-weight:700;color:var(--ink)}
+/* Price rides alongside the time. Same weight as the time so the pair reads
+   as one unit, but not the ink colour: what it costs is secondary to when. */
+.sub .eprice{font-weight:700}
 .where{font-size:12.5px}
 .where b{display:block;font-weight:600}
 .where span{color:var(--muted)}
@@ -1106,7 +1109,18 @@ function render(){
   const expand=active.size>0;
   const pairs=[];
   feed.forEach(e=>occurrences(e,from,to,expand).forEach(day=>pairs.push([day,e])));
+  // Within a day: by START TIME, then town, then title. Sorting by town first
+  // read as alphabetical-by-title to anyone looking at it, because the day's
+  // rows arrived 20:00, 21:00, 14:30, 11:00 down the screen. A what's-on list
+  // is read in the order the evening happens.
+  //
+  // Events with no time sort LAST, not as 00:00. An unknown time is not
+  // midnight (see feed-schema), and floating them to the top of the day pushes
+  // the events someone can actually plan around off the first screen.
+  const NO_TIME = "99:99";
+  const slotTime = e => (e.time && e.time !== "00:00") ? e.time : NO_TIME;
   pairs.sort((a,b)=>a[0].localeCompare(b[0])||
+    slotTime(a[1]).localeCompare(slotTime(b[1]))||
     a[1].town.localeCompare(b[1].town,"fr")||a[1].title.localeCompare(b[1].title));
 
   const w=new Date(); w.setDate(w.getDate()+7);
@@ -1147,7 +1161,11 @@ function render(){
     // what used to be baked inconsistently into the note text.
     const desc = e.cancelled ? esc(e.cancel_note||"Annulé") : (e.note?esc(e.note):"");
     const tm = (!e.cancelled && e.time) ? `<span class="etime">${esc(e.time)}</span>` : "";
-    const sub = (tm && desc) ? `${tm} · ${desc}` : (tm || desc);
+    // Price sits with the time, because "when and how much" is one question.
+    // Suppressed on a free event: the Free pill already says it, and "Free · 0 €"
+    // is worse than either alone.
+    const pr = (!e.cancelled && !e.free && e.price) ? `<span class="eprice">${esc(e.price)}</span>` : "";
+    const sub = [tm, pr, desc].filter(Boolean).join(" · ");
     html.push(`<div class="${cls}" data-fp="${esc(e.fingerprint)}">
       <div class="idx">${String(i).padStart(2,"0")}</div>
       <div>
