@@ -346,6 +346,17 @@ _KEEP_CAPS = {
     "DJ", "MC", "VIP", "AI", "IA", "EDM", "NFT", "XXL", "B2B", "VO", "VF",
     "MAMAC", "TNN", "OGC", "FC", "PACA", "MJC", "CCAS", "SNCF", "CNRS",
     "UNESCO", "LGBT", "LGBTQ", "UK", "USA", "CD", "DVD", "EP", "BD",
+    # Added 2026-08-21, when de-shouting moved from whole titles to single
+    # words. Taken from the words the change actually altered across the live
+    # feed, not guessed: every one of these has a vowel and so survives the
+    # no-vowel acronym rule on its own.
+    #
+    # This list only has to cover acronyms WITH vowels that are short enough to
+    # look like words. If a new one slips through, the symptom is cosmetic — an
+    # acronym rendered "Amsl" — so add it here rather than loosening the rule
+    # and letting the page go back to shouting.
+    "SOS", "JEP", "UTMB", "AMSL", "CIAP", "ESF", "AMA", "TAAC", "DAEU", "PAI",
+    "UNAFAM", "CRESP", "EAC", "SCO", "EYM", "OVN", "REF", "LEC", "UVIA", "UMA",
 }
 _ROMAN_RE = re.compile(r"^[IVXLCDM]+$")
 _VOWEL_RE = re.compile(r"[AEIOUYÀÂÄÉÈÊËÎÏÔÖÙÛÜ]", re.I)
@@ -406,6 +417,109 @@ def _deshout(t: str) -> str:
     )
 
 
+#: One shouted WORD inside an otherwise normal title. Three or more letters, so
+#: "DJ", "FC", "VO", "MC" are never candidates on length alone. Three rather
+#: than four because "ROOF TOP" came out "Roof TOP" otherwise, and the
+#: three-letter acronyms that matter are covered either by `_KEEP_CAPS` (VIP,
+#: EDM, USA) or by the no-vowel rule (OGC, TNN, MJC, SNCF).
+_SHOUTED_WORD = re.compile(r"[A-ZÀ-ÖØ-Þ]{3,}")
+
+
+def _unshout_words(t: str) -> str:
+    """Lower-case the shouted words in a title that is not shouted overall.
+
+    `_deshout` only fires at 60 percent capitals, which is the right threshold
+    for a title yelled end to end. It leaves the far commoner case untouched:
+    one word in caps inside an ordinary title. The page was showing
+    'MILONGA "El Gato Tanguero" aux Amarras', 'Soirées MUSIC - Les Canailles',
+    'Milonga de L'AMITIE à la Casita' and 'Language Exchange ROOF TOP'.
+
+    Same guards as `_deshout`, for the same reason: acronyms must survive. OGC,
+    TNN, SNCF and friends are either in `_KEEP_CAPS` or have no vowel, and a
+    four-letter minimum keeps FC and DJ out of range entirely.
+    """
+    def fix(m: re.Match) -> str:
+        w = m.group(0)
+        if w in _KEEP_CAPS or _ROMAN_RE.match(w) or not _VOWEL_RE.search(w):
+            return w
+        return w[0] + w[1:].lower()
+
+    return _SHOUTED_WORD.sub(fix, t)
+
+
+#: A clock time sitting in a title: "12h30", "19H", "20:00", "9h00".
+#: Anchored to a word boundary on both sides so a date ("2026"), a house number
+#: or an edition number ("Apéro 20") is never read as a time.
+#: Minutes are optional after "h" ("20h" is a time people write) but REQUIRED
+#: after a colon. "Walk & Talk 1 : « Je voudrais… »" is an edition number and a
+#: separator, and reading it as 01:00 sorted that event to the top of the day.
+#: A lone colon is punctuation far more often than it is a clock.
+_TITLE_TIME = re.compile(
+    r"(?<![\w:.])(?:à\s+|at\s+|@\s*)?"
+    r"(?:(\d{1,2})\s*[hH]\s*(\d{2})?|(\d{1,2})\s*:\s*(\d{2}))(?![\d\w])")
+
+
+def _time_from_title(title: str, stored: str | None) -> tuple[str, Optional[str]]:
+    """Lift a start time out of a title. Returns (title without it, time or None).
+
+    Sources that have no time field put the time in the name instead:
+    "Saturday Morning Yoga 12h30 (at Espace Rancher!)". The page then shows a
+    listing with no time next to one that has it, and the same information
+    formatted two different ways on the same screen.
+
+    Only ever fills a GAP. A stored time always wins, because it came from a
+    structured field and the title is the guess. If the two disagree the title
+    is simply left alone rather than silently corrected: that is a data problem
+    worth seeing in the health check, not something to paper over here.
+    """
+    m = _TITLE_TIME.search(title or "")
+    if not m:
+        return title, stored
+    hh = int(m.group(1) or m.group(3))
+    mm = int(m.group(2) or m.group(4) or 0)
+    if not (0 <= hh <= 23 and 0 <= mm <= 59):
+        return title, stored
+    found = f"{hh:02d}:{mm:02d}"
+    if stored and stored != "00:00" and stored != found:
+        return title, stored                     # disagreement: change nothing
+    stripped = (title[: m.start()] + " " + title[m.end():])
+    stripped = re.sub(r"\s+", " ", stripped)
+    # "Yoga 12h30 (at Espace Rancher)" -> "Yoga (at Espace Rancher)", and
+    # "Yoga à 12h30" must not keep a dangling "à".
+    stripped = re.sub(r"\s+([-–—·:,])\s*$", "", stripped).strip(" -–—·:,")
+    if len([c for c in stripped if c.isalpha()]) < 3:
+        return title, found                      # title was mostly the time
+    return stripped, found
+
+
+#: Brackets and quotes that must come in pairs.
+_PAIRS = (("(", ")"), ("[", "]"), ("«", "»"))
+
+
+def _close_brackets(t: str) -> str:
+    """Close what a source left open, or drop the opener if nothing follows.
+
+    Meetup titles are typed by hand into a box with no validation, so they
+    arrive like "Saturday Morning Yoga 12h30 (at Espace Rancher!" — an opening
+    bracket and no close. Rendering that verbatim makes the whole page look
+    broken, and it is the one formatting fault a reader is guaranteed to notice.
+
+    Unmatched CLOSERS are left alone: ")" after a word is usually a list marker
+    or a smiley, and inventing an opener for it would be a guess.
+    """
+    for open_c, close_c in _PAIRS:
+        missing = t.count(open_c) - t.count(close_c)
+        if missing <= 0:
+            continue
+        # An opener with nothing after it is noise; one with content is a real
+        # parenthetical that simply lost its close.
+        if t.rstrip().endswith(open_c):
+            t = t.rstrip()[: -len(open_c)].rstrip()
+        else:
+            t = t.rstrip().rstrip("!?.,;:") + close_c * missing
+    return t
+
+
 def _clean_title(t: str) -> str:
     t = _DASH_RE.sub(" - ", _tidy_text(t))
     t = _EMOJI_RE.sub(" ", t)
@@ -414,7 +528,9 @@ def _clean_title(t: str) -> str:
     # Only a separator standing on its own goes: "... | 2/-" keeps its hyphen.
     t = re.sub(r"^[-–—·|]+\s*", "", t)
     t = re.sub(r"\s+[-–—·|]+$", "", t)
-    return _deshout(t.strip())
+    t = _deshout(t.strip())
+    t = _unshout_words(t)
+    return _close_brackets(t).strip()
 
 
 # The note column is a grab-bag: many scrapers prefix it with the time and a
@@ -797,8 +913,10 @@ def _site_jsonld(base: str) -> str:
 #: public API and should stay complete — but shipping them inline costs every
 #: visitor parse time and memory for data no code path touches. Checked against
 #: the template: "source" appears there only as an element id, and "recurring"
-#: and "price" not at all.
-_PAGE_DROP_FIELDS = ("source", "recurring", "price")
+#: and "recurring" not at all. "price" moved OUT of this list on 2026-08-21: the
+#: page now shows it next to the time, so a paid event says what it costs
+#: instead of looking identical to a free one that has no Free pill yet.
+_PAGE_DROP_FIELDS = ("source", "recurring")
 
 
 def _page_events(events: list[dict]) -> list[dict]:
@@ -857,7 +975,10 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     active = [e for e in dicts if not e.get("cancelled")]
     events = _collapse_recurring(_collapse_overlaps(active)) + cancelled
     for e in events:                      # no em dashes in any displayed title
-        e["title"] = _clean_title(e.get("title", ""))
+        title, when = _time_from_title(e.get("title", ""), e.get("time"))
+        e["title"] = _clean_title(title)
+        if when:
+            e["time"] = when
     _assign_slugs(events)                 # stable, unique short link per event
     stats = db.stats(conn)
 

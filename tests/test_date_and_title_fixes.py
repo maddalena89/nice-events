@@ -191,11 +191,32 @@ def test_a_shouted_name_gets_its_case_back():
     )
 
 
-def test_a_mostly_lowercase_title_is_left_alone():
-    # Under the threshold: one capitalised word is a name, not shouting.
-    assert _clean_title("MILONGA de la Liberté") == "MILONGA de la Liberté"
+def test_a_single_shouted_word_is_de_shouted_too():
+    """CHANGED 2026-08-21: no word on the page is left in caps.
+
+    This used to assert the opposite — "MILONGA de la Liberté" was deliberately
+    left alone, on the reasoning that one capitalised word is a name rather than
+    shouting. On the page it did not read that way. A day's rows carried
+    'MILONGA "El Gato Tanguero"', 'Soirées MUSIC', "Milonga de L'AMITIE" and
+    'Language Exchange ROOF TOP', each shouting a different word, and the list
+    looked like four sources rather than one site.
+
+    Acronyms are still protected, which is the whole reason this is a word-level
+    rule with guards and not a blanket .title() call.
+    """
+    assert _clean_title("MILONGA de la Liberté") == "Milonga de la Liberté"
+    assert _clean_title('MILONGA "El Gato Tanguero" aux Amarras') == (
+        'Milonga "El Gato Tanguero" aux Amarras'
+    )
+    assert _clean_title("Soirées MUSIC - Les Canailles") == "Soirées Music - Les Canailles"
+
+
+def test_an_ordinary_title_is_untouched():
     assert _clean_title("Arrivée du Tour de France Femmes à Nice") == (
         "Arrivée du Tour de France Femmes à Nice"
+    )
+    assert _clean_title("Match Ligue 1 - OGC NICE / FC Lorient") == (
+        "Match Ligue 1 - OGC Nice / FC Lorient"      # OGC and FC survive
     )
 
 
@@ -264,3 +285,74 @@ def test_a_second_source_cannot_wipe_what_it_does_not_know():
         row = conn.execute("SELECT end, free FROM events").fetchone()
         assert row["end"] == "2026-08-11"
         assert row["free"]
+
+
+# ------------------------------------------------- unclosed brackets and times
+#
+# 21 August 2026, from the live page. Meetup titles are typed by hand into a box
+# with no validation, so they arrive unfinished and with the start time in the
+# name instead of the time field.
+
+from niceevents.site import _close_brackets, _time_from_title
+
+
+def test_an_unclosed_bracket_is_closed():
+    assert _clean_title("Saturday Morning Yoga (at Espace Rancher!") == (
+        "Saturday Morning Yoga (at Espace Rancher)"
+    )
+    assert _close_brackets("Concert [jazz") == "Concert [jazz]"
+    assert _close_brackets("Expo « Lumière") == "Expo « Lumière»"
+
+
+def test_a_trailing_opener_with_nothing_after_it_is_dropped():
+    assert _close_brackets("Brocante du Cours Saleya (") == "Brocante du Cours Saleya"
+
+
+def test_a_balanced_title_and_a_stray_closer_are_untouched():
+    assert _close_brackets("Soirée (complet)") == "Soirée (complet)"
+    assert _close_brackets("Atelier 2) suite") == "Atelier 2) suite"
+
+
+def test_a_time_in_the_title_moves_to_the_time_field():
+    assert _time_from_title("Saturday Morning Yoga 12h30", None) == (
+        "Saturday Morning Yoga", "12:30")
+    assert _time_from_title("Concert à 20h", None) == ("Concert", "20:00")
+
+
+def test_a_number_that_is_not_a_time_is_left_where_it_is():
+    assert _time_from_title("Apéro 20", None) == ("Apéro 20", None)
+    assert _time_from_title("Rétrospective 2026", None) == ("Rétrospective 2026", None)
+
+
+def test_a_stored_time_always_wins():
+    """The title is a guess; a time field came from structured data. On a
+    disagreement, change nothing — that is a data fault worth seeing."""
+    assert _time_from_title("Yoga 12h30", "19:00") == ("Yoga 12h30", "19:00")
+    assert _time_from_title("Yoga 12h30", "00:00") == ("Yoga", "12:30")   # 00:00 = unknown
+
+
+def test_a_title_that_is_only_a_time_keeps_its_text():
+    assert _time_from_title("12h30", None) == ("12h30", "12:30")
+
+
+def test_acronyms_with_vowels_survive_word_level_deshouting():
+    """The no-vowel rule cannot save these, so they are in _KEEP_CAPS. Taken
+    from the words the change actually altered across the live feed."""
+    for t, keep in [
+        ("Expositions AMSL Aquarelle", "AMSL"),
+        ("Free Startup Office Hours AMA", "AMA"),
+        ("Trail UTMB 2026", "UTMB"),
+        ("Permanence UNAFAM", "UNAFAM"),
+        ("Journées JEP au CIAP", "JEP"),
+    ]:
+        assert keep in _clean_title(t), f"{keep} lost in {_clean_title(t)!r}"
+
+
+def test_a_colon_without_minutes_is_not_a_time():
+    """"Walk & Talk 1 : « … »" is an edition number and a separator. Reading it
+    as 01:00 sorted that event to the very top of its day."""
+    t = "Walk & Talk 1 : « Je voudrais tellement rencontrer des gens comme moi »"
+    assert _time_from_title(t, None) == (t, None)
+    assert _time_from_title("Atelier 3 : les bases", None) == ("Atelier 3 : les bases", None)
+    # but "h" without minutes IS a time people write
+    assert _time_from_title("Concert à 20h", None) == ("Concert", "20:00")
