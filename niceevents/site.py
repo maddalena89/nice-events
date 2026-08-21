@@ -549,7 +549,12 @@ def _row_to_dict(r: sqlite3.Row) -> dict:
     # Normalise the description: tidy entities/unicode, drop the redundant
     # time+category prefix, infer free/paid from the full text, then keep it short.
     full = _note_full(d.get("note"))
-    if not d["free"] and _FREE_POS.search(full) and not _PRICE.search(full):
+    # Infer free/paid from the title as well as the note: some sources put
+    # "gratuit" only in the title ("Visite libre et gratuite …") and left the
+    # flag unset. The _PRICE veto still applies to the combined text, so a stated
+    # price anywhere wins over a stray "gratuit".
+    free_hay = f"{d.get('title', '')} {full}"
+    if not d["free"] and _FREE_POS.search(free_hay) and not _PRICE.search(free_hay):
         d["free"] = True
     d["note"] = _shorten(full)
 

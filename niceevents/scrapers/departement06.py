@@ -19,7 +19,7 @@ from typing import Iterator, Optional
 
 from selectolax.parser import HTMLParser
 
-from ..models import Event, canon_town, classify, is_nonevent
+from ..models import Event, canon_town, classify, is_nonevent, strip_accents
 from .base import HttpScraper, register
 
 log = logging.getLogger(__name__)
@@ -33,6 +33,34 @@ _HHMM = re.compile(r"^\d{1,2}:\d{2}$")
 # Category chips that are service/accessibility tags, not a genre. Kept out of
 # the note so it reads "festival · genre", not "... · Accessible PMR".
 _SKIP_CHIPS = {"accessible pmr", "gratuit"}
+
+# A few departmental venues publish only the venue name in the "Lieu :" line,
+# with no commune, so the town field would otherwise carry venue text. Map the
+# venue (matched as an accent-folded substring) to its commune. Keep this small
+# and only add entries whose commune is certain.
+_VENUE_COMMUNE = {
+    "maison departementale de l'environnement": "Nice",  # the DOME, Parc Phoenix
+    "dome": "Nice",
+}
+
+
+def _commune_from_lieu(lieu: str) -> str:
+    """Resolve the commune for the town field, keeping venue text out of it.
+
+    The "Lieu :" line is one of: "Commune - Venue" (take the commune), a bare
+    commune, or — for a handful of departmental venues — only the venue name.
+    Take the part before " - " as the commune candidate, map the venue-only names
+    explicitly, and canon the rest. canon_town echoes an unknown string
+    unchanged, which is right for a real commune we simply have not listed but
+    would re-pollute town for a pure venue name, so those must live in the map.
+    """
+    if not lieu:
+        return "Alpes-Maritimes"
+    low = strip_accents(lieu).lower()
+    for key, commune in _VENUE_COMMUNE.items():
+        if key in low:
+            return commune
+    return canon_town(lieu.split(" - ", 1)[0].strip())
 
 
 @register
@@ -113,7 +141,7 @@ class Departement06(HttpScraper):
             start=start,
             end=end,
             time=t,
-            town=canon_town(lieu) if lieu else "Alpes-Maritimes",
+            town=_commune_from_lieu(lieu),
             venue=lieu or None,
             category=classify(title, " ".join(chips)),
             url=url,
