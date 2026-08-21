@@ -151,3 +151,39 @@ def test_single_day_events_get_the_budget_before_long_runs(monkeypatch):
     out = list(s.fetch())
     assert len(out) == 2
     assert hit == ["https://x.invalid/gig"]
+
+
+# ------------------------------------------------- the time is not in JSON-LD
+#
+# Only 8 of 177 enriched events had openingHoursSpecification on the first live
+# run. The time was on nearly all of them, in the visible date line, and their
+# template mangles "18h30" into "18 a.m30" — the "a.m" is a broken "h", not a
+# meridiem, so the hour is already 24-hour.
+
+VISIBLE_ONLY = """
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Articles","name":"Match",
+ "description":"Ligue 1 fixture at the Allianz Riviera stadium."}
+</script>
+<p class="wpet-date reset-margin">The Saturday 22 August at 20 a.m45</p>
+<p itemprop="address">Stade Allianz Riviera</p>
+"""
+
+
+def test_the_visible_time_is_used_when_json_ld_has_no_hours():
+    assert _detail(VISIBLE_ONLY, date(2026, 8, 22))["time"] == "20:45"
+
+
+def test_a_mangled_am_is_not_treated_as_a_meridiem():
+    """"20 a.m45" is 20:45, never 08:45."""
+    got = _detail(VISIBLE_ONLY, date(2026, 8, 22))["time"]
+    assert got == "20:45" and not got.startswith("08")
+
+
+def test_json_ld_hours_still_win_over_the_visible_line():
+    both = FULL + '<p class="wpet-date">The Friday 21 August at 23 a.m59</p>'
+    assert _detail(both, date(2026, 8, 21))["time"] == "19:00"
+
+
+def test_a_page_with_neither_yields_no_time():
+    assert "time" not in _detail(NO_STREET)

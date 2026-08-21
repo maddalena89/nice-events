@@ -37,6 +37,12 @@ BASE = "https://www.explorenicecotedazur.com"
 #: The detail page carries what the listing card omits.
 _LD_RE = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
 _ADDR_RE = re.compile(r'itemprop="address"[^>]*>(.*?)</p>', re.S)
+#: The visible date line, e.g. "The Friday 21 August at 19 a.m00". Their template
+#: renders "19h00" as "19 a.m00" — the "a.m" is a mangled "h", NOT a meridiem, so
+#: the hour is already 24-hour and must not be shifted. Most event pages carry no
+#: openingHoursSpecification at all and this line is the only time on them.
+_VISIBLE_DATE = re.compile(r'class="wpet-date[^"]*"[^>]*>([^<]{0,120})<')
+_VISIBLE_TIME = re.compile(r'\bat\s+(\d{1,2})\s*(?:a\.?m\.?|h|:)\s*(\d{2})\b', re.I)
 
 FEEDS = [
     ("/en/events/all-events/", 61),
@@ -248,6 +254,18 @@ class ExploreNCA(HttpScraper):
             if opens and (not vf or not vt or vf <= iso <= vt):
                 out["time"] = opens
                 break
+
+        # Fallback: the visible date line. Only 8 of 177 enriched events had
+        # openingHoursSpecification on the first live run, yet the time was
+        # sitting in plain sight on nearly all of them.
+        if "time" not in out:
+            m = _VISIBLE_DATE.search(html)
+            if m:
+                t = _VISIBLE_TIME.search(unescape(m.group(1)))
+                if t:
+                    hh, mm = int(t.group(1)), int(t.group(2))
+                    if 0 <= hh <= 23 and 0 <= mm <= 59:
+                        out["time"] = f"{hh:02d}:{mm:02d}"
         return out
 
     def _event(self, title: str, href: str, block: str, today: date) -> Optional[Event]:
