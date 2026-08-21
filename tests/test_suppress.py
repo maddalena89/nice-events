@@ -50,3 +50,31 @@ def test_all_none_line_is_noop():
     # A line of all wildcards must not wipe the whole feed.
     keep = {"title": "Anything", "town": "Nice", "start": "2026-07-28"}
     assert _matches(keep, None, None, None, None) is False
+
+
+# --------------------------------------------------------- Jazz au Château
+#
+# Reported 2026-08-21: the row never said which band was playing. The tourist
+# office publishes the festival as one umbrella entry (26 Jun - 11 Sep) that
+# names no act, and browsing Concerts repeated it on every day of its run, on
+# top of the per-night rows that DO name the band. Same shape as the Trinquette
+# umbrella, and suppressed the same way.
+
+def test_the_jazz_au_chateau_umbrella_is_dropped_but_the_bands_are_not():
+    """Uses the LIVE list on purpose: this asserts the real rule is present and
+    correctly scoped, not that the mechanism works (test_drops_by_url does that)."""
+    umbrella = "https://www.explorenicecotedazur.com/en/event/jazz-at-the-chateau/"
+    nights = "https://ville.cagnes.fr/actualites-csm/jazz-au-chateau-2026/"
+    evs = [
+        {"title": "Jazz at the Château", "town": "Cagnes-sur-Mer",
+         "start": "2026-06-26", "end": "2026-09-11", "url": umbrella},
+        # the same page again, a year out because its card carries no year
+        {"title": "Jazz at the Château", "town": "Cagnes-sur-Mer",
+         "start": "2027-06-26", "url": umbrella},
+        {"title": "The Jazz Bicravers", "town": "Cagnes-sur-Mer",
+         "start": "2026-08-21", "url": nights},
+        {"title": "Les Accordes Swing", "town": "Cagnes-sur-Mer",
+         "start": "2026-08-28", "url": nights},
+    ]
+    kept = [e["title"] for e in drop_suppressed(evs)]
+    assert kept == ["The Jazz Bicravers", "Les Accordes Swing"]

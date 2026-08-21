@@ -45,6 +45,23 @@ SUPPRESSED: list[tuple] = [
     # Jazz Club" umbrella (Feb–Nov). We now scrape the club's real per-night
     # line-up, so the umbrella is a redundant, uninformative block. Drop it.
     ("https://www.explorenicecotedazur.com/en/event/concerts-at-the-trinquette-jazz-club/", None, None, None),
+    # Same shape as the Trinquette umbrella above, reported 2026-08-21: the
+    # tourist office lists "Jazz at the Château" as ONE entry covering the whole
+    # festival (26 Jun - 11 Sep, 23rd edition) and never names the band playing.
+    # The per-night line-up is in seed.py, one row per Friday, titled with the
+    # band: The Jazz Bicravers, Les Accordes Swing, Sheik of Swing, Romano
+    # Dandies. Browsing Concerts, the umbrella repeated on every day of its run
+    # and buried the rows that actually say who is on.
+    #
+    # This also removes a second copy of the same page dated 2027-06-26: the
+    # card carries no year, so "26 June" rolled forward past today.
+    #
+    # TRADE-OFF, read before deleting: seed.py only covers the 2026 season. If
+    # nobody types up the 2027 line-up, dropping this umbrella means Jazz au
+    # Château vanishes from the site entirely rather than showing an
+    # uninformative block. Either add the 2027 nights to seed.py, or delete this
+    # line, before next June.
+    ("https://www.explorenicecotedazur.com/en/event/jazz-at-the-chateau/", None, None, None),
     # Clean up the bad rows the first Trinquette scrape stored before the parser
     # fix: their title is just the start time ("21H" / "20H"). Scoped to the club
     # town so nothing else is touched. Remove these lines after 2 Aug 2026.
