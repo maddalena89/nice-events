@@ -170,6 +170,10 @@ class NiceFr(HttpScraper):
         # own, only an acf.pages redirect to /mon-ete-cinema/. A programme page is
         # always really served, so prefer it; keep the permalink only when there
         # is no such fallback (best available beats nothing).
+        #
+        # Preferring the page costs nothing: across 100 live API records on
+        # 2026-08-08, NO event with a sitemap-confirmed permalink also carried
+        # `acf.pages`, while 56 had a dead permalink and a page to fall back to.
         if link and self._live is not None and slug in self._live:
             return link                      # sitemap confirms it is served
         page = self._page_link(acf.get("pages"))
