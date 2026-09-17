@@ -198,7 +198,7 @@ def upsert(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]
         conn.execute(
             """UPDATE events SET
                  title=?, end=?, time=?, venue=?, url=?, note=?, price=?,
-                 free=?, image=?, outdoor=?, sources=?, last_seen=?
+                 free=?, image=?, outdoor=?, category=?, sources=?, last_seen=?
                WHERE fingerprint=?""",
             (
                 _better_title(ev.title, row["title"]),
@@ -216,6 +216,16 @@ def upsert(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]
                 int(ev.free) if owns else int(ev.free or row["free"]),
                 ev.image or row["image"],
                 int(ev.outdoor or row["outdoor"]),
+                # Refreshed on every scrape, and it was not before. A stored
+                # category was written once and kept for the life of the row, so
+                # correcting a classification rule fixed nothing already in the
+                # database — the 76 talks filed under "Business, tech & AI"
+                # would have stayed there for as long as they ran. Only the
+                # owning source may reclassify, so a second source that merely
+                # mentions the event cannot drag it into its own reading.
+                # Manual pins are unaffected: overrides.py is applied at build
+                # time, after this, and still wins.
+                ev.category if owns else row["category"],
                 ",".join(sorted(srcs)),
                 now,
                 ev.fingerprint,
