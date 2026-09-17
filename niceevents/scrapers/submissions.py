@@ -21,6 +21,8 @@ error, or every local build breaks.
 """
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import os
 import re
@@ -33,6 +35,41 @@ import httpx
 # SUPABASE_URL. Without this we'd build ".../rest/v1/rest/v1/submissions", which
 # PostgREST rejects (the request comes back 401/404 and no submissions load).
 _REST_TAIL = re.compile(r"/rest(/v1)?/?$")
+
+
+def _key_privilege(key: str) -> str:
+    """Is this key allowed to bypass RLS? 'privileged' | 'weak' | 'unknown'.
+
+    Read from the key itself, because the alternative doesn't work: "RLS hid
+    every row" and "the table is genuinely empty" both come back as HTTP 200 and
+    an empty list, and no query can separate them. The key, though, says what it
+    is on the tin, in both Supabase generations:
+
+      * current — ``sb_secret_…`` (privileged) vs ``sb_publishable_…`` (weak)
+      * legacy  — a JWT whose payload carries ``{"role": "service_role"|"anon"}``
+
+    The JWT is decoded, never verified. That is deliberate: this is our own
+    config being classified, not a token being trusted, and a signature check
+    would need a secret we don't have. Nothing is authorised on the strength of
+    what this returns — it only decides which error message is honest.
+    """
+    k = (key or "").strip()
+    if k.startswith("sb_secret_"):
+        return "privileged"
+    if k.startswith("sb_publishable_"):
+        return "weak"
+    parts = k.split(".")
+    if len(parts) == 3:                                  # shaped like a JWT
+        try:
+            pad = parts[1] + "=" * (-len(parts[1]) % 4)  # base64url needs padding
+            role = json.loads(base64.urlsafe_b64decode(pad)).get("role")
+        except Exception:
+            return "unknown"
+        if role == "service_role":
+            return "privileged"
+        if role:                                         # anon, authenticated, …
+            return "weak"
+    return "unknown"
 
 from ..models import CATEGORIES, Event, canon_town, parse_date
 from .base import HttpScraper, register
@@ -100,17 +137,37 @@ class Submissions(HttpScraper):
 
         # An anon/publishable key authenticates fine (HTTP 200) but Row Level
         # Security then hides every row, so an empty result is ambiguous: no
-        # approved events, or a key that can't see the table at all? Probe for a
-        # single row of ANY kind to tell them apart, so a mis-set key can never
-        # masquerade as "nothing to publish" again.
+        # approved events, or a key that can't see the table at all?
+        #
+        # The probe that used to live here — read one row of ANY kind, raise if
+        # none came back — could not answer that, and was never going to: an
+        # empty table returns exactly what a blindfolded key returns. So it
+        # reported a broken key every single day for a site whose submissions
+        # table was simply still empty, which is the ordinary state of a form
+        # nobody has used yet. Ask the KEY what it is instead; that is knowable.
         if not rows:
-            probe = self.client.get(f"{base}/rest/v1/submissions?select=id&limit=1",
-                                    headers=headers)
-            if probe.status_code == 200 and not probe.json():
+            priv = _key_privilege(key)
+            if priv == "weak":
                 raise RuntimeError(
-                    f"{self.name}: the key sees 0 rows in the submissions table — it is "
-                    f"not a service_role / sb_secret_ key (RLS is hiding everything). "
-                    f"Fix SUPABASE_SERVICE_KEY.")
+                    f"{self.name}: SUPABASE_SERVICE_KEY is an anon / publishable key, so "
+                    f"Row Level Security hides every row. It must be the service_role / "
+                    f"sb_secret_ key.")
+            if priv == "unknown":
+                # Unrecognised key shape, so fall back to the probe — but report
+                # both things an empty table can mean instead of asserting one.
+                probe = self.client.get(f"{base}/rest/v1/submissions?select=id&limit=1",
+                                        headers=headers)
+                if probe.status_code == 200 and not probe.json():
+                    raise RuntimeError(
+                        f"{self.name}: 0 rows visible and the key's type could not be "
+                        f"identified — either SUPABASE_SERVICE_KEY is not the "
+                        f"service_role / sb_secret_ key, or the submissions table is "
+                        f"empty. Open the table in Supabase to tell which.")
+            # Privileged key, nothing approved: an empty queue, not a fault. This
+            # must stay a clean `empty` in sources.json — a source that cries
+            # `failed` every day is a source nobody reads any more.
+            log.info("%s: no approved submissions waiting", self.name)
+            return
 
         today = date.today()
         published: list[str] = []
