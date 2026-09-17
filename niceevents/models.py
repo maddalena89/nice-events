@@ -37,7 +37,11 @@ CATEGORIES = {
 # drift into calling one category two different things on two pages.
 DISPLAY_CATEGORIES = {
     "marche": "Brocantes & fêtes",
-    **{k: v for k, v in CATEGORIES.items() if k not in ("brocante", "marche")},
+    # Talks were folded in here rather than given a chip of their own: the grid
+    # holds exactly 12 boxes (11 categories plus "All the events"), which is what
+    # keeps it in tidy rows, and a 13th would leave a ragged one.
+    **{k: v for k, v in CATEGORIES.items() if k not in ("brocante", "marche", "atelier")},
+    "atelier": "Talks & workshops",
 }
 
 
@@ -63,9 +67,19 @@ _CATEGORY_RULES: list[tuple[str, str]] = [
      r"blues|reggae|lyrique|art lyrique|chant lyrique|festival de musique", "concert"),
     (r"théâtre|theatre|spectacle|opéra|opera|ballet|one man show|humour|cirque|danse contemporaine", "scene"),
     (r"visite guidée|visite|guided (tour|visit)|parcours patrimoine|balade", "visite"),
-    (r"atelier|workshop|stage de|masterclass|initiation|cours\b", "atelier"),
-    (r"conférence|conference|networking|afterwork|startup|\bai\b|\bia\b|intelligence artificielle|"
+    # Business BEFORE workshops, and it no longer owns the word "conférence".
+    # In French a "conférence" is a public lecture — an archaeologist talking
+    # about the Lazaret cave, an organist on Valoncini. Treating it as a business
+    # word filed 76 of the 110 events in "Business, tech & AI" wrongly: museum
+    # talks, a Ray Charles appreciation, a lecture on a Niçois watercolourist.
+    # The genuinely commercial words stay here and are tested first, so
+    # "Conférence startup" still lands in business; a talk on archives does not.
+    (r"networking|afterwork|startup|\bai\b|\bia\b|intelligence artificielle|"
      r"tech\b|pitch|hackathon|business|entrepreneur|coworking|summit|forum|salon professionnel|webinar", "business"),
+    # Talks live with workshops. Both are someone standing up and explaining
+    # something, so a reader looks in the same place for either.
+    (r"atelier|workshop|stage de|masterclass|initiation|cours\b|"
+     r"conférence|conference|causerie|table ronde|rencontre littéraire", "atelier"),
     (r"expat|language exchange|échange linguistique|apéro|picnic|pique-nique|rencontre|social|hangout|"
      r"jeux de société|board game|quiz|blind test", "social"),
     (r"marché|market|fête|festa|foire|festin|procession|feu d'artifice|carnaval|transhumance", "marche"),
@@ -156,7 +170,7 @@ _TYPE_TO_CAT: list[tuple[str, str]] = [
     ("cirque", "scene"), ("humour", "scene"), ("danse", "danse"),
     ("atelier", "atelier"), ("stage", "atelier"), ("masterclass", "atelier"),
     ("visite", "visite"), ("balade", "visite"), ("patrimoine", "visite"),
-    ("conference", "business"), ("rencontre", "social"), ("lecture", "social"),
+    ("conference", "atelier"), ("rencontre", "social"), ("lecture", "social"),
     ("brocante", "brocante"), ("vide-grenier", "brocante"), ("vide grenier", "brocante"),
     ("marche", "marche"), ("fete", "marche"), ("festin", "marche"),
     ("sport", "sport"), ("randonnee", "sport"),
@@ -303,11 +317,32 @@ def _rolling_year(month: int) -> int:
     return today.year if month >= today.month else today.year + 1
 
 
+#: An ISO 8601 timestamp, anchored at the start of the string.
+#:
+#: This has to be tried BEFORE the loose patterns below, and getting that order
+#: wrong cost us every Meetup start time for months. In "2026-09-07T19:00:00+02:00"
+#: the generic `\b(\d{1,2})\s*[h:]` never sees the 19: `\b` wants a word boundary
+#: before the hour and the "T" glues "07" to "19", so there is none. The scan runs
+#: past it and matches the first hour-like pair that DOES sit on a boundary, which
+#: is the "00:00" of the seconds and offset. parse_time then returned a confident
+#: "00:00", _row_to_dict read that as "time unknown" and nulled it, and a time the
+#: source had stated plainly became a blank on the page. 106 of 116 Meetup events
+#: on the 2026-09-07 build.
+_ISO_DT = re.compile(r"^\s*\d{4}-\d{2}-\d{2}[t ](\d{2}):(\d{2})")
+
+
 def parse_time(text: Optional[str]) -> Optional[str]:
-    """'19h30' | '19:30' | '7:00pm' -> '19:30'."""
+    """'19h30' | '19:30' | '7:00pm' | '2026-09-07T19:00:00+02:00' -> '19:30'."""
     if not text:
         return None
     s = str(text).strip().lower()
+
+    # Take the wall clock exactly as written. The offset is already local (these
+    # feeds publish Europe/Paris), so converting would shift every time by two
+    # hours in summer — which is precisely the openagenda bug of 28 Aug 2026.
+    m = _ISO_DT.match(s)
+    if m:
+        return f"{m[1]}:{m[2]}"
 
     m = re.search(r"\b(\d{1,2})\s*[:.]?\s*(\d{2})?\s*(am|pm)\b", s)
     if m:
@@ -322,6 +357,57 @@ def parse_time(text: Optional[str]) -> Optional[str]:
         if 0 <= h <= 23 and 0 <= mi <= 59:
             return f"{h:02d}:{mi:02d}"
     return None
+
+
+#: Weekday names we accept, mapped to Python's Monday=0 numbering.
+_WEEKDAY_NAMES = {
+    "monday": 0, "lundi": 0,
+    "tuesday": 1, "mardi": 1,
+    "wednesday": 2, "mercredi": 2,
+    "thursday": 3, "jeudi": 3,
+    "friday": 4, "vendredi": 4,
+    "saturday": 5, "samedi": 5,
+    "sunday": 6, "dimanche": 6,
+}
+
+#: "every Wednesday", "tous les mercredis", "chaque jeudi et vendredi".
+#:
+#: Deliberately narrow. It requires an explicit recurrence word, so a note that
+#: merely mentions a day ("book by Friday", "closed on Mondays") is not swept up.
+_WEEKLY = re.compile(
+    r"\b(?:every|each|tous\s+les|toutes\s+les|chaque)\s+"
+    r"((?:%s)s?(?:\s*(?:,|and|et|&)\s*(?:%s)s?)*)\b"
+    % ("|".join(_WEEKDAY_NAMES), "|".join(_WEEKDAY_NAMES)),
+    re.I,
+)
+
+
+def weekly_weekdays(*texts: Optional[str]) -> list[int]:
+    """Weekdays a listing says it repeats on, Monday=0. Empty when it says none.
+
+    Some sources describe a weekly series in prose and then hand us a single row
+    spanning the whole run: explorenicecotedazur published "Club Sonore" as
+    2026-08-05 to 2026-09-24 with "Every Wednesday" in the description and no
+    structured recurrence anywhere. A 51-day span with the weekday buried in a
+    sentence renders as a listing that is on every day for seven weeks, so the
+    site showed a Wednesday beach party on a Monday. Reading the sentence is the
+    only signal these rows carry.
+
+    Returns [] rather than None so callers can treat "no recurrence stated" and
+    "not weekly" the same way.
+    """
+    out: set[int] = set()
+    for t in texts:
+        if not t:
+            continue
+        for m in _WEEKLY.finditer(str(t)):
+            for name in re.findall(r"[a-zéû]+", m[1], re.I):
+                n = _WEEKDAY_NAMES.get(name.lower().rstrip("s"))
+                if n is None:                      # "and"/"et", or a plural we
+                    n = _WEEKDAY_NAMES.get(name.lower())   # already trimmed
+                if n is not None:
+                    out.add(n)
+    return sorted(out)
 
 
 # ------------------------------------------------------------------- event

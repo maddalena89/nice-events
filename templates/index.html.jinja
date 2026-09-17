@@ -549,7 +549,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
        find it.</p>
     <div class="stats">
       <div class="stat"><b id="s-total">{{ stats.total }}</b><span>Listed</span></div>
-      <div class="stat"><b id="s-week">0</b><span>Next 7 days</span></div>
+      {#- Rendered server-side, not left at 0 for JavaScript to fix. A crawler
+          that does not run scripts was being told this site has nothing on. #}
+      <div class="stat"><b id="s-week">{{ week_count }}</b><span>Next 7 days</span></div>
       <div class="stat"><b>{{ stats.towns }}</b><span>Towns</span></div>
     </div>
   </div>
@@ -597,7 +599,36 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 <div class="cats" id="cats"></div>
 <div class="tally" id="tally"></div>
 <div id="exhibs"></div>
-<div id="list"></div>
+{#- The feed, written into the page rather than left for JavaScript to fill.
+    render() replaces this wholesale on load, so a reader never sees both; a
+    crawler that does not run scripts sees real events instead of an empty div.
+    Deliberately plainer markup than render()'s rows — no per-row buttons or
+    index numbers, since none of that means anything to a crawler and all of it
+    costs bytes. Escaped by hand ("|e") because this template does NOT
+    autoescape: select_autoescape(["html"]) reads the last extension, which here
+    is "jinja". #}
+<div id="list">
+{%- for day in seed_feed %}
+  <div class="daymark"><b>{{ day.label|e }}</b><span>{{ day.year|e }}</span></div>
+  {%- for e in day.events %}
+  <div class="row">
+    <div class="idx"></div>
+    <div>
+      <div class="ttl">
+        {%- if e.free %}<span class="pill free">Free</span>{% endif %}
+        {%- if e.url %}<a class="tt" href="{{ e.url|e }}" rel="noopener nofollow">{{ e.title|e }}</a>
+        {%- else %}<span class="tt">{{ e.title|e }}</span>{% endif %}
+      </div>
+      {%- if e.time or e.note %}
+      <div class="sub">{% if e.time %}<span class="etime">{{ e.time|e }}</span>{% if e.note %} · {% endif %}{% endif %}{{ e.note|e }}</div>
+      {%- endif %}
+    </div>
+    <div class="where"><b>{{ e.town|e }}</b> <span>{{ e.venue|e if e.venue else "" }}</span></div>
+    <div class="kind">{{ categories.get(e.category, e.category)|e }}</div>
+  </div>
+  {%- endfor %}
+{%- endfor %}
+</div>
 
 <button class="addbtn" id="addbtn" aria-label="Add an event" title="Add an event">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
@@ -936,13 +967,26 @@ const isExhib=e=>e.category==="expo";
 // stamped onto every day of the feed.
 const isStanding=e=>isExhib(e)&&isMultiDay(e);
 
+// Weekly series (`days`, Monday=0, set by _mark_weekly at build time): a row
+// covering seven weeks that only actually happens on Wednesdays. JS counts from
+// Sunday, so shift it.
+const DAY_NAMES=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const wd=d=>(new Date(d+"T12:00:00").getDay()+6)%7;
+const isWeekly=e=>Array.isArray(e.days)&&e.days.length>0;
+const runsOn=(e,d)=>!isWeekly(e)||e.days.includes(wd(d));
+
 // A month-long exhibition should read as one thing that runs for a while — this
 // is the "from here to here" sticker. Ongoing -> "until 31 Aug"; upcoming ->
-// "5 Aug – 31 Aug".
+// "5 Aug – 31 Aug". A weekly series says which day it is on, because "until
+// 24 Sep" on its own reads as "every day until 24 Sep", which is the thing that
+// put a Wednesday party on a Monday.
 function runBadge(e){
   if(!isMultiDay(e)) return "";
-  const txt = e.start<TODAY ? `until ${fmtShort(e.end)}`
-                            : `${fmtShort(e.start)} - ${fmtShort(e.end)}`;
+  const span = e.start<TODAY ? `until ${fmtShort(e.end)}`
+                             : `${fmtShort(e.start)} - ${fmtShort(e.end)}`;
+  const txt = isWeekly(e)
+    ? `${e.days.map(n=>DAY_NAMES[n]+"s").join(", ")} ${span}`
+    : span;
   return `<span class="pill run">${txt}</span>`;
 }
 
@@ -954,6 +998,20 @@ function runBadge(e){
 const EXPAND_CAP_DAYS = 31;
 function occurrences(e, from, to, expand){
   const first = e.start < from ? from : e.start;
+  // A weekly series never lands on a day it does not run, collapsed or expanded.
+  // Returning [] is fine and meaningful: nothing to list in this range.
+  // Collapsed, we want only the next occurrence, so stop at the first hit rather
+  // than walking a year-long run to throw the rest away.
+  if(isWeekly(e)){
+    const cap = expand ? addDays(TODAY, EXPAND_CAP_DAYS) : addDays(first, 7);
+    const horizon = [to, e.end || e.start, cap].reduce((a,b)=> a<b ? a : b);
+    const out=[]; let d=first;
+    while(d <= horizon){
+      if(runsOn(e,d)){ out.push(d); if(!expand) break; }
+      d=addDays(d,1);
+    }
+    return out;
+  }
   if(!expand || !isMultiDay(e)) return [first];
   const horizon = [to, addDays(TODAY, EXPAND_CAP_DAYS), e.end]
     .reduce((a,b)=> a<b ? a : b);

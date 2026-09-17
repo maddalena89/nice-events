@@ -44,6 +44,38 @@ def test_parse_time(raw, expected):
     assert parse_time(raw) == expected
 
 
+@pytest.mark.parametrize("raw,expected", [
+    ("2026-09-07T19:00:00+02:00", "19:00"),   # Meetup, Google Calendar, OpenAgenda
+    ("2026-09-07T19:00:00Z", "19:00"),
+    ("2026-09-07 19:00:00", "19:00"),         # space separator
+    ("2026-09-07T09:05:00+02:00", "09:05"),   # leading zeros survive
+    ("2026-09-07T00:00:00+02:00", "00:00"),   # _row_to_dict nulls this, correctly
+])
+def test_parse_time_reads_iso_timestamps(raw, expected):
+    """The hour of an ISO stamp, taken literally.
+
+    Regression test for the bug that emptied the time on 106 of 116 Meetup
+    events: `\\b(\\d{1,2})\\s*[h:]` cannot see the 19 in "...07T19:00:00" because
+    the T leaves no word boundary before it, so the scan fell through to the
+    "00:00" of the seconds and returned that instead.
+    """
+    assert parse_time(raw) == expected
+
+
+def test_parse_time_does_not_shift_the_offset():
+    """The wall clock as published, never converted.
+
+    These feeds already publish Europe/Paris. Converting to UTC and back is what
+    made every OpenAgenda listing read two hours early in August 2026.
+    """
+    assert parse_time("2026-09-07T19:00:00+02:00") == "19:00"   # not 17:00
+    assert parse_time("2026-01-07T19:00:00+01:00") == "19:00"   # not 18:00
+
+
+def test_parse_time_ignores_a_bare_date():
+    assert parse_time("2026-09-07") is None
+
+
 # ------------------------------------------------------------------ towns
 
 def test_canon_town_variants():

@@ -30,7 +30,8 @@ from . import db
 from .cancellations import mark_cancelled
 from .suppress import drop_suppressed
 from . import landing
-from .models import DISPLAY_CATEGORIES, _title_key, classify, slugify
+from .models import (DISPLAY_CATEGORIES, _title_key, classify, slugify,
+                     weekly_weekdays)
 from .overrides import apply_override
 
 TPL_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -928,6 +929,125 @@ def _page_events(events: list[dict]) -> list[dict]:
     ]
 
 
+#: Shortest span worth reading a weekly recurrence out of. A "every Saturday"
+#: note on a two-day row is describing something else — the series it belongs to,
+#: or the venue's usual habit — not this row's own dates.
+_WEEKLY_MIN_SPAN_DAYS = 6
+
+
+def _mark_weekly(events: list[dict]) -> None:
+    """Tag long spans that are really a weekly series with the days they run.
+
+    Some sources publish a weekly event as ONE row covering the whole run, with
+    the weekday only in the prose: explorenicecotedazur gave us "Club Sonore",
+    2026-08-05 to 2026-09-24, note "Every Wednesday". Nothing in the data says
+    Wednesday, so the feed treated it as 51 consecutive days and the page put a
+    Wednesday beach party on Monday 7 September, next to a Thursday one. Reported
+    by a reader, which is the wrong way to find it.
+
+    Expanding these into real per-date rows would be the thorough fix, but it
+    changes fingerprints and multiplies rows for something we inferred from a
+    sentence. Recording the weekdays and letting the renderers skip the days in
+    between keeps one row, one fingerprint, and puts it on the right dates.
+
+    Sets `days` (Monday=0) only when the row is long enough to be a run and the
+    text names the weekdays. Everything else is left untouched, so any event
+    without `days` renders exactly as it did before.
+    """
+    for e in events:
+        start, end = e.get("start"), e.get("end")
+        if not start or not end or end == start:
+            continue
+        try:
+            span = (date.fromisoformat(end) - date.fromisoformat(start)).days
+        except ValueError:
+            continue
+        if span < _WEEKLY_MIN_SPAN_DAYS:
+            continue
+        days = weekly_weekdays(e.get("title"), e.get("note"))
+        if days:
+            e["days"] = days
+
+
+#: Days of the feed rendered into the HTML itself, and the row ceiling for it.
+#: Seven days is what the page's own headline stat promises, and it keeps the
+#: seeded block to tens of kilobytes against a page that already ships hundreds.
+_SEED_DAYS = 7
+_SEED_MAX = 150
+
+
+def _first_slot(e: dict, frm: str, to: str) -> Optional[str]:
+    """The first day in [frm, to] this event should actually be listed under.
+
+    Normally that is simply where its run starts, or today if it is already
+    under way. A weekly series (`days`, set by _mark_weekly) skips forward to its
+    next real weekday instead, and returns None when it has none in range — a
+    Wednesday party has nothing to say about a Monday.
+    """
+    start = max(e.get("start", ""), frm)
+    days = e.get("days")
+    if not days:
+        return start
+    last = min(e.get("end") or e.get("start", ""), to)
+    d = date.fromisoformat(start)
+    while d.isoformat() <= last:
+        if d.weekday() in days:
+            return d.isoformat()
+        d += timedelta(days=1)
+    return None
+
+
+def _seed_feed(events: list[dict]) -> list[dict]:
+    """The next week of listings, as real HTML in the page rather than a promise
+    that JavaScript will fetch some.
+
+    The feed is drawn by JS from an inline JSON blob, so the served markup had an
+    empty <div id="list"> and nothing else: 1.1MB of page containing zero
+    readable events. Googlebot renders JS eventually, but its first pass — and
+    most AI search fetchers, which do not render at all — saw a site with no
+    events on it.
+
+    So the same rows are also written into the page, and render() overwrites them
+    the moment it runs. Progressive enhancement, not duplication for its own
+    sake: what a crawler reads here is exactly what a reader sees a beat later.
+
+    Online events are left out (the page hides them by default, so including
+    them would advertise what the default view does not show), as are cancelled
+    ones. Anything already running is filed under today rather than its start
+    date, so the block never opens on a heading from last month.
+    """
+    today = date.today().isoformat()
+    horizon = (date.today() + timedelta(days=_SEED_DAYS)).isoformat()
+    live = [
+        e for e in events
+        if not e.get("online") and not e.get("cancelled")
+        and e.get("start", "") <= horizon
+        and (e.get("end") or e.get("start", "")) >= today
+    ]
+    buckets: dict[str, list[dict]] = {}
+    for e in live:
+        slot = _first_slot(e, today, horizon)
+        if slot:
+            buckets.setdefault(slot, []).append(e)
+
+    out, rows = [], 0
+    for iso in sorted(buckets):
+        if rows >= _SEED_MAX:
+            break
+        d = date.fromisoformat(iso)
+        items = sorted(buckets[iso],
+                       key=lambda e: (e.get("time") or "99:99", e.get("title", "")))
+        items = items[: _SEED_MAX - rows]
+        rows += len(items)
+        day = d.strftime("%-d") if os.name != "nt" else d.strftime("%d")
+        out.append({
+            "label": f"{d.strftime('%A')} {day} {d.strftime('%B')}",
+            "year": d.strftime("%Y"),
+            "events": items,
+        })
+    return out
+
+
 def _sitemap(base: str, updated: date, extra: list[str] | None = None) -> str:
     """Every real, crawlable URL on the site.
 
@@ -979,6 +1099,7 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         e["title"] = _clean_title(title)
         if when:
             e["time"] = when
+    _mark_weekly(events)                  # a weekly series is not an every-day one
     _assign_slugs(events)                 # stable, unique short link per event
     stats = db.stats(conn)
 
@@ -1044,6 +1165,20 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     updated = (date.today().strftime("%-d %B %Y") if os.name != "nt"
                else date.today().strftime("%d %B %Y"))
 
+    # Server-rendered so a crawler reads a real number. This used to be a
+    # literal 0 in the template that JavaScript overwrote on load, which meant
+    # every non-rendering client — Googlebot on its first pass, and every AI
+    # search fetcher — read "0 Next 7 days" sitting next to "2824 Listed". That
+    # is not a missing number, it is a false one: it says the site is empty this
+    # week. Same rule the page's own JS applies: in-person only, still running.
+    _wk = date.today() + timedelta(days=7)
+    week_count = sum(
+        1 for e in events
+        if not e.get("online")
+        and e.get("start", "") <= _wk.isoformat()
+        and (e.get("end") or e.get("start", "")) >= date.today().isoformat()
+    )
+
     # Worked out before the home page renders, because the home page links to
     # these: without a real link from the one page search engines already know,
     # every landing page is an orphan that only the sitemap mentions.
@@ -1082,6 +1217,8 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         site_jsonld=_site_jsonld(base) if base else "",
         town_links=town_links,
         cat_links=cat_links,
+        week_count=week_count,
+        seed_feed=_seed_feed(events),
         og_image=f"{base}/og.png" if base else "",
         cf_analytics_token=os.environ.get("CF_ANALYTICS_TOKEN", ""),
         poster_ai_url=poster_ai_url,
