@@ -85,17 +85,63 @@ def _looks_like_commune(town: str) -> bool:
 #: type. These go in the visible copy and the meta description, not into a
 #: hidden keyword dump: same words, honest placement.
 CAT_FR = {
-    "marche": "brocantes, vide-greniers et fêtes de village",
-    "danse": "tango, milongas et soirées danse",
-    "concert": "concerts et musique live",
-    "expo": "expositions et musées",
-    "scene": "théâtre et spectacles",
-    "visite": "visites guidées et patrimoine",
-    "atelier": "ateliers et stages",
-    "business": "conférences tech, IA et business",
-    "social": "rencontres et soirées expat",
-    "sport": "sport et courses",
-    "autre": "clubs, soirées et le reste",
+    "marche": "brocantes, vide-greniers, foires et fêtes de village",
+    "danse": "tango, milongas, salsa, bachata, kizomba, swing et lindy hop",
+    "concert": "concerts, jazz, musique live et festivals",
+    "expo": "expositions, musées, galeries et vernissages",
+    "scene": "théâtre, spectacles, opéra et humour",
+    "visite": "visites guidées, patrimoine et balades",
+    "atelier": "ateliers, stages et conférences",
+    "business": "conférences tech, IA, startups et networking",
+    "social": "rencontres, soirées expat et échanges linguistiques",
+    "sport": "sport, courses, randonnées et yoga",
+    "autre": "clubs, soirées, cinéma et le reste",
+}
+
+#: The words people type that the chip's own name does not contain.
+#:
+#: The chips are short on purpose and stay that way — "Tango & dance" reads well
+#: on a button. But nobody searches "tango and dance": they search salsa, or
+#: bachata, or lindy hop, and a page whose title and text never say those words
+#: cannot answer them. So the page says them.
+#:
+#: These are DESCRIPTIONS, not a keyword dump. Every term here has to be a thing
+#: the page genuinely lists — salsa is here because there are salsa nights in
+#: the feed — and every one of them appears in text a reader sees, not hidden in
+#: a meta tag. A term that stops being true should be deleted.
+#: The <title>, which is a different job from the body copy. A search result
+#: shows roughly sixty characters and cuts the rest, so this is a short natural
+#: phrase, not the full list — the long version below would be truncated exactly
+#: where the useful words start. It also has to read like a sentence a person
+#: wrote, because it is the first thing anyone sees of the page.
+CAT_TITLE = {
+    "danse": "Tango, salsa & dance",
+    "concert": "Concerts, jazz & live music",
+    "marche": "Brocantes, vide-greniers & fêtes",
+    "expo": "Exhibitions, museums & galleries",
+    "scene": "Theatre, opera & comedy",
+    "visite": "Guided visits & heritage walks",
+    "atelier": "Talks, lectures & workshops",
+    "business": "Tech, AI & business events",
+    "social": "Expat meetups & language exchange",
+    "sport": "Sport, running & hiking",
+    "autre": "Club nights, DJ sets & cinema",
+}
+
+CAT_ALSO = {
+    "danse": "salsa, bachata, kizomba, swing and lindy hop",
+    "concert": "jazz, live music and gigs",
+    "marche": "vide-greniers, flea markets and village fêtes",
+    "expo": "museums, galleries and vernissages",
+    "scene": "theatre, opera and comedy",
+    "visite": "heritage walks and guided tours",
+    # No "talks" here: the chip is already called "Talks & workshops", and
+    # repeating it made the title read "Talks & workshops, talks, lectures…".
+    "atelier": "lectures, conférences and masterclasses",
+    "business": "startups, networking, AI and tech meetups",
+    "social": "expat meetups and language exchanges",
+    "sport": "running, hiking and yoga",
+    "autre": "club nights, DJ sets and cinema",
 }
 
 #: URL slug per category. Fixed and readable rather than derived, because these
@@ -327,16 +373,29 @@ def _copy_for(page: dict, total_towns: int) -> dict:
         }
     label = page["name"]
     fr = CAT_FR.get(page["key"], "")
+    also = CAT_ALSO.get(page["key"], "")
+    # The heading keeps the chip's short name so the page matches the button that
+    # led here. The title and the opening line carry the longer wording, which is
+    # where a search engine and a reader both actually look.
+    head = CAT_TITLE.get(page["key"], label)
     return {
-        "title": f"{label} in Nice & the Alpes-Maritimes · What's on in Nice",
+        "title": f"{head} in Nice & the 06 · What's on in Nice",
+        # Kept under about 155 characters, which is what a search result shows.
+        # The French half deliberately does NOT repeat the English list: saying
+        # "salsa, bachata, kizomba" twice in two languages filled the whole
+        # description with the same five words and read like keyword stuffing.
+        # It carries the phrase people actually type instead.
         "description": (
-            f"{n} upcoming {label.lower()} across Nice, Antibes and the 06 "
-            f"({fr}) — updated daily, always linked to the source."
+            f"{n} events across Nice, Antibes and the 06"
+            + (f": {also}" if also else "")
+            + ". Que faire à Nice ? L'agenda, mis à jour chaque jour."
         ),
         "h1_pre": "", "h1_em": label,
         "lede": (
             f"{label} across Nice and the Alpes-Maritimes over the next "
-            f"{WINDOW_DAYS} days, gathered daily from {total_towns} towns."
+            f"{WINDOW_DAYS} days"
+            + (f" — {also} included" if also else "")
+            + f", gathered daily from {total_towns} towns."
         ),
         "lede_fr": f"Les {fr} à Nice et dans les Alpes-Maritimes.",
     }
