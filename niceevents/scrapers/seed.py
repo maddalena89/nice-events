@@ -90,6 +90,18 @@ SEED: list[tuple] = [
     ("2026-06-19", "2026-09-11", "Étoiles grandeur nature", "Vence", "", "autre", "Open-air astronomy observation evenings at Col de Vence", "https://www.explorenicecotedazur.com/en/event/etoiles-grandeur-nature/", False),
     # Les Contes d'apéro is on nice.fr (TNN) already — the scraper covers it per night.
 
+    # MIRAGE Experience — promoter-run rooftop party (CMEA Consulting SAS) sold
+    # through Weezevent. Seeded rather than harvested ON PURPOSE: the ticket page
+    # carries clean schema.org/Event JSON-LD, but it is a SINGLE event page, not a
+    # calendar — a harvest VENUES entry would yield one event and then rot the day
+    # after the party. Weezevent has no public listing to crawl either: no city
+    # search, no organiser directory, no sitemap on my.weezevent.com (all 404 on
+    # 2026-08-27), so `my.weezevent.com/<slug>` is only reachable if you already
+    # hold the link. The 28 Weezevent URLs already in the feed are not scraped from
+    # Weezevent at all — they are nice_fr events that happen to ticket there.
+    # Query string stripped: the link came with _gl/fbclid tracking parameters.
+    ("2026-09-05", "", "MIRAGE Experience · Rooftop Edition", "Nice", "Rooftop du Palais des Congrès OCEANICE · Quai Amiral Infernet", "autre", "18h00 – 00h00 · Samantha Flores B2B Lüna B2B Carl · percussions live Steffan Blaze · Aerial Sunset Show · dress code élégant", "https://my.weezevent.com/mirage-experience-rooftop-edition-palais-des-congres-oceanice", False),
+
     # ---- exhibitions: Nice ----
     ("2026-06-17", "2026-09-28", "Henri Matisse – Yves Saint Laurent. Le beau, la mode et le bonheur", "Nice", "Musée Matisse", "expo", "Major summer show · fashion & Matisse", "https://www.explorenicecotedazur.com/en/event/henri-matisse-yves-saint-laurent-le-beau-la-mode-et-le-bonheur/", False),
     ("2026-05-02", "2026-09-21", "Chagall à l'œuvre — un prêt d'exception", "Nice", "Musée Marc Chagall", "expo", "Chagall's Opera ceiling sketches, Firebird ballet designs and ceramics", "https://www.explorenicecotedazur.com/en/event/chagall-a-loeuvre-un-pret-dexception-au-musee/", False),
