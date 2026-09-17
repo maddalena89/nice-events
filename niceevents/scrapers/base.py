@@ -13,6 +13,7 @@ import logging
 import os
 import time
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from typing import Iterator, Optional
 
 import httpx
@@ -138,6 +139,82 @@ class BrowserScraper(Scraper):
     def __init__(self, headless: bool = True, timeout_ms: int = 45000):
         self.headless = headless
         self.timeout_ms = timeout_ms
+
+    def _launch_kwargs(self) -> dict:
+        launch_kw: dict = {"headless": self.headless}
+        proxy = _proxy()
+        if proxy:
+            from urllib.parse import urlsplit
+            u = urlsplit(proxy)
+            server = f"{u.scheme}://{u.hostname}" + (f":{u.port}" if u.port else "")
+            launch_kw["proxy"] = {"server": server}
+            if u.username:
+                launch_kw["proxy"]["username"] = u.username
+            if u.password:
+                launch_kw["proxy"]["password"] = u.password
+        return launch_kw
+
+    @contextmanager
+    def _session(self):
+        """One browser, many pages — yields a `get(url, ...) -> html | None`.
+
+        _page_text launches and tears down a whole Chromium per call, which is
+        fine for a scraper that fetches three URLs and ruinous for one that
+        fetches a hundred: the launch alone costs more than the page load. A
+        source that pages through results should open a session once and pull
+        every URL through it.
+
+        The page is reused across URLs too. That keeps the browser's connection
+        to the host warm and, incidentally, keeps whatever cookie banner the
+        site sets after the first navigation, instead of meeting a fresh one
+        every time.
+        """
+        from playwright.sync_api import sync_playwright  # noqa: local import on purpose
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(**self._launch_kwargs())
+            ctx = browser.new_context(
+                user_agent=UA,
+                locale="fr-FR",
+                viewport={"width": 1440, "height": 1000},
+            )
+            page = ctx.new_page()
+
+            last = [0.0]
+
+            def get(url: str, wait_for: Optional[str] = None,
+                    scroll: int = 0) -> Optional[str]:
+                # Pace the session. `delay` was declared on this class but only
+                # ever enforced by HttpScraper.get, which did not matter while a
+                # browser scraper fetched three pages; it matters for one
+                # sweeping a hundred. A page load already costs a second or two,
+                # so this usually adds nothing — it just guarantees a floor.
+                gap = time.monotonic() - last[0]
+                if gap < self.delay:
+                    time.sleep(self.delay - gap)
+                try:
+                    page.goto(url, timeout=self.timeout_ms, wait_until="domcontentloaded")
+                    if wait_for:
+                        try:
+                            page.wait_for_selector(wait_for, timeout=15000)
+                        except Exception:
+                            log.warning("%s: selector %r never appeared on %s",
+                                        self.name, wait_for, url)
+                    for _ in range(scroll):
+                        page.mouse.wheel(0, 4000)
+                        page.wait_for_timeout(900)
+                    return page.content()
+                except Exception as e:
+                    log.warning("%s: render failed for %s -> %s", self.name, url, e)
+                    return None
+                finally:
+                    last[0] = time.monotonic()
+
+            try:
+                yield get
+            finally:
+                ctx.close()
+                browser.close()
 
     def _page_text(self, url: str, wait_for: Optional[str] = None,
                    scroll: int = 0) -> Optional[str]:
