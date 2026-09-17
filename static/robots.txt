@@ -29,7 +29,44 @@ Allow: /
 Sitemap: https://whatsonnice.com/sitemap.xml
 
 # ---------------------------------------------------------------------------
-# AI training crawlers.
+# AI crawlers. There are two kinds and they are NOT the same thing.
+#
+# SEARCH / ANSWER bots fetch a page so they can cite it in an answer, the way a
+# search engine does. Blocking them does not protect anything — it just makes
+# this site invisible to people asking "what's on in Nice this weekend" in
+# ChatGPT or Perplexity. They are named explicitly below so nobody later
+# "tidies up" the wildcard and silently removes the site from AI answers.
+#
+# TRAINING crawlers collect text to train a model. Different trade-off, and the
+# block to uncomment is further down.
+#
+# Naming them is belt-and-braces: "User-agent: *  Allow: /" above already
+# permits every one of them. The explicit list is documentation, and insurance
+# against a future edit that narrows the wildcard.
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+# ---------------------------------------------------------------------------
+# AI TRAINING crawlers.
 #
 # Left ALLOWED on purpose, and it is worth knowing why rather than inheriting
 # the default. This site exists so people can find out what is on in Nice; if a
@@ -38,12 +75,12 @@ Sitemap: https://whatsonnice.com/sitemap.xml
 # public listings while forbidding anyone to read ours.
 #
 # To change your mind, uncomment the block below. It costs nothing and is
-# reversible.
+# reversible. Note it does NOT affect the search bots listed above, which is
+# the point of keeping the two apart.
 #
 # User-agent: GPTBot
 # User-agent: ClaudeBot
 # User-agent: Google-Extended
 # User-agent: CCBot
-# User-agent: PerplexityBot
 # User-agent: Bytespider
 # Disallow: /
