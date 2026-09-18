@@ -366,7 +366,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    this template and the page renders blank. Jinja scans the raw text: being
    inside a CSS comment does not save you, so do not write the two characters
    together even in prose. */
-@media(max-width:600px){ #freshbar{left:16px;right:16px;transform:none;max-width:none} }
+@media(max-width:600px),(pointer:coarse) and (max-width:900px){ #freshbar{left:16px;right:16px;transform:none;max-width:none} }
 
 .foot{margin-top:70px;border-top:1px solid var(--ink);padding-top:16px;font-size:11.5px;color:var(--muted)}
 .foot a{color:var(--muted)}
@@ -405,7 +405,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    - safe-area insets keep the button clear of the notch / Dynamic Island.
    - the dialog goes near-fullscreen; a centred modal on a 390px screen is
      just a cramped box.                                                     */
-@media(max-width:600px){
+@media(max-width:600px),(pointer:coarse) and (max-width:900px){
  body{font-size:16px}
  .wrap{padding:0 16px 64px}
 
@@ -508,11 +508,12 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 
 /* ---------- phone layout, September 2026 redesign ----------
    The masthead stays big (it is the brand) and hands over to a slim bar once it
-   scrolls away. The filters that filled the first screen live behind one
+   scrolls away (on phones, and on touch screens up to 900px such as a
+   foldable opened up). The filters that filled the first screen live behind one
    "Filters" button, dates are one row of buttons, and each day's heading stays
    pinned while its events scroll under it. Nothing here applies above 600px. */
 #slimbar,.whenrow,#fbtn,#onnow,#fsheet:not([open]){display:none}
-@media(max-width:600px){
+@media(max-width:600px),(pointer:coarse) and (max-width:900px){
  .hero{position:relative}
  .hero::before{content:"Alpes-Maritimes · 06";display:block;font-size:10.5px;font-weight:700;
    letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-right:60px}
@@ -598,7 +599,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    About twice as many events now fit on a screen. */
 .rtime{display:none}
 #evsheet:not([open]){display:none}
-@media(max-width:600px){
+@media(max-width:600px),(pointer:coarse) and (max-width:900px){
  .row{display:grid;grid-template-columns:46px minmax(0,1fr) 12px;
    grid-template-areas:"time body chev" "time where chev" "time kind chev";
    column-gap:12px;row-gap:3px;padding:13px 0;cursor:pointer;
@@ -1522,7 +1523,9 @@ function render(){
 }
 
 // ---------- phone controls ----------
-const PHONE = matchMedia("(max-width:600px)");
+// A phone, or any touch screen up to 900px: a foldable opened up is ~700-850px
+// wide and got the tablet layout, first event two screens down under the filters.
+const PHONE = matchMedia("(max-width:600px),(pointer:coarse) and (max-width:900px)");
 function syncPhoneBar(when, count){
   document.querySelectorAll("#whenrow [data-w]").forEach(b =>
     b.classList.toggle("on", b.dataset.w === when));
