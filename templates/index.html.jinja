@@ -83,6 +83,9 @@ h1 em{font-style:normal;color:var(--accent)}
 .marquee-inner{display:inline-block;animation:slide 38s linear infinite}
 .marquee span{font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;padding:0 16px}
 .marquee span::after{content:"◆";margin-left:32px;color:var(--accent)}
+/* Each word is a shortcut into search; it looks exactly as it did as plain text. */
+.marquee a{color:inherit;text-decoration:none}
+.marquee a:hover{color:var(--accent)}
 @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media(prefers-reduced-motion:reduce){.marquee-inner{animation:none}}
 /* stretch, not center: every control in the bar draws a box, so they must share
@@ -503,6 +506,91 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .foot{margin-top:44px;font-size:11px}
 }
 
+/* ---------- phone layout, September 2026 redesign ----------
+   The masthead stays big (it is the brand) and hands over to a slim bar once it
+   scrolls away. The filters that filled the first screen live behind one
+   "Filters" button, dates are one row of buttons, and each day's heading stays
+   pinned while its events scroll under it. Nothing here applies above 600px. */
+#slimbar,.whenrow,#fbtn,#onnow,#fsheet:not([open]){display:none}
+@media(max-width:600px){
+ .hero{position:relative}
+ .hero::before{content:"Alpes-Maritimes · 06";display:block;font-size:10.5px;font-weight:700;
+   letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-right:60px}
+ h1{font-size:clamp(44px,13.4vw,58px);margin-top:8px;line-height:.88}
+ .standfirst{display:none}
+ .hero{padding-bottom:14px}
+ /* The "+" square scrolls away with the masthead; the slim bar takes over. */
+ .addbtn{position:absolute;top:max(12px,env(safe-area-inset-top));right:16px;width:48px;height:48px}
+ .marquee{margin-bottom:12px}
+
+ #slimbar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+   position:fixed;left:0;right:0;top:0;z-index:55;background:var(--paper);
+   padding:max(8px,env(safe-area-inset-top)) 16px 8px;border-bottom:2px solid var(--ink);
+   transform:translateY(-105%);transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+ #slimbar.show{transform:none}
+ .slim-mark{color:var(--ink);text-decoration:none;font-size:20px;font-weight:900;
+   letter-spacing:-.035em;text-transform:uppercase;line-height:1}
+ .slim-mark em{font-style:normal;color:var(--accent)}
+ .slim-add{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;
+   background:var(--accent);border-color:var(--accent);color:#fff;font-size:11.5px;font-weight:700}
+ .slim-add:hover{background:var(--ink);border-color:var(--ink)}
+ @media(prefers-reduced-motion:reduce){ #slimbar{transition:none}}
+
+ /* Each day's heading stays pinned under the slim bar while its events scroll. */
+ .daymark{position:sticky;top:calc(62px + env(safe-area-inset-top));z-index:3;
+   background:var(--paper);margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+ .row,#bar,#exhibs{scroll-margin-top:140px}
+ #exhibs{scroll-margin-top:72px}
+
+ /* Dates: one scrolling row of buttons and a calendar. */
+ #when{display:none}
+ .whenrow{display:flex;gap:8px;flex:1 0 100%;min-width:0}
+ .whenchips{flex:1 1 auto;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;
+   -webkit-overflow-scrolling:touch}
+ .whenchips::-webkit-scrollbar{display:none}
+ .whenchips button,.whencal{flex:none;min-height:40px;height:40px;padding:0 13px;font-size:11.5px;
+   font-weight:700;letter-spacing:.08em}
+ .whenchips button.on,.whencal.on{background:var(--ink);color:var(--paper)}
+ .whencal{width:44px;padding:0;display:flex;align-items:center;justify-content:center}
+ .bar.searching .whenrow{opacity:.4}
+
+ /* Town, Filters and On now share one row; the rest moved into the panel. */
+ #town-wrap{flex:1 1 0;min-width:0}
+ /* The town takes what is left; the two buttons size to their words, so
+    "Running now 59" never wraps on a 360px phone. */
+ .barbtn{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:5px;
+   min-height:44px;padding:0 8px;font-size:11.5px;letter-spacing:.02em;white-space:nowrap}
+ #town-wrap{min-width:92px}
+ #town-btn{padding-right:28px;background-position:right 9px center}
+ .barbtn i{font-style:normal;font-weight:700;color:var(--accent)}
+ .barbtn:hover i,.barbtn[aria-expanded="true"] i{color:inherit}
+ .barbtn[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
+ #fbtn,#onnow:not([hidden]){display:flex}
+ #bar > .chk,#reset{display:none}
+ .cats{display:none}
+
+ /* Running now opens from its button in the filter row, not from its own block. */
+ #exhibs:not(.open){display:none}
+ #exhibs .exhib-toggle{display:none}
+
+ /* The panel rises from the bottom rather than covering the whole screen. */
+ #fsheet[open]{inset:auto 0 0 0;top:auto;height:auto;max-height:88dvh;
+   border-top:2px solid var(--ink);animation:fsup .28s cubic-bezier(.2,.8,.2,1)}
+ @keyframes fsup{from{transform:translateY(100%)}to{transform:none}}
+ @media(prefers-reduced-motion:reduce){ #fsheet[open]{animation:none}}
+ .fs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+   padding:10px 16px;border-bottom:2px solid var(--ink);flex:none}
+ .fs-head h2{font-size:19px;font-weight:800;letter-spacing:-.02em}
+ .fs-reset{font-size:14px;color:var(--accent);text-decoration:none;letter-spacing:0;text-transform:none;min-height:44px}
+ .fs-body{padding:14px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px}
+ .fs-label{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+ #fs-cats .cats{display:flex;margin:0}
+ #fs-opts{display:flex;flex-direction:column;gap:8px}
+ #fs-opts .chk{min-height:48px;justify-content:flex-start;padding:0 12px}
+ .fs-foot{flex:none;padding:12px 16px max(14px,env(safe-area-inset-bottom));border-top:1px solid var(--rule)}
+ .fs-foot button{width:100%;min-height:52px;font-size:12px;letter-spacing:.1em}
+}
+
 /* Landscape phone: don't let a 100dvh dialog trap the form. */
 @media(max-width:900px) and (orientation:landscape) and (max-height:500px){
  dialog{height:100dvh}
@@ -569,8 +657,31 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 
 <div class="marquee"><div class="marquee-inner" id="mq"></div></div>
 
+{# Phone only: once the big masthead has scrolled away, this slim bar slides in
+   with the name and "Add event", so the list gets the room and the brand stays.
+   Hidden on wider screens, where the fixed "+" square already does this job. #}
+<div id="slimbar" aria-hidden="true">
+  <a href="#" class="slim-mark" tabindex="-1">What's on in <em>Nice</em></a>
+  <button type="button" class="slim-add" id="slim-add" tabindex="-1">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add event</button>
+</div>
+
 <div class="bar" id="bar">
   <input type="search" id="q" placeholder="Search title, venue, town, artist, DJ…">
+  {# Phone only: the date menu as one row of buttons, plus a calendar. They drive
+     the #when select below (hidden on phones), so render() has one source. #}
+  <div class="whenrow" id="whenrow">
+    <div class="whenchips" id="whenchips" role="group" aria-label="When">
+      <button type="button" data-w="today">Today</button>
+      <button type="button" data-w="tomorrow">Tomorrow</button>
+      <button type="button" data-w="weekend">Weekend</button>
+      <button type="button" data-w="7">7 days</button>
+      <button type="button" data-w="30">30 days</button>
+      <button type="button" data-w="">Any date</button>
+    </div>
+    <button type="button" class="whencal" data-w="pick" aria-label="Pick a date">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
+  </div>
   {# Town: a checkbox panel so several communes can be picked at once. The
      button carries the summary ("Nice", "3 towns", "All towns"); the list
      itself is built in JS from the live data, biggest-first then A-Z. #}
@@ -587,6 +698,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   </div>
   <select id="when">
     <option value="today">Today</option>
+    <option value="tomorrow">Tomorrow</option>
     <option value="weekend">This weekend</option>
     <option value="7">Next 7 days</option>
     <option value="30" selected>Next 30 days</option>
@@ -598,6 +710,13 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     <option value="pick">Pick a date…</option>
   </select>
   <input type="date" id="day" aria-label="Pick a date" hidden>
+  {# Phone only. "Filters" opens a panel holding the categories, "Free only" and
+     "Online too", which otherwise filled the whole first screen. "Running now" opens
+     the exhibitions and shows that run for weeks, in the space beside them. #}
+  <button type="button" id="fbtn" class="barbtn" aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Filters</span><i id="fbtn-n"></i></button>
+  <button type="button" id="onnow" class="barbtn" aria-controls="exhibs" aria-expanded="false" hidden>
+    <span>Running now</span><i id="onnow-n"></i></button>
   <label class="chk"><input type="checkbox" id="online"> Online too</label>
   <label class="chk"><input type="checkbox" id="freeonly"> Free only</label>
   <button id="reset" aria-label="Reset all filters" title="Reset all filters">
@@ -643,6 +762,24 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   {%- endfor %}
 {%- endfor %}
 </div>
+
+{# The phone's filter panel. The category chips and the two checkboxes are MOVED
+   in here on a phone (see placeFilters), not copied, so their handlers and
+   state are the very same ones the wide layout uses. #}
+<dialog id="fsheet" aria-labelledby="fsheet-title">
+  <div class="fs-head">
+    <button type="button" class="dlg-x" id="fsheet-close" aria-label="Close">✕</button>
+    <h2 id="fsheet-title">Filters</h2>
+    <button type="button" class="linklike fs-reset" id="fsheet-reset">Reset</button>
+  </div>
+  <div class="fs-body" id="fs-body">
+    <div class="fs-label">What</div>
+    <div id="fs-cats"></div>
+    <div class="fs-label">Options</div>
+    <div id="fs-opts"></div>
+  </div>
+  <div class="fs-foot"><button type="button" class="primary" id="fsheet-go">Show events</button></div>
+</dialog>
 
 <button class="addbtn" id="addbtn" aria-label="Add an event" title="Add an event">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
@@ -857,7 +994,13 @@ $("mq").innerHTML = (() => {
   const b = ["Vide-greniers","Milongas","Jazz","Brocantes","Exhibitions","Club nights",
              "Design meetups","AI & tech","Village fêtes","Pop-ups","Vernissages","Expat socials",
              "Beaulieu-sur-Mer","Villefranche","Èze","Cagnes","Antibes","Cours Saleya"];
-  const r = b.map(x=>`<span>${x}</span>`).join(""); return r+r;
+  // Each word is a shortcut: tapping it searches for it. The search term is the
+  // form that actually matches listings ("milonga", not "Milongas").
+  const Q = {"Vide-greniers":"vide-grenier","Milongas":"milonga","Brocantes":"brocante",
+             "Club nights":"club","Design meetups":"design","AI & tech":"tech",
+             "Village fêtes":"fete","Pop-ups":"pop-up","Vernissages":"vernissage",
+             "Expat socials":"expat","Cours Saleya":"saleya"};
+  const r = b.map(x=>`<span><a href="#bar" data-q="${Q[x]||x}">${x}</a></span>`).join(""); return r+r;
 })();
 
 // "All the events" — the default view, black and active the moment the page
@@ -1101,7 +1244,10 @@ function exhibRow(e, i, soonCut, newCut){
 // ones that opened this week. Always opens collapsed; see the note above.
 function renderExhibs(items){
   const box=$("exhibs"); box.innerHTML="";
-  if(!items.length) return;
+  const onnow=$("onnow");
+  onnow.hidden = !items.length;
+  $("onnow-n").textContent = items.length || "";
+  if(!items.length){ box.classList.remove("open"); onnow.setAttribute("aria-expanded","false"); return; }
   const soonCut=addDays(TODAY,10), newCut=addDays(TODAY,-7);
   items=items.slice().sort((a,b)=>(a.end||a.start).localeCompare(b.end||b.start)||
     a.town.localeCompare(b.town,"fr")||a.title.localeCompare(b.title));
@@ -1125,6 +1271,8 @@ function renderExhibs(items){
   btn.className="exhib-toggle"; btn.setAttribute("aria-controls","exhib-more");
   const paint = open => {
     more.hidden = !open;
+    box.classList.toggle("open", open);
+    onnow.setAttribute("aria-expanded", open ? "true" : "false");
     btn.setAttribute("aria-expanded", open ? "true" : "false");
     // The visible label is deliberately short — the count is already in the
     // header beside it, and a long label wraps badly on a phone. Screen readers
@@ -1137,6 +1285,11 @@ function renderExhibs(items){
   btn.addEventListener("click", ()=>{
     paint(btn.getAttribute("aria-expanded") !== "true");
   });
+  onnow.onclick = ()=>{
+    const open = btn.getAttribute("aria-expanded") !== "true";
+    paint(open);
+    if(open) box.scrollIntoView({behavior:"smooth", block:"start"});
+  };
   h.appendChild(btn);                           // in the header, not below the list
 }
 
@@ -1168,6 +1321,7 @@ function render(){
   if(q) {}                                      // searching: from today, no end
   else if(when==="weekend") [from,to]=weekendRange();
   else if(when==="today") to=TODAY;
+  else if(when==="tomorrow") from=to=addDays(TODAY,1);
   // One chosen day. Anything on then matches, including a run that opened
   // earlier and is still on, because overlaps() compares ranges.
   else if(when==="pick") from=to=($("day").value||TODAY);
@@ -1227,6 +1381,7 @@ function render(){
     (standing.length?` · ${standing.length} running now`:"");
 
   renderExhibs(standing);
+  syncPhoneBar(when, feed.length);
 
   const list=$("list"); list.innerHTML="";
   if(!pairs.length){list.innerHTML='<div class="empty">Nothing matches those filters.</div>';return;}
@@ -1280,6 +1435,67 @@ function render(){
   });
   list.innerHTML=html.join("");
 }
+
+// ---------- phone controls ----------
+const PHONE = matchMedia("(max-width:600px)");
+function syncPhoneBar(when, count){
+  document.querySelectorAll("#whenrow [data-w]").forEach(b =>
+    b.classList.toggle("on", b.dataset.w === when));
+  // Keep the chosen date button in view: "30 days", the default, sits past the
+  // right edge on a phone, and an unseen selection reads as no selection.
+  const on = $("whenchips").querySelector(".on"), row = $("whenchips");
+  if(on && (on.offsetLeft < row.scrollLeft || on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth))
+    row.scrollLeft = on.offsetLeft - row.offsetLeft - 8;
+  const n = active.size + ($("freeonly").checked?1:0) + ($("online").checked?1:0);
+  $("fbtn-n").textContent = n || "";
+  $("fsheet-go").textContent = `Show ${count} event${count===1?"":"s"}`;
+}
+document.querySelectorAll("#whenrow [data-w]").forEach(b => b.onclick = () => {
+  $("when").value = b.dataset.w;
+  $("when").onchange();
+  if(b.dataset.w !== "pick") b.scrollIntoView({block:"nearest", inline:"nearest"});
+});
+
+// The categories and the two checkboxes live in the page on a wide screen and in
+// the Filters panel on a phone. Moved, never copied, so there is one of each.
+const HOME = {cats:[$("cats").parentNode, $("cats").nextSibling],
+              opts:[...document.querySelectorAll("#bar > .chk")].map(el=>[el, el.nextSibling])};
+function placeFilters(){
+  if(PHONE.matches){
+    $("fs-cats").appendChild($("cats"));
+    HOME.opts.forEach(([el])=>$("fs-opts").appendChild(el));
+  } else {
+    HOME.cats[0].insertBefore($("cats"), HOME.cats[1]);
+    HOME.opts.forEach(([el])=>$("bar").insertBefore(el, $("reset")));
+    if($("fsheet").open) $("fsheet").close();
+  }
+}
+placeFilters();
+PHONE.addEventListener("change", placeFilters);
+$("fbtn").onclick = () => $("fsheet").showModal();
+$("fsheet-close").onclick = $("fsheet-go").onclick = () => $("fsheet").close();
+$("fsheet-reset").onclick = () => $("reset").click();
+$("fsheet").addEventListener("click", e => { if(e.target === $("fsheet")) $("fsheet").close(); });
+
+// Band words search for themselves.
+$("mq").addEventListener("click", e => {
+  const a = e.target.closest("a[data-q]"); if(!a) return;
+  e.preventDefault();
+  $("q").value = a.dataset.q; render();
+  $("bar").scrollIntoView({behavior:"smooth", block:"start"});
+});
+
+// Slim bar: in once the big title has scrolled off the top, out when it returns.
+if("IntersectionObserver" in window){
+  new IntersectionObserver(([en]) => {
+    const show = !en.isIntersecting && en.boundingClientRect.top < 0;
+    $("slimbar").classList.toggle("show", show);
+    $("slimbar").setAttribute("aria-hidden", show ? "false" : "true");
+    document.querySelectorAll("#slimbar a,#slimbar button").forEach(el => el.tabIndex = show ? 0 : -1);
+  }).observe(document.querySelector(".hero h1"));
+}
+document.querySelector(".slim-mark").onclick = e => { e.preventDefault(); scrollTo({top:0, behavior:"smooth"}); };
+$("slim-add").onclick = () => $("addbtn").click();
 
 $("q").oninput=render; $("day").onchange=render;
 $("when").onchange=()=>{
