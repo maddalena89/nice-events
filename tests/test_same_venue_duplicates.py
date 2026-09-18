@@ -123,3 +123,30 @@ def test_a_different_kind_of_event_named_after_the_show_stays():
     run = _e("Dériver encore", "Le 109", end="2026-10-10", category="expo")
     gig = _e("Dériver encore", "Le 109", start="2026-09-26", time="21:00", category="concert")
     assert len(_collapse_same_venue([run, gig])) == 2
+
+
+# ---- 18 Sep 2026: typos, one match three ways, a one-word title ---------------
+
+def test_a_typo_in_the_title_is_still_the_same_show():
+    a = _e("Le Comte de Bouderbala", "Lino Ventura (Théâtre)", time="20:30")
+    b = _e("Le Comte de Bourderbala", "Théâtre Lino Ventura", time="20:30")
+    assert _same_listing(a, b)
+
+
+def test_one_match_listed_three_ways_is_one_row():
+    rows = [_e("Match OGC Nice -Lille", "Stade Allianz Riviera Bd des jardiniers", start="2026-09-20", time="17:15"),
+            _e("OGC Nice vs LOSC Lille", "Allianz Riviera", start="2026-09-20", time="17:15"),
+            _e("Match Ligue 1 – OGC NICE / LOSC", "Stade Allianz Riviera Bd des jardiniers", start="2026-09-20", time="17:15")]
+    assert len(_collapse_same_venue(rows)) == 1
+
+
+def test_a_one_word_title_at_the_same_place_and_minute():
+    a = _e("Chopin", "Opéra Nice Côte d’Azur", time="18:00")
+    b = _e("Chopin - Récital de Piano", "Opéra Nice Côte d'Azur 4/6 rue Saint-François-de-Paule", time="18:00")
+    assert _same_listing(a, b)
+
+
+def test_worded_differently_at_different_hours_stays_apart():
+    a = _e("Match OGC Nice -Lille", "Allianz Riviera", start="2026-09-20", time="17:15")
+    b = _e("OGC Nice vs LOSC Lille", "Allianz Riviera", start="2026-09-20", time="21:00")
+    assert not _same_listing(a, b)

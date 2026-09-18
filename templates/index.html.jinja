@@ -619,6 +619,10 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  #bar > .chk,#reset{display:none}
  .cats{display:none}
 
+ /* The count line under the filters is noise on a phone; it only appears while
+    a search is typed, when it says the search looks in every town and date. */
+ .tally{display:none}
+ .bar.searching ~ .tally{display:block}
  /* Running now opens from its button in the filter row, not from its own block. */
  #exhibs:not(.open){display:none}
  #exhibs .exhib-toggle{display:none}
@@ -1336,7 +1340,9 @@ function weekendRange(){
   const sun=new Date(sat); sun.setDate(sat.getDate()+1);
   return [iso(sat),iso(sun)];
 }
-const overlaps=(e,f,t)=>e.start<=t&&(e.end||e.start)>=f;
+// A play on several separate nights (`dates`, grouped at build time) is only
+// "on" on those nights, not on every day between the first and the last.
+const overlaps=(e,f,t)=>e.dates ? e.dates.some(d=>d>=f&&d<=t) : e.start<=t&&(e.end||e.start)>=f;
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const fmtDay=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
 const fmtYr=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{year:"numeric"});
@@ -1372,7 +1378,8 @@ const isMultiDay=e=>e.end&&e.end!==e.start;
 // are excluded: those happen on particular days and occurrences() places them.
 const STANDING_MIN_SPAN = 4;   // end minus start, in days: 4 = five calendar days
 const runSpan=e=>e.end?Math.round((new Date(e.end+"T12:00:00")-new Date(e.start+"T12:00:00"))/864e5):0;
-const isStanding=e=>isMultiDay(e)&&!isWeekly(e)&&runSpan(e)>=STANDING_MIN_SPAN;
+const isStanding=e=>(Array.isArray(e.dates)&&e.dates.length>1)||
+  (isMultiDay(e)&&!isWeekly(e)&&runSpan(e)>=STANDING_MIN_SPAN);
 
 // Weekly series (`days`, Monday=0, set by _mark_weekly at build time): a row
 // covering seven weeks that only actually happens on Wednesdays. JS counts from
@@ -1388,6 +1395,11 @@ const runsOn=(e,d)=>!isWeekly(e)||e.days.includes(wd(d));
 // 24 Sep" on its own reads as "every day until 24 Sep", which is the thing that
 // put a Wednesday party on a Monday.
 function runBadge(e){
+  if(Array.isArray(e.dates) && e.dates.length > 1){
+    // Recurring theatre: how many nights, and the next one.
+    const next = e.dates.find(d => d >= TODAY) || e.dates[e.dates.length-1];
+    return `<span class="pill run">${e.dates.length} nights · next ${fmtShort(next)}</span>`;
+  }
   if(!isMultiDay(e)) return "";
   const span = e.start<TODAY ? `until ${fmtShort(e.end)}`
                              : `${fmtShort(e.start)} - ${fmtShort(e.end)}`;
@@ -1988,6 +2000,10 @@ const host = u => { try { return new URL(u).hostname.replace(/^www\./,""); } cat
 function whenLines(e){
   const time = (!e.cancelled && e.time) ? e.time : "";
   if(!isMultiDay(e)) return [fmtDay(e.start), time || "Time not given"];
+  if(Array.isArray(e.dates) && e.dates.length > 1){
+    const left = e.dates.filter(d => d >= TODAY);
+    return [`${left.length} night${left.length===1?"":"s"} left`, left.map(fmtShort).join(" · ") + (time ? " · " + time : "")];
+  }
   const span = `${fmtShort(e.start)} – ${fmtShort(e.end)}`;
   if(isWeekly(e)) return [`${e.days.map(n=>DAY_NAMES[n]+"s").join(", ")}`, `${span}${time?" · "+time:""}`];
   return [e.start < TODAY ? `Until ${fmtDay(e.end)}` : span, time ? `From ${time}` : "Any day it is on"];

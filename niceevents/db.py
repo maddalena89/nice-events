@@ -203,7 +203,9 @@ def upsert(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]
             (
                 _better_title(ev.title, row["title"]),
                 ev.end.isoformat() if ev.end else (None if owns else row["end"]),
-                ev.time or row["time"],
+                # The owning source may also CLEAR a time it once gave wrongly (the
+                # OpenAgenda UTC bug stored "22:00" for events with no time).
+                ev.time if owns else (ev.time or row["time"]),
                 _richer(ev.venue, row["venue"]),
                 # First url normally wins (it's the one people clicked), but the
                 # source that OWNS the row may correct its own link — otherwise a

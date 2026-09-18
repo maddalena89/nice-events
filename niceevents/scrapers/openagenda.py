@@ -25,8 +25,9 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import Iterator, Optional
+from zoneinfo import ZoneInfo
 
 from ..models import Event, canon_town, classify
 from .base import HttpScraper, register
@@ -50,21 +51,45 @@ def _where(today: date) -> str:
             f"and lastdate_end >= date'{today.isoformat()}'")
 
 
-def _iso_date(s: Optional[str]) -> Optional[date]:
-    """OpenAgenda hands back ISO datetimes like 2026-07-18T19:30:00+02:00."""
+PARIS = ZoneInfo("Europe/Paris")
+
+
+def _local(s: Optional[str]) -> Optional[datetime]:
+    """The datetime in Nice's own time.
+
+    `firstdate_begin` / `lastdate_end` come back in UTC ("…T07:30:00+00:00"),
+    not in local time. Reading the clock digits straight off the string put every
+    OpenAgenda event two hours early in summer and one in winter: France
+    Travail's 09:30 "Comprendre les financements" showed at 07:30, and 124
+    events sat at a suspicious 07:00 (18 Sep 2026). Near midnight it also moved
+    the DATE back a day. Convert first, then read date and time."""
     if not s or len(s) < 10:
         return None
     try:
-        return date.fromisoformat(s[:10])
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt.astimezone(PARIS) if dt.tzinfo else dt
+
+
+def _iso_date(s: Optional[str]) -> Optional[date]:
+    dt = _local(s)
+    if dt is not None:
+        return dt.date()
+    try:
+        return date.fromisoformat(s[:10]) if s and len(s) >= 10 else None
     except ValueError:
         return None
 
 
 def _iso_time(s: Optional[str]) -> Optional[str]:
-    if s and len(s) >= 16 and s[10] == "T":
-        hhmm = s[11:16]
-        return None if hhmm == "00:00" else hhmm      # midnight == "no time given"
-    return None
+    if not (s and len(s) >= 16 and s[10] == "T"):
+        return None
+    dt = _local(s)
+    if dt is None:
+        return None
+    hhmm = dt.strftime("%H:%M")
+    return None if hhmm == "00:00" else hhmm      # midnight == "no time given"
 
 
 def _text(v) -> str:

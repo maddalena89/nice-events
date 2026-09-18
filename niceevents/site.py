@@ -334,6 +334,23 @@ def _venue_words(venue: Optional[str]) -> set:
     return _fold_words(venue, _VENUE_GENERIC)
 
 
+def _near(a: str, b: str) -> bool:
+    """Equal, or one typo apart in a long word: "bouderbala" / "bourderbala"."""
+    if a == b:
+        return True
+    if min(len(a), len(b)) < 6 or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) == 1
+    short, long_ = sorted((a, b), key=len)
+    return any(long_[:i] + long_[i + 1:] == short for i in range(len(long_)))
+
+
+def _contained(small: set, big: set) -> bool:
+    """Every word of `small` is in `big`, allowing one typo in a long word."""
+    return all(w in big or any(_near(w, x) for x in big) for w in small)
+
+
 def _same_listing(a: dict, b: dict) -> bool:
     """Two rows describing one event, worded differently by two sources.
 
@@ -368,10 +385,22 @@ def _same_listing(a: dict, b: dict) -> bool:
         return False
     ta, tb = _dup_words(a.get("title")), _dup_words(b.get("title"))
     st, lt = sorted((ta, tb), key=len)
-    if len(st) < 2 or not st <= lt:
-        return False
     if (ta ^ tb) & _VARIANT_WORDS:                     # a different version of it
         return False
+    if len(st) >= 2 and _contained(st, lt):
+        pass                                           # same words (a typo allowed)
+    else:
+        # Worded differently by different sources, but the same place at the same
+        # minute and most of the words in common: one match listed three ways
+        # ("Match OGC Nice -Lille", "OGC Nice vs LOSC Lille", "Match Ligue 1 – OGC
+        # NICE / LOSC", Allianz Riviera, 17:15, 20 Sep 2026). Needs an exact time
+        # on both, which two different shows in one venue never share.
+        # A one-word title counts too ("Chopin" and "Chopin - Récital de piano",
+        # Opéra de Nice, 18:00): same place, same minute, that one word shared.
+        shared = len(ta & tb)
+        if not (st and a.get("time") and a.get("time") == b.get("time")
+                and shared >= min(2, len(st)) and shared >= 0.6 * len(st)):
+            return False
     single_day = (a.get("end") or a["start"]) == a["start"]
     if single_day and a.get("time") and b.get("time") and a["time"] != b["time"]:
         return False
@@ -1302,13 +1331,102 @@ def _sitemap(base: str, updated: date, extra: list[str] | None = None) -> str:
     )
 
 
+def _drop_moved(rows: list) -> list:
+    """Drop the old copy of an event whose source MOVED its date.
+
+    The fingerprint includes the date, so a moved event arrives as a new row and
+    the old one lingers until its date passes. The signature is exact: the same
+    source, the same link, a different date, and the new date first seen at or
+    after the moment the old one was last seen (and the old one not seen for two
+    days since). Explore Nice moved OGC Nice - Lille from 19 to 20 September and
+    both showed. Several dates of one series that the source keeps listing side
+    by side do not match: their new dates were not born as the old ones died."""
+    by: dict = {}
+    for r in rows:
+        if r["url"]:
+            by.setdefault((r["source"], r["url"]), []).append(r)
+    gone = set()
+    for group in by.values():
+        if len(group) < 2:
+            continue
+        for old in group:
+            for new in group:
+                if new is old or new["start"] == old["start"]:
+                    continue
+                if (new["first_seen"] or "") >= (old["last_seen"] or "") and \
+                   _days_between(old["last_seen"], new["last_seen"]) > 2:
+                    gone.add(old["fingerprint"])
+    return [r for r in rows if r["fingerprint"] not in gone]
+
+
+def _days_between(a: Optional[str], b: Optional[str]) -> float:
+    try:
+        return (datetime.fromisoformat(b) - datetime.fromisoformat(a)).total_seconds() / 86400
+    except (TypeError, ValueError):
+        return 0.0
+
+
+#: A self-guided visit is a building with its doors open, not something on at
+#: an hour: Heritage Days filled the list with them, in French ("Visite libre de
+#: la Tour Saint-François") and in English ("Visit of the Saint-François Tower",
+#: described only as "Self-guided visits"). Maddalena: "freaking spam". Read in
+#: the title AND the description. Kept when it ALSO offers a guided visit
+#: ("libre ou commentée"), which is a real activity at a time.
+_SELF_GUIDED = re.compile(r"\bvisites?\s+libres?\b|\bself[-\s]?guided\b|\bvisites?\s+en\s+autonomie\b|\bunguided\b", re.I)
+_GUIDED_TOO = re.compile(r"comment[ée]e?s?|guid[ée]e?s?|guided|conf[ée]rence", re.I)
+
+
+def _is_self_guided_only(e: dict) -> bool:
+    text = f"{e.get('title') or ''} · {e.get('note') or ''}"
+    if not _SELF_GUIDED.search(text):
+        return False
+    # Take the self-guided phrases out first, or "self-guided" itself reads as guided.
+    return not _GUIDED_TOO.search(_SELF_GUIDED.sub(" ", text))
+
+
+def _group_stage_runs(events: list[dict]) -> list[dict]:
+    """A play or show on several separate nights becomes ONE entry for Running
+    now, carrying its dates, instead of a row on every night it is on.
+
+    Stage & theatre only (Maddalena, 18 Sep 2026: "the recurring theater only").
+    Same title, same venue, same town, two or more dates within 60 days. Weekly
+    series and single long runs are left to the existing logic."""
+    groups: dict = {}
+    for e in events:
+        if e.get("category") != "scene" or e.get("cancelled") or e.get("days"):
+            continue
+        if (e.get("end") or e["start"]) != e["start"]:
+            continue                                   # already a run
+        # No venue given (some sources leave it out): the show's own link stands in.
+        place = frozenset(_venue_words(e.get("venue"))) or e.get("url")
+        if not place:
+            continue
+        key = (_title_key(e.get("title") or ""), place, e.get("town"))
+        groups.setdefault(key, []).append(e)
+    out, used = [], set()
+    for members in groups.values():
+        dates = sorted({m["start"] for m in members})
+        if len(dates) < 2 or (date.fromisoformat(dates[-1]) - date.fromisoformat(dates[0])).days > 60:
+            continue
+        members.sort(key=lambda m: m["start"])
+        base = dict(members[0])
+        base["start"], base["end"], base["dates"] = dates[0], dates[-1], dates
+        times = {m.get("time") for m in members if m.get("time")}
+        base["time"] = times.pop() if len(times) == 1 else None
+        out.append(base)
+        used.update(id(m) for m in members)
+    return [e for e in events if id(e) not in used] + out
+
+
 def build(conn: sqlite3.Connection, out_dir: str = "dist",
           weather: Optional[dict] = None) -> tuple[int, str]:
     """`weather`: {"YYYY-MM-DD": "sun"|"part"|...} from weather.fetch_forecast, drawn
     as a small mark beside each day's heading. None (tests, no network) = no marks."""
     rows = db.upcoming(conn)
     # Remove phantom / dead listings first, before anything else looks at them.
+    rows = _drop_moved(list(rows))
     dicts = mark_cancelled(drop_suppressed([_row_to_dict(r) for r in rows]))
+    dicts = [d for d in dicts if not _is_self_guided_only(d)]
     # Cancelled events stay as their own struck-through row, and must NOT be folded
     # into a collapsed range, or a single cancelled date would disappear into an
     # otherwise-active run of the same event.
@@ -1321,6 +1439,7 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist",
         if when:
             e["time"] = when
     _mark_weekly(events)                  # a weekly series is not an every-day one
+    events = _group_stage_runs(events)    # a play on several nights: one entry
     _assign_slugs(events)                 # stable, unique short link per event
     # Every category an event belongs to, primary first. Done here, last, so it
     # sees each event's FINAL category: after the brocante fold, the manual pins
