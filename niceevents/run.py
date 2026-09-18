@@ -116,12 +116,25 @@ def cmd_scrape(args) -> int:
                     moved = db.reconcile_dates(conn, name, events)
                     if moved:
                         log.info("%-16s dropped %d row(s) whose date moved", name, moved)
-                db.log_run(conn, name, ok=True, found=len(events), added=added)
+                # "Found nothing" and "could not read the source" look identical
+                # from here, and only one of them is your problem. If the scraper
+                # came back empty AND its HTTP layer recorded a failure, say so
+                # in the runs table, because that is what sources.json publishes
+                # and it is the only place a person will see it. A source that
+                # returned events is fine even if one detail page 404'd.
+                read_error = getattr(scraper, "fetch_error", None)
+                if not events and read_error:
+                    failures.append(name)
+                    db.log_run(conn, name, ok=False, found=0, error=read_error)
+                    log.error("%-16s could not read its source: %s (%d failed request(s))",
+                              name, read_error, getattr(scraper, "fetch_failures", 1))
+                else:
+                    db.log_run(conn, name, ok=True, found=len(events), added=added)
                 total_added += added
                 total_found += len(events)
                 log.info("%-16s %3d found · %3d new · %3d merged",
                          name, len(events), added, merged)
-                if not events:
+                if not events and not read_error:
                     log.warning("%-16s returned NOTHING — likely broken, check with -v", name)
             except Exception as e:
                 failures.append(name)

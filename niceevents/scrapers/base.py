@@ -62,6 +62,29 @@ class Scraper(ABC):
     #: only for a source you have checked returns everything, every time.
     reconciles_dates: bool = False
 
+    #: Why the source could not be read, set by the HTTP layer on the first
+    #: failed request. A scraper that returns nothing AND has this set did not
+    #: find "nothing on": it could not read its source at all, and those two
+    #: are not the same news.
+    #:
+    #: This exists because of 7 August 2026. The Supabase service key had
+    #: expired, every submissions read came back HTTP 401, and sources.json
+    #: reported the source as `status: "empty", error: null` for days, which is
+    #: what a quiet Tuesday looks like. The failure was written in the Action
+    #: log and nowhere a person would ever look. A source that cannot be read
+    #: has to say so on the dashboard, in words.
+    fetch_error: Optional[str] = None
+    #: How many requests failed. One dud detail page is noise; every request
+    #: failing is the story. Only used for the log line.
+    fetch_failures: int = 0
+
+    def note_fetch_failure(self, detail: str) -> None:
+        """Record a failed request. The FIRST one is kept: later failures are
+        usually knock-ons of the same cause, and the first names it."""
+        self.fetch_failures += 1
+        if self.fetch_error is None:
+            self.fetch_error = detail[:160]
+
     @abstractmethod
     def fetch(self) -> Iterator[Event]:
         ...
@@ -117,10 +140,12 @@ class HttpScraper(Scraper):
             self._last = time.monotonic()
             if r.status_code >= 400:
                 log.warning("%s: %s -> HTTP %s", self.name, url, r.status_code)
+                self.note_fetch_failure(f"HTTP {r.status_code} on {url}")
                 return None
             return r
         except httpx.HTTPError as e:
             log.warning("%s: %s -> %s", self.name, url, e)
+            self.note_fetch_failure(f"{type(e).__name__} on {url}")
             return None
 
     def close(self):
