@@ -29,6 +29,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from . import db
 from .cancellations import mark_cancelled
 from .suppress import drop_suppressed
+from .noise import drop_noise
 from . import landing
 from .models import (DISPLAY_CATEGORIES, _title_key, classify, extra_categories, slugify,
                      weekly_weekdays)
@@ -1427,6 +1428,7 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist",
     rows = _drop_moved(list(rows))
     dicts = mark_cancelled(drop_suppressed([_row_to_dict(r) for r in rows]))
     dicts = [d for d in dicts if not _is_self_guided_only(d)]
+    dicts = drop_noise(dicts)            # jobs, fitness classes, trading webinars: noise.py
     # Cancelled events stay as their own struck-through row, and must NOT be folded
     # into a collapsed range, or a single cancelled date would disappear into an
     # otherwise-active run of the same event.
