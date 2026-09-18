@@ -128,6 +128,10 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
    free to be as wide as it likes. */
 #town-wrap{position:relative;flex:0 1 210px;width:210px;min-width:0}
 #when{flex:0 0 auto}
+#day{flex:0 0 auto}
+/* While a search is typed it looks across every town and date (see render), so
+   the two controls it is ignoring are dimmed rather than left looking in force. */
+.bar.searching #town-btn,.bar.searching #when,.bar.searching #day{opacity:.4}
 /* The town filter is a checkbox panel, not a <select>: an evening out is rarely
    confined to one commune, and the old single-choice control made "Nice or
    Villefranche" impossible to ask for. The trigger is styled to match the
@@ -423,6 +427,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .bar{gap:7px;margin-bottom:12px}
  input[type=search]{flex:1 0 100%;min-width:0}
  #town-wrap,#when{flex:1 1 calc(50% - 4px);width:auto;min-width:0}
+ #day{flex:1 0 100%;min-width:0}
  /* 16px on the trigger for the same reason as the inputs: anything smaller and
     iOS Safari zooms the page and never zooms back. */
  #town-btn{font-size:16px;padding:11px 34px 11px 12px;min-height:44px}
@@ -564,7 +569,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 
 <div class="marquee"><div class="marquee-inner" id="mq"></div></div>
 
-<div class="bar">
+<div class="bar" id="bar">
   <input type="search" id="q" placeholder="Search title, venue, town, artist, DJ…">
   {# Town: a checkbox panel so several communes can be picked at once. The
      button carries the summary ("Nice", "3 towns", "All towns"); the list
@@ -588,7 +593,11 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     {# Restored: without this there is no way to reach the ~1400 events that
        start more than a month out, and they are the ones worth planning for. #}
     <option value="">Any date</option>
+    {# One specific day. Picking it reveals the calendar box beside the menu;
+       with ~3600 listings, "what's on the 27th" is the question people ask. #}
+    <option value="pick">Pick a date…</option>
   </select>
+  <input type="date" id="day" aria-label="Pick a date" hidden>
   <label class="chk"><input type="checkbox" id="online"> Online too</label>
   <label class="chk"><input type="checkbox" id="freeonly"> Free only</label>
   <button id="reset" aria-label="Reset all filters" title="Reset all filters">
@@ -1131,8 +1140,20 @@ function renderExhibs(items){
   h.appendChild(btn);                           // in the header, not below the list
 }
 
+// Search ignores accents and case: "fete" finds "Fête", "prive" finds "Privé".
+const fold = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+// What a search looks through, folded once per event rather than on every key.
+const hay = e => e._hay || (e._hay = fold(
+  `${e.title} ${e.town} ${e.venue||""} ${e.note||""} ${tagsOf(e).map(t=>CATNAME[t]||t).join(" ")}`));
+
 function render(){
-  const q=$("q").value.trim().toLowerCase(), when=$("when").value;
+  const q=fold($("q").value.trim()), when=$("when").value;
+  // A typed search looks EVERYWHERE: every town, every date from today on. The
+  // page opens on Nice and the next 30 days, so a search scoped to those found
+  // nothing for an event in Monaco next month, and read as "search is broken"
+  // (Salon Prive MC, 18 Sep 2026). The ignored controls are dimmed meanwhile.
+  $("bar").classList.toggle("searching", !!q);
+  $("day").hidden = when!=="pick";
   // Online events are off unless asked for. This site is about being somewhere;
   // a Zoom call that surfaced under "near Nice" is noise until someone opts in.
   const showOnline=$("online").checked;
@@ -1144,14 +1165,19 @@ function render(){
   // nothing to distinguish it from "genuinely nothing on today".
   // from===to is correct, not a degenerate case: overlaps() compares two ranges,
   // so an exhibition that opened in June and is still running today still matches.
-  if(when==="weekend") [from,to]=weekendRange();
+  if(q) {}                                      // searching: from today, no end
+  else if(when==="weekend") [from,to]=weekendRange();
   else if(when==="today") to=TODAY;
+  // One chosen day. Anything on then matches, including a run that opened
+  // earlier and is still on, because overlaps() compares ranges.
+  else if(when==="pick") from=to=($("day").value||TODAY);
   else if(when){const e=new Date();e.setDate(e.getDate()+ +when);to=iso(e);}
+  const byTown = !q && townSel.size;
 
-  const base=EVENTS.filter(e=>(!townSel.size||townSel.has(e.town))&&overlaps(e,from,to)&&
+  const base=EVENTS.filter(e=>(!byTown||townSel.has(e.town))&&overlaps(e,from,to)&&
     (showOnline||!e.online)&&
     (!freeOnly||e.free)&&
-    (!q||`${e.title} ${e.town} ${e.venue||""} ${e.note||""}`.toLowerCase().includes(q)));
+    (!q||hay(e).includes(q)));
   [...$("cats").children].forEach(el=>{
     const c=el.querySelector("i"); if(!c) return;        // skip the "All" chip
     c.textContent=base.filter(e=>tagsOf(e).includes(el.dataset.k)).length;});
@@ -1194,8 +1220,9 @@ function render(){
   $("s-week").textContent=EVENTS.filter(e=>(showOnline||!e.online)&&
     (!freeOnly||e.free)&&overlaps(e,TODAY,iso(w))).length;
   $("tally").textContent=`${feed.length} listing${feed.length===1?"":"s"}`+
-    (when?" in range":"")+
-    (townSel.size===1?` · ${[...townSel][0]}`:townSel.size?` · ${townSel.size} towns`:"")+
+    (q?" · searching all towns and dates":
+      (when==="pick"?` on ${fmtDay(from)}`:when?" in range":"")+
+      (townSel.size===1?` · ${[...townSel][0]}`:townSel.size?` · ${townSel.size} towns`:""))+
     (active.size?" · filtered":"")+
     (standing.length?` · ${standing.length} running now`:"");
 
@@ -1254,11 +1281,19 @@ function render(){
   list.innerHTML=html.join("");
 }
 
-$("q").oninput=render; $("when").onchange=render;
+$("q").oninput=render; $("day").onchange=render;
+$("when").onchange=()=>{
+  // Open the calendar straight away, so "Pick a date…" is one step, not two.
+  if($("when").value==="pick"){
+    const d=$("day"); d.hidden=false; d.min=TODAY; if(!d.value) d.value=TODAY;
+    try{ d.showPicker(); }catch(_){}           // older browsers: the box is there
+  }
+  render();
+};
 $("online").onchange=render; $("freeonly").onchange=render;
 // Reset returns to the page's opening state, which includes Nice — not to a
 // blank slate. Landing on all 109 communes is not what "reset" means here.
-$("reset").onclick=()=>{$("q").value="";$("when").value="30";
+$("reset").onclick=()=>{$("q").value="";$("when").value="30";$("day").value="";
   townSel.clear(); if(TOWNS.includes("Nice")) townSel.add("Nice"); syncTown();
   $("online").checked=false; $("freeonly").checked=false;
   active.clear();
