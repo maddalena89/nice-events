@@ -136,7 +136,7 @@ HORIZON_DAYS = 90
 #: webinar groups repeating forever. They are also hidden behind a checkbox on
 #: the site. So: take a month of them, best-effort, and spend the request
 #: budget on the events someone can actually turn up to.
-ONLINE_HORIZON_DAYS = 30
+ONLINE_HORIZON_DAYS = 14   # was 30; see below
 
 #: Results Meetup returns per request. If a window comes back with this many,
 #: assume there are more behind it and split. Read off pageInfo when Meetup
@@ -154,10 +154,18 @@ MAX_REQUESTS = 500
 class Meetup(BrowserScraper):
     name = "meetup"
     label = "Meetup (all categories, near Nice)"
-    #: Lower than the 2s default because this scraper makes ~120 requests rather
-    #: than a handful. A rendered page load already costs a second or so on top,
-    #: so the real interval sits nearer two seconds either way.
-    delay = 1.0
+    #: Half a second on top of a rendered page load that already costs one to
+    #: two, so the real interval is still well over a second. Was 1.0.
+    #:
+    #: Both this and the shorter online horizon are about the workflow's time
+    #: limit. The day-by-day sweep took the whole scrape from about 26 minutes to
+    #: 39 against a 45-minute cut-off, and a run that hits the cut-off is killed
+    #: and the site does not update that day. Raising the limit is the better fix
+    #: but needs a token with `workflow` scope; until then the time comes back
+    #: from here. Online events were the cheap place to take it from: they are
+    #: hidden behind a checkbox and a fortnight of them is plenty. In-person
+    #: coverage, the reason this scraper was rewritten, is untouched at 90 days.
+    delay = 0.5
 
     def fetch(self) -> Iterator[Event]:
         found: dict[str, Event] = {}
