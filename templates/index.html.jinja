@@ -20,7 +20,7 @@
    voice of the site. Same words a reader sees, in the places a reader sees them
    — not a hidden keyword list. Kept under ~60 / ~155 characters so neither gets
    clipped mid-phrase in a result. #}
-<title>{{ title }} · events, concerts &amp; brocantes in the 06</title>
+<title>{{ title }} · events in the 06 · Que faire à Nice</title>
 <meta name="description" content="Que faire à Nice ? Vide-greniers, milongas, concerts, expos and meetups across Nice and the Alpes-Maritimes — gathered daily, always linked to the source.">
 <meta property="og:site_name" content="{{ title }}">
 <meta property="og:title" content="{{ title }} · events in Nice &amp; the 06">
@@ -546,7 +546,12 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     <p>The events you'll wish you'd known about.<br>
        From café gigs to village fêtes, discover what's happening in Nice and the
        Côte d'Azur. Hosting an event or spotted a flyer? Add it and help everyone
-       find it.</p>
+       find it.<br>
+       {#- Inside the same <p> on purpose; see the note above. This is the phrase
+           French speakers actually type into a search box, in readable text rather
+           than hidden in a tag, which is where search engines give it weight. #}
+       <span style="color:var(--muted)">Que faire à Nice &amp; dans le 06 ? Tous les
+       événements de la Côte d'Azur, gratuit et mis à jour chaque jour.</span></p>
     <div class="stats">
       <div class="stat"><b id="s-total">{{ stats.total }}</b><span>Listed</span></div>
       {#- Rendered server-side, not left at 0 for JavaScript to fix. A crawler
