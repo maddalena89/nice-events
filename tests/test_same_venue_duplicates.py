@@ -78,3 +78,48 @@ def test_the_merged_row_keeps_the_richer_listing():
     assert len(merged) == 1
     assert merged[0]["url"] == "https://example.com/x"
     assert merged[0]["note"] == "Détails"
+
+
+# ---- A shorter listing inside a longer run (_within_run) ----------------------
+# Le 109, September 2026, exactly as the sources gave it: the run from nice.fr,
+# the opening weekend from OpenAgenda, and the inauguration as one row PER DAY.
+# The earlier test above used a made-up 19-20 inauguration row, which is why it
+# passed while the live page still showed four rows.
+
+def _le109():
+    return [
+        _e("Dériver encore", "Le 109", end="2026-10-10", time="13:00", category="expo"),
+        _e("Exposition collective de L'Image Satellite « Dériver encore »", "Le 109",
+           end="2026-09-20", time="11:00", category="expo"),
+        _e("Inauguration de l’image_Satellite", "Le 109", time="13:00", category="expo"),
+        _e("Inauguration de l’image_Satellite", "Le 109", start="2026-09-20", time="12:00",
+           category="expo"),
+        _e("Vernissage de l'exposition collective « Dériver encore »", "Le 109",
+           time="15:00", category="expo"),
+    ]
+
+
+def test_one_exhibition_listed_four_ways_is_one_row_for_the_whole_run():
+    out = _collapse_same_venue(_le109())
+    runs = [e for e in out if "vernissage" not in e["title"].lower()]
+    assert len(runs) == 1
+    assert (runs[0]["start"], runs[0]["end"]) == ("2026-09-19", "2026-10-10")
+
+
+def test_the_vernissage_stays_its_own_event():
+    out = _collapse_same_venue(_le109())
+    assert any(e["title"].startswith("Vernissage") for e in out)
+
+
+def test_a_guided_tour_of_an_exhibition_is_not_the_exhibition():
+    run = _e("Exposition Lévitation de Mathieu Forget", "Musée de la Photographie Charles Nègre",
+             start="2026-06-13", end="2026-09-27", category="expo")
+    tour = _e("Visite commentée de l’exposition « Lévitation » de Mathieu Forget",
+              "Musée de la Photographie Charles Nègre", time="15:00", category="expo")
+    assert len(_collapse_same_venue([run, tour])) == 2
+
+
+def test_a_different_kind_of_event_named_after_the_show_stays():
+    run = _e("Dériver encore", "Le 109", end="2026-10-10", category="expo")
+    gig = _e("Dériver encore", "Le 109", start="2026-09-26", time="21:00", category="concert")
+    assert len(_collapse_same_venue([run, gig])) == 2

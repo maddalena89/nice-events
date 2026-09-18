@@ -378,13 +378,70 @@ def _same_listing(a: dict, b: dict) -> bool:
     return True
 
 
+#: Something you go to at a set hour that NAMES an exhibition without being it:
+#: its opening or closing party, a guided tour of it, a workshop or screening
+#: around it. Never folded into the run by _within_run. Checked on the raw
+#: title, because _CARD_STOP drops some of these from the words _dup_words
+#: compares. "Visite commentée de l'exposition « Lévitation »" (19 and 20 Sep)
+#: would otherwise vanish into "Exposition Lévitation de Mathieu Forget".
+_OCCASION_WORDS = set((
+    "vernissage vernissages finissage finissages visite visites commentee "
+    "commentees atelier ateliers projection projections"
+).split())
+
+
+def _span_days(e: dict) -> int:
+    return (date.fromisoformat(e.get("end") or e["start"]) - date.fromisoformat(e["start"])).days + 1
+
+
+def _within_run(inner: dict, run: dict) -> bool:
+    """`inner` is a shorter listing of the run `run`: an exhibition listed for its
+    whole run by one source and for its opening weekend, or day by day, by
+    another. _same_listing cannot see these, because it needs identical dates.
+
+    Le 109, September 2026: "Dériver encore" (19 Sep - 10 Oct), "Exposition
+    collective de L'Image Satellite « Dériver encore »" (19-20 Sep) and
+    "Inauguration de l'image_Satellite" (one row on the 19th, one on the 20th)
+    are one exhibition, and were four rows under it.
+
+    Same conditions as _same_listing, except the dates: the run lasts at least
+    two days and `inner` sits wholly inside it. Plus the same category, so a talk
+    named after an exhibition is not swallowed by it, and no vernissage."""
+    if _span_days(run) < 2 or _span_days(inner) >= _span_days(run):
+        return False
+    if not (run["start"] <= inner["start"] and
+            (inner.get("end") or inner["start"]) <= (run.get("end") or run["start"])):
+        return False
+    if (inner.get("town") or "") != (run.get("town") or ""):
+        return False
+    if inner.get("category") != run.get("category"):
+        return False
+    vi, vr = _venue_words(inner.get("venue")), _venue_words(run.get("venue"))
+    if not vi or not vr:
+        return False
+    sv, lv = sorted((vi, vr), key=len)
+    if not sv <= lv:
+        return False
+    ti, tr = _dup_words(inner.get("title")), _dup_words(run.get("title"))
+    st, lt = sorted((ti, tr), key=len)
+    if len(st) < 2 or not st <= lt:
+        return False
+    raw_i, raw_r = _fold_words(inner.get("title"), set()), _fold_words(run.get("title"), set())
+    if (raw_i ^ raw_r) & (_VARIANT_WORDS | _OCCASION_WORDS):
+        return False
+    return True
+
+
 def _collapse_same_venue(events: list[dict]) -> list[dict]:
-    """Fold rows that _same_listing says are one event. The survivor is the row
-    carrying the most information, then the fuller title; gaps are filled from
-    the others, as _merge_cluster does."""
+    """Fold rows that _same_listing or _within_run say are one event. The
+    survivor is the row carrying the most information, then the fuller title;
+    gaps are filled from the others, as _merge_cluster does, and the dates
+    become the whole span the group covers."""
     by_day: dict[tuple, list[int]] = {}
+    by_town: dict[str, list[int]] = {}
     for i, e in enumerate(events):
         by_day.setdefault((e["start"], e.get("town") or ""), []).append(i)
+        by_town.setdefault(e.get("town") or "", []).append(i)
 
     parent = list(range(len(events)))
 
@@ -400,6 +457,15 @@ def _collapse_same_venue(events: list[dict]) -> list[dict]:
                 i, j = idxs[x], idxs[y]
                 if _same_listing(events[i], events[j]):
                     parent[find(i)] = find(j)
+
+    # Shorter listings inside a longer run. Only runs are compared against the
+    # rest of their town, which keeps this to a few hundred thousand cheap checks.
+    for idxs in by_town.values():
+        runs = [i for i in idxs if _span_days(events[i]) >= 2]
+        for r in runs:
+            for i in idxs:
+                if i != r and _within_run(events[i], events[r]):
+                    parent[find(i)] = find(r)
 
     groups: dict[int, list[dict]] = {}
     for i, e in enumerate(events):
@@ -421,6 +487,11 @@ def _collapse_same_venue(events: list[dict]) -> list[dict]:
                 if not base.get(f) and m.get(f):
                     base[f] = m[f]
             base["free"] = bool(base.get("free") or m.get("free"))
+        # The whole run, not the opening weekend the richest listing described.
+        base["start"] = min(m["start"] for m in members)
+        last = max((m.get("end") or m["start"]) for m in members)
+        if last != base["start"]:
+            base["end"] = last
         out.append(base)
     out.sort(key=lambda e: (e["start"], e.get("title", "")))
     return out
