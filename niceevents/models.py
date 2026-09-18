@@ -78,7 +78,9 @@ _CATEGORY_RULES: list[tuple[str, str]] = [
      r"tech\b|pitch|hackathon|business|entrepreneur|coworking|summit|forum|salon professionnel|webinar", "business"),
     # Talks live with workshops. Both are someone standing up and explaining
     # something, so a reader looks in the same place for either.
-    (r"atelier|workshop|stage de|masterclass|initiation|cours\b|"
+    # "\bcours\b", not "cours\b": without the leading boundary "Parcours" matched,
+    # and an exhibition called "Fragments d'un Parcours" was tagged a workshop.
+    (r"atelier|workshop|stage de|masterclass|initiation|\bcours\b|"
      r"conférence|conference|causerie|table ronde|rencontre littéraire", "atelier"),
     (r"expat|language exchange|échange linguistique|apéro|picnic|pique-nique|rencontre|social|hangout|"
      r"jeux de société|board game|quiz|blind test", "social"),
@@ -141,6 +143,35 @@ _NONEVENT_RE = re.compile("|".join(_NONEVENT_PATTERNS))
 def is_nonevent(title: str) -> bool:
     """True if the title looks like club admin, not a public event."""
     return bool(_NONEVENT_RE.search(strip_accents(title or "").lower()))
+
+
+def extra_categories(title: Optional[str], primary: str) -> list[str]:
+    """Other categories the TITLE clearly signals, beyond the one already chosen.
+
+    An event can genuinely be two things. "Visites guidées de la bibliothèque et
+    de l'exposition Michel Butor" is a guided visit AND an exhibition; filing it
+    under one hid it from anyone browsing the other. Until now the site had
+    exactly one category per event, and overrides.py was pinning things to "the
+    tab the right crowd looks at" to work around that.
+
+    The primary category is left alone. It is what the row is labelled with, what
+    the landing page and structured data use, and it may come from a source's own
+    type label or a manual pin, both of which know better than a keyword. This
+    only ADDS categories on top.
+
+    Title only, deliberately, for the reason classify() gives: a prose description
+    name-drops things. A concert blurb that mentions a gallery is not an
+    exhibition. Measured on the live feed, the title adds a second category to
+    about 3% of events, and the common pairs are the right ones (exhibition plus
+    guided visit, workshop plus dance).
+    """
+    hay = strip_accents((title or "").lower())
+    out: list[str] = []
+    for rx, cat in _COMPILED_RULES:
+        c = "marche" if cat == "brocante" else cat      # same fold as the chips
+        if c != primary and c not in out and rx.search(hay):
+            out.append(c)
+    return out
 
 
 def classify(*parts: Optional[str]) -> str:

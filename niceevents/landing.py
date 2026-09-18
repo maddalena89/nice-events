@@ -309,7 +309,10 @@ def collect(events: list[dict]) -> tuple[list[dict], list[dict]]:
 
     cats: dict[str, list[dict]] = {}
     for e in live:
-        cats.setdefault(_display_cat(e), []).append(e)
+        # Under every category the event belongs to, not only its primary one, so
+        # a guided visit of an exhibition is on /exhibitions/ AND /guided-visits/.
+        for c in (e.get("tags") or [_display_cat(e)]):
+            cats.setdefault("marche" if c == "brocante" else c, []).append(e)
 
     town_pages = [
         {"kind": "town", "key": t, "name": t, "path": f"/in/{slugify(t)}/", "events": evs}

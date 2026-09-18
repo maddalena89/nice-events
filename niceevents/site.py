@@ -30,7 +30,7 @@ from . import db
 from .cancellations import mark_cancelled
 from .suppress import drop_suppressed
 from . import landing
-from .models import (DISPLAY_CATEGORIES, _title_key, classify, slugify,
+from .models import (DISPLAY_CATEGORIES, _title_key, classify, extra_categories, slugify,
                      weekly_weekdays)
 from .overrides import apply_override
 
@@ -1101,6 +1101,14 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
             e["time"] = when
     _mark_weekly(events)                  # a weekly series is not an every-day one
     _assign_slugs(events)                 # stable, unique short link per event
+    # Every category an event belongs to, primary first. Done here, last, so it
+    # sees each event's FINAL category: after the brocante fold, the manual pins
+    # in overrides.py, and the merging of duplicates. The chips filter on this
+    # list, so one event can sit under two of them. `category` is kept as it was
+    # for everything that needs exactly one: the row's label, the structured
+    # data, and anyone already reading events.json.
+    for e in events:
+        e["tags"] = [e["category"]] + extra_categories(e.get("title"), e["category"])
     stats = db.stats(conn)
 
     out = Path(out_dir)
