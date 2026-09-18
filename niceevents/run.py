@@ -177,8 +177,10 @@ def cmd_scrape(args) -> int:
 
 def cmd_build(args) -> int:
     from .site import build
+    from .weather import fetch_forecast
+    weather = fetch_forecast()                 # {} on any failure; never stops a build
     with db.connect(args.db) as conn:
-        n, out = build(conn, out_dir=args.out)
+        n, out = build(conn, out_dir=args.out, weather=weather)
     print(f"  built {out}/index.html with {n} events")
     return 0
 

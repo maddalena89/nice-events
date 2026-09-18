@@ -52,11 +52,28 @@
         data-cf-beacon='{"token": "{{ cf_analytics_token }}"}'></script>
 {%- endif %}
 <style>
-:root{color-scheme:light;--ink:#0e0e0e;--paper:#f4f2ed;--accent:#1f3bff;--muted:#7d7970;--rule:#d8d4cb}
+:root{color-scheme:light;--ink:#0e0e0e;--paper:#f4f2ed;--accent:#1f3bff;--muted:#7d7970;--rule:#d8d4cb;
+  /* Blue as TEXT gets its own token: the brand blue reads on cream, but on the
+     dark page it needs lifting to stay legible. Fills keep --accent. */
+  --accent-text:#1f3bff;--hover:#e8e5de;--press:#ebe8e1;--field:#fff;--field-line:#dcd8cf;
+  --soft-ink:#4a463f;--placeholder:#b3aea3;--dash:#c7c2b8;--accent-deep:#1730d6;
+  --chev:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e0e0e' stroke-width='2.5' stroke-linecap='square'><path d='M5 9l7 7 7-7'/></svg>")}
+/* Dark mode, when the phone or computer is set to dark. Same design, inverted:
+   ink ground, cream type, and a coarser WHITE grain over everything so the page
+   keeps its printed, tactile feel instead of going flat digital black. */
+@media (prefers-color-scheme:dark){
+ :root{color-scheme:dark;--ink:#f1efe9;--paper:#0f0f0e;--accent:#3b55ff;--accent-text:#8a9bff;
+   --muted:#a19c92;--rule:#2e2d2a;--hover:#1e1d1b;--press:#242320;--field:#1a1a18;--field-line:#3a3935;
+   --soft-ink:#d2cdc3;--placeholder:#6f6b63;--dash:#4a4843;--accent-deep:#2f47e6;
+   --chev:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f1efe9' stroke-width='2.5' stroke-linecap='square'><path d='M5 9l7 7 7-7'/></svg>")}
+ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:90;opacity:.55;
+   mix-blend-mode:screen;background-size:260px 260px;
+   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='g' x='0' y='0'><feTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 2.6 -1.55'/></filter><rect width='100%25' height='100%25' filter='url(%23g)' opacity='.5'/></svg>")}
+}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--paper);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px 80px}
-a{color:var(--accent)}
+a{color:var(--accent-text)}
 .hero{padding:44px 0 0}
 /* padding-right clears the fixed add-event button (52px wide at right:24px = 76px
    of occupied gutter). Without it the button sits on top of "· 5 SOURCES". */
@@ -66,14 +83,25 @@ a{color:var(--accent)}
 .linklike{border:0;background:none;padding:0;margin:0;min-height:0;font:inherit;
   letter-spacing:inherit;text-transform:inherit;color:var(--muted);cursor:pointer;
   text-decoration:underline;text-underline-offset:2px}
-.linklike:hover{background:none;color:var(--accent)}
+.linklike:hover{background:none;color:var(--accent-text)}
 /* About dialog reads as prose, not a form. */
 .about-body p{margin:0 0 14px;font-size:15.5px;line-height:1.6;max-width:60ch}
 .about-body p:last-child{margin-bottom:0}
-.about-body a{color:var(--accent)}
+.about-body a{color:var(--accent-text)}
 .about-body .sign{font-weight:600;color:var(--ink)}
 h1{font-size:clamp(58px,12.5vw,168px);line-height:.83;letter-spacing:-.05em;font-weight:800;margin:26px 0 0;text-transform:uppercase}
 h1 em{font-style:normal;color:var(--accent)}
+/* The town in the title is a little slot machine: swipe or tap it and it spins
+   through the towns, then lands. A game only; it changes nothing on the page.
+   The second line is a flex row aligned on the baseline, and the town is a
+   one-line window, so the reel inside it (added by script on first touch, so
+   search engines only ever read "Nice") never moves the layout. */
+h1 .l2{display:inline-flex;align-items:baseline;white-space:nowrap;max-width:100%}
+h1 .l2 em{display:block;overflow:hidden;height:1em;line-height:1;touch-action:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer}
+h1 .reel{display:block;will-change:transform}
+h1 .reel .it{display:flex;align-items:flex-end;height:1em;line-height:1}
+h1 .reel .it i{font-style:normal;white-space:nowrap}
 .standfirst{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:30px 0 0;padding-bottom:28px}
 .standfirst p{font-size:17px;line-height:1.4;max-width:46ch}
 .stats{display:flex;gap:38px;align-self:end;justify-content:flex-end}
@@ -82,10 +110,10 @@ h1 em{font-style:normal;color:var(--accent)}
 .marquee{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);overflow:hidden;white-space:nowrap;padding:11px 0;margin-bottom:34px;background:var(--ink);color:var(--paper)}
 .marquee-inner{display:inline-block;animation:slide 38s linear infinite}
 .marquee span{font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;padding:0 16px}
-.marquee span::after{content:"◆";margin-left:32px;color:var(--accent)}
+.marquee span::after{content:"◆";margin-left:32px;color:var(--accent-text)}
 /* Each word is a shortcut into search; it looks exactly as it did as plain text. */
 .marquee a{color:inherit;text-decoration:none}
-.marquee a:hover{color:var(--accent)}
+.marquee a:hover{color:var(--accent-text)}
 @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media(prefers-reduced-motion:reduce){.marquee-inner{animation:none}}
 /* stretch, not center: every control in the bar draws a box, so they must share
@@ -106,7 +134,7 @@ h1 em{font-style:normal;color:var(--accent)}
      margin:0;color:var(--ink);
      border:1px solid var(--ink);padding:10px 12px;font-size:14.5px;font-weight:400;
      letter-spacing:normal;text-transform:none;user-select:none}
-.chk:hover{background:#e8e5de}
+.chk:hover{background:var(--hover)}
 /* Native checkboxes draw themselves rounded on macOS, which fights a site with
    border-radius:0 on every other edge. appearance:none hands us the box so we
    can keep it square, then we draw the tick ourselves. */
@@ -123,7 +151,7 @@ input[type=search]{flex:1;min-width:190px}
    ignores padding-right. Take it off, draw our own, and reserve 34px for it so
    long town names stop colliding with the arrow. */
 select{appearance:none;-webkit-appearance:none;padding-right:34px;
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e0e0e' stroke-width='2.5' stroke-linecap='square'><path d='M5 9l7 7 7-7'/></svg>");
+  background-image:var(--chev);
   background-repeat:no-repeat;background-position:right 12px center;background-size:11px 11px}
 /* A <select> sizes itself to its LONGEST <option>, and the town list carries
    names like "Saint-Martin-Vésubie" — left alone it ate most of the bar. Cap it:
@@ -145,9 +173,9 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
 #town-btn{display:flex;align-items:center;width:100%;
   font-size:14.5px;font-weight:400;letter-spacing:normal;text-transform:none;text-align:left;
   padding:10px 34px 10px 12px;background-color:transparent;color:var(--ink);
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e0e0e' stroke-width='2.5' stroke-linecap='square'><path d='M5 9l7 7 7-7'/></svg>");
+  background-image:var(--chev);
   background-repeat:no-repeat;background-position:right 12px center;background-size:11px 11px}
-#town-btn:hover{background-color:#e8e5de;color:var(--ink)}
+#town-btn:hover{background-color:var(--hover);color:var(--ink)}
 #town-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #town-btn[aria-expanded=true]{outline:2px solid var(--accent);outline-offset:-2px}
 /* The panel hangs off the trigger rather than pushing the page around. It is
@@ -168,7 +196,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
 .multi-list{max-height:min(330px,50vh);overflow-y:auto;padding:4px 0}
 .opt{display:flex;align-items:center;gap:9px;margin:0;padding:7px 12px;cursor:pointer;
   font-size:14px;font-weight:400;letter-spacing:normal;text-transform:none;color:var(--ink)}
-.opt:hover{background:#e8e5de}
+.opt:hover{background:var(--hover)}
 .opt span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The count is the whole point of the ordering -- it shows why Grasse outranks
    Villefranche -- so it is dimmed but never hidden. */
@@ -207,7 +235,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
    the outer edges are single hairlines, not doubled. */
 .cats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--ink);border-right:0;border-bottom:0;margin-bottom:22px}
 .cat{display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:pointer;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);user-select:none;white-space:nowrap;font-weight:600}
-.cat:hover{background:#e8e5de}
+.cat:hover{background:var(--hover)}
 .cat.on{background:var(--ink);color:var(--paper)}
 .cat i{font-style:normal;opacity:.5;margin-left:5px;font-weight:400}
 button{font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:9px 16px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
@@ -216,6 +244,9 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .tally{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
 .daymark{display:flex;align-items:baseline;gap:14px;margin:34px 0 0;padding-bottom:7px;border-bottom:2px solid var(--ink)}
 .daymark b{font-size:22px;font-weight:800;letter-spacing:-.02em}
+/* The day's forecast: one small line drawing in ink, nothing more. */
+.wx{display:inline-flex;align-self:center;color:var(--ink)}
+.wx svg{width:17px;height:17px;display:block}
 .daymark span{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 /* A wide filter can put well over a thousand rows in the list. content-visibility
    lets the browser skip layout and paint for the ones scrolled out of view, and
@@ -224,11 +255,11 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
    height, so one estimate fits. Purely a rendering hint: nothing about the
    markup, find-in-page or scroll-to-event changes. */
 .row{content-visibility:auto;contain-intrinsic-size:auto 62px;display:grid;grid-template-columns:46px 1fr 210px 120px;gap:18px;align-items:baseline;padding:15px 0;border-bottom:1px solid var(--rule)}
-.row:hover{background:#e9e6df}
+.row:hover{background:var(--hover)}
 .idx{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 .ttl{font-size:19px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
 .ttl a{color:var(--ink);text-decoration:none}
-.ttl a:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.ttl a:hover{color:var(--accent-text);text-decoration:underline;text-underline-offset:3px}
 .sub{font-size:12.5px;color:var(--muted);margin-top:4px}
 .sub .etime{font-weight:700;color:var(--ink)}
 /* Price rides alongside the time. Same weight as the time so the pair reads
@@ -241,7 +272,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .pill{display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:2px 6px;margin-right:5px;vertical-align:2px;background:var(--accent);color:#fff}
 .pill.out{background:transparent;color:var(--muted);border:1px solid var(--rule)}
 /* Run-length sticker for exhibitions and other multi-day events. */
-.pill.run{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.pill.run{background:transparent;color:var(--accent-text);border:1px solid var(--accent)}
 /* "Ends soon" urgency badge + "New" badge for the exhibitions section. */
 .pill.soon{background:#c8102e;color:#fff}
 .pill.new{background:var(--accent);color:#fff}
@@ -258,7 +289,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
   font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .exhib-toggle::after{content:"";position:absolute;inset:-14px -8px}
-.exhib-toggle:hover{background:none;color:var(--accent)}
+.exhib-toggle:hover{background:none;color:var(--accent-text)}
 /* No blue ring after a click — Safari draws one by default and it looked like a
    mistake. Keyboard users still get it, which is the case that needs it. */
 .exhib-toggle:focus{outline:none}
@@ -275,10 +306,10 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
    button chrome so they're just muted icons, not bordered boxes. */
 .sharebtn,.calbtn,.cardbtn{border:0;background:none;padding:5px;margin-left:2px;color:var(--muted);
   cursor:pointer;line-height:0;vertical-align:-3px;min-height:0}
-.sharebtn:hover,.calbtn:hover,.cardbtn:hover{background:none;color:var(--accent)}
+.sharebtn:hover,.calbtn:hover,.cardbtn:hover{background:none;color:var(--accent-text)}
 .sharebtn svg,.calbtn svg,.cardbtn svg{display:block}
 .sharebtn[data-copied]{color:#0a7a3f}
-.cardbtn[data-busy]{color:var(--accent);opacity:.6}
+.cardbtn[data-busy]{color:var(--accent-text);opacity:.6}
 /* A shared event, opened via ?e=… — highlighted in blue and scrolled to. */
 .row.hl{background:rgba(31,59,255,.10);box-shadow:inset 3px 0 0 var(--accent)}
 .sec{margin-top:76px}
@@ -291,7 +322,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-weight:600}
 label i{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400;opacity:.6}
 .form input,.form select,.form textarea{width:100%}
-.callout{border-left:3px solid var(--accent);background:rgba(31,59,255,.05);padding:14px 16px;font-size:15px;line-height:1.5;color:#4a463f;margin-bottom:22px;max-width:56ch}
+.callout{border-left:3px solid var(--accent);background:rgba(31,59,255,.05);padding:14px 16px;font-size:15px;line-height:1.5;color:var(--soft-ink);margin-bottom:22px;max-width:56ch}
 .callout b{color:var(--ink)}
 /* Snap-a-flyer */
 .snap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
@@ -301,7 +332,7 @@ label i{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400;o
   padding:11px 16px;min-height:44px}
 .snap-btn:hover{background:var(--ink);border-color:var(--ink)}
 .snap-msg{font-size:14px;color:var(--muted);flex:1;min-width:180px}
-.snap-msg.busy{color:var(--accent)}
+.snap-msg.busy{color:var(--accent-text)}
 .snap-msg.done{color:#0a7a3f}
 
 /* Add-event: blue square, white plus, pinned top-right. Opens the form as a
@@ -359,7 +390,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:8px 12px;min-height:36px}
 #freshbar button:hover{background:#fff;color:var(--ink)}
 #freshbar #freshno{background:transparent;color:var(--paper);padding:8px 4px;font-size:13px;letter-spacing:0}
-#freshbar #freshno:hover{background:transparent;color:var(--accent)}
+#freshbar #freshno:hover{background:transparent;color:var(--accent-text)}
 /* NOTE the space after the opening brace, and keep it there. A brace followed
    immediately by a hash is how Jinja opens a comment, so a CSS rule that puts
    an id selector straight after the brace silently swallows the whole rest of
@@ -381,7 +412,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 .browse ul{list-style:none;display:flex;flex-wrap:wrap;gap:7px 8px;margin:0 0 20px;padding:0}
 .browse a{display:inline-block;border:1px solid var(--rule);padding:6px 10px;font-size:12.5px;
   color:var(--ink);text-decoration:none}
-.browse a:hover{border-color:var(--ink);background:#e8e5de}
+.browse a:hover{border-color:var(--ink);background:var(--hover)}
 .browse a i{font-style:normal;color:var(--muted);font-size:11px}
 .empty{padding:60px 0;text-align:center;color:var(--muted)}
 /* ---------------- tablet ---------------- */
@@ -573,7 +604,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    min-height:44px;padding:0 8px;font-size:11.5px;letter-spacing:.02em;white-space:nowrap}
  #town-wrap{min-width:92px}
  #town-btn{padding-right:28px;background-position:right 9px center}
- .barbtn i{font-style:normal;font-weight:700;color:var(--accent)}
+ .barbtn i{font-style:normal;font-weight:700;color:var(--accent-text)}
  .barbtn:hover i,.barbtn[aria-expanded="true"] i{color:inherit}
  .barbtn[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
  #fbtn,#onnow:not([hidden]){display:flex}
@@ -592,7 +623,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .fs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
    padding:10px 16px;border-bottom:2px solid var(--ink);flex:none}
  .fs-head h2{font-size:19px;font-weight:800;letter-spacing:-.02em}
- .fs-reset{font-size:14px;color:var(--accent);text-decoration:none;letter-spacing:0;text-transform:none;min-height:44px}
+ .fs-reset{font-size:14px;color:var(--accent-text);text-decoration:none;letter-spacing:0;text-transform:none;min-height:44px}
  .fs-body{padding:14px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px}
  .fs-label{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
  #fs-cats .cats{display:flex;margin:0}
@@ -614,7 +645,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    grid-template-areas:"time body chev" "time where chev" "time kind chev";
    column-gap:12px;row-gap:3px;padding:13px 0;cursor:pointer;
    -webkit-tap-highlight-color:transparent}
- .row:active{background:#ebe8e1}
+ .row:active{background:var(--press)}
  .row.exrow{grid-template-columns:minmax(0,1fr) 12px;grid-template-areas:"body chev" "where chev" "kind chev"}
  .rtime{display:block;grid-area:time;font-size:15px;font-weight:700;line-height:1.3;
    font-variant-numeric:tabular-nums;padding-top:1px}
@@ -632,7 +663,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  /* No arrow after the title (tried, felt like too much). Instead a title turns
     blue the moment it is pressed and stays blue until the source opens, so the
     tap is visibly heard. "opening" is added on tap by the script below. */
- .ttl a.tt:active,.ttl a.tt.opening,.ev-body h2 a:active,.ev-body h2 a.opening{color:var(--accent)}
+ .ttl a.tt:active,.ttl a.tt.opening,.ev-body h2 a:active,.ev-body h2 a.opening{color:var(--accent-text)}
 
  /* The event page: full screen, and it simply appears. The slide-in was tried
     in the motion prototype and turned down. */
@@ -641,7 +672,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    padding:max(8px,env(safe-area-inset-top)) 8px 8px;border-bottom:2px solid var(--ink)}
  .ev-back{display:flex;align-items:center;gap:8px;border:0;background:none;min-height:44px;
    padding:0 8px;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
- .ev-back:hover{background:none;color:var(--accent)}
+ .ev-back:hover{background:none;color:var(--accent-text)}
  .ev-body:focus{outline:none}
  .ev-body{flex:1;overflow-y:auto;padding:18px 16px max(24px,env(safe-area-inset-bottom));
    display:flex;flex-direction:column;gap:16px}
@@ -670,9 +701,29 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .ev-also{display:grid;grid-template-columns:46px minmax(0,1fr);gap:12px;width:100%;text-align:left;
    border:0;border-bottom:1px solid var(--rule);background:none;padding:12px 0;min-height:0;
    font-size:15px;letter-spacing:0;text-transform:none;font-weight:700;color:var(--ink)}
- .ev-also:hover{background:none;color:var(--accent)}
+ .ev-also:hover{background:none;color:var(--accent-text)}
  .ev-also span{font-variant-numeric:tabular-nums}
 }
+
+/* The Easter egg: a small blue card, whatever the screen size. */
+#egg{width:min(360px,calc(100% - 32px));max-width:none;height:fit-content;max-height:none;margin:auto;
+  inset:0;border:0;padding:0;background:var(--accent);color:#fff}
+#egg:not([open]){display:none}
+#egg::backdrop{background:rgba(14,14,14,.6)}
+#egg[open]{animation:eggpop .32s cubic-bezier(.3,1.4,.45,1)}
+@keyframes eggpop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){ #egg[open]{animation:none}}
+.egg-in{position:relative;padding:22px 20px 20px;display:flex;flex-direction:column;gap:8px}
+.egg-k{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.8}
+.egg-q{font-size:13px;opacity:.85;margin-top:6px}
+#egg h2{font-size:26px;font-weight:900;letter-spacing:-.03em;line-height:1.05;text-transform:uppercase;padding-right:30px}
+.egg-m{font-size:14px;opacity:.9}
+.egg-acts{display:flex;gap:8px;margin-top:10px}
+.egg-acts button{flex:1;min-height:46px;border:1px solid #fff;background:transparent;color:#fff}
+.egg-acts button.primary{background:#fff;color:#0e0e0e;border-color:#fff}
+.egg-acts button:hover{background:#0e0e0e;border-color:#0e0e0e;color:#fff}
+.egg-x{position:absolute;top:12px;right:12px;border-color:#fff;color:#fff;background:transparent}
+.egg-x:hover{background:#fff;color:var(--accent)}
 
 /* Landscape phone: don't let a 100dvh dialog trap the form. */
 @media(max-width:900px) and (orientation:landscape) and (max-height:500px){
@@ -681,19 +732,19 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 }
 
 /* ---------- Add-event form: friendlier "Option B" styling ---------- */
-.form label{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;color:#4a463f}
+.form label{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;color:var(--soft-ink)}
 .form label i{opacity:.55}
-.form input,.form select,.form textarea{border:1px solid #dcd8cf;border-radius:11px;background:#fff;padding:11px 13px;font-size:15px}
+.form input,.form select,.form textarea{border:1px solid var(--field-line);border-radius:11px;background:var(--field);color:var(--ink);padding:11px 13px;font-size:15px}
 .form input:focus,.form select:focus,.form textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,59,255,.16)}
-.form input::placeholder,.form textarea::placeholder{color:#b3aea3}
+.form input::placeholder,.form textarea::placeholder{color:var(--placeholder)}
 .form textarea{font:inherit;resize:vertical;min-height:92px;line-height:1.45}
 .form .hint{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4;text-transform:none;letter-spacing:0}
 .form button.primary{border-radius:11px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:700;padding:14px 18px}
-.form button.primary:hover{background:#1730d6;border-color:#1730d6;color:#fff}
+.form button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
 /* the snap area becomes a soft, dashed "drop a flyer" panel */
 .snap{display:block;margin-bottom:20px}
 .snap-btn{display:flex;align-items:center;gap:12px;width:100%;justify-content:flex-start;
-  background:#fff;color:#4a463f;border:1.5px dashed #c7c2b8;border-radius:12px;
+  background:var(--field);color:var(--soft-ink);border:1.5px dashed var(--dash);border-radius:12px;
   padding:12px 15px;font-size:13.5px;letter-spacing:0;text-transform:none;font-weight:600;min-height:0}
 .snap-btn::before{content:"📸";background:var(--accent);color:#fff;border-radius:9px;padding:7px 9px;font-size:15px;line-height:1}
 .snap-btn:hover{background:#fff;border-color:var(--accent);color:var(--ink)}
@@ -714,7 +765,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     <span>Alpes-Maritimes · 06</span>
     <span><button type="button" class="linklike" id="about-open">About</button> · <button type="button" class="linklike" id="bug-top">Report a bug</button> · <button type="button" class="linklike" id="add-top">Add your event for free</button> · Updated <b>{{ updated }}</b></span>
   </div>
-  <h1>What's<br>on in <em>Nice</em></h1>
+  <h1>What's<br><span class="l2">on in&nbsp;<em id="town">Nice</em></span></h1>
   <div class="standfirst">
     {# One <p>, never two: .standfirst is a two-column grid whose children are
        this paragraph and the stats block. A second <p> becomes a third grid item
@@ -857,6 +908,24 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M20 12H5M11 6l-6 6 6 6"/></svg><span id="ev-day"></span></button>
   </div>
   <div class="ev-body" id="ev-body" tabindex="-1"></div>
+</dialog>
+
+{# Unannounced on purpose: nothing on the page mentions it. Shaking an Android
+   phone opens it, and so does pressing and holding the town in the title for a
+   second (the only way on an iPhone, which asks permission before a web page
+   may feel a shake, and a permission prompt would give the secret away). #}
+<dialog id="egg" aria-labelledby="egg-title">
+  <div class="egg-in">
+    <div class="egg-k">Shh. You found it.</div>
+    <div class="egg-q">Tonight, go to</div>
+    <h2 id="egg-title"></h2>
+    <div class="egg-m" id="egg-m"></div>
+    <div class="egg-acts">
+      <button type="button" class="primary" id="egg-go">Show me</button>
+      <button type="button" id="egg-again">Another</button>
+    </div>
+    <button type="button" class="dlg-x egg-x" id="egg-x" aria-label="Close">✕</button>
+  </div>
 </dialog>
 
 {# The phone's filter panel. The category chips and the two checkboxes are MOVED
@@ -1218,6 +1287,20 @@ const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"
 const fmtDay=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
 const fmtYr=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{year:"numeric"});
 const fmtShort=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+// The forecast for Nice, per day, baked in at build time (weather.py). A small
+// ink drawing beside the day's heading; nothing at all when there is no forecast.
+const WX = {{ weather_json }};
+const WX_ICON = {
+  sun:   ["Sunny", '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>'],
+  part:  ["Sun and cloud", '<path d="M8.5 5.5v-2M3.5 10.5h-1.5M5 7L3.8 5.8M13.5 7l1.2-1.2"/><path d="M11.6 9.2A4 4 0 1 0 5.3 13"/><path d="M8 20h9.5a3.5 3.5 0 0 0 .3-7A5 5 0 0 0 8.2 13.6 3.2 3.2 0 0 0 8 20z"/>'],
+  cloud: ["Cloudy", '<path d="M7 19h10.5a4 4 0 0 0 .4-8A6 6 0 0 0 6.5 12.4 3.3 3.3 0 0 0 7 19z"/>'],
+  fog:   ["Fog", '<path d="M4 9h16M2.5 13h14M6 17h15.5"/>'],
+  rain:  ["Rain", '<path d="M7 15h10.5a4 4 0 0 0 .4-8A6 6 0 0 0 6.5 8.4 3.3 3.3 0 0 0 7 15z"/><path d="M8.5 18l-1 2.5M12.5 18l-1 2.5M16.5 18l-1 2.5"/>'],
+  storm: ["Storm", '<path d="M7 14h10.5a4 4 0 0 0 .4-8A6 6 0 0 0 6.5 7.4 3.3 3.3 0 0 0 7 14z"/><path d="M12.5 15l-2 3.5h3l-2 3.5"/>'],
+  snow:  ["Snow", '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>']
+};
+const wxMark = d => { const w = WX_ICON[WX[d]]; return w
+  ? `<span class="wx" role="img" aria-label="${w[0]}" title="${w[0]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${w[1]}</svg></span>` : ""; };
 const addDays=(d,n)=>{const x=new Date(d+"T12:00:00");x.setDate(x.getDate()+n);return iso(x);};
 const isMultiDay=e=>e.end&&e.end!==e.start;
 // A "run" is something you can go to on any of many days: a play's season, a
@@ -1491,7 +1574,7 @@ function render(){
   pairs.forEach(([slot,e])=>{
     const ongoing=e.start<slot;
     if(slot!==last){
-      html.push(`<div class="daymark"><b>${fmtDay(slot)}</b><span>${fmtYr(slot)}</span></div>`);
+      html.push(`<div class="daymark"><b>${fmtDay(slot)}</b>${wxMark(slot)}<span>${fmtYr(slot)}</span></div>`);
       last=slot;
     }
     i++;
@@ -1868,7 +1951,7 @@ function openEvent(fp, push){
     .sort((a,b)=>(a.time||"99").localeCompare(b.time||"99")).slice(0, 6) : [];
   $("ev-day").textContent = fmtDay(day).split(" ").slice(0,2).join(" ");
   $("ev-body").innerHTML = `
-    <div class="ev-kind">${tagsOf(e).map(t=>esc(CATNAME[t]||t)).join(" · ")}${e.free?' · <span style="color:var(--accent)">Free</span>':""}</div>
+    <div class="ev-kind">${tagsOf(e).map(t=>esc(CATNAME[t]||t)).join(" · ")}${e.free?' · <span style="color:var(--accent-text)">Free</span>':""}</div>
     <h2 id="ev-title">${title}</h2>
     ${e.cancelled?`<p class="ev-cancel">Annulé${e.cancel_note?" · "+esc(e.cancel_note):""}</p>`:""}
     <div class="ev-facts">
@@ -1931,6 +2014,136 @@ document.addEventListener("click", ev => {
   if(!row || ev.target.closest("a,button")) return;
   openEvent(row.dataset.fp, true);
 });
+
+// ---------- a light tick (Android only: iPhones do not let web pages vibrate) ----------
+const tick = (ms = 8) => { try { navigator.vibrate && navigator.vibrate(ms); } catch(_) {} };
+document.addEventListener("click", ev => {
+  if(ev.target.closest("#whenrow [data-w], #cats .cat, #fs-opts .chk input")) tick();
+});
+
+// ---------- the town reel ----------
+(() => {
+  const em = $("town"); if(!em) return;
+  // Short names only: it is a game, and a long one would have to shrink.
+  const TOWNS = ["Nice","Antibes","Menton","Cannes","Èze","Vence","Monaco","Grasse","Biot","Sospel","Cagnes"];
+  const COPIES = 5, N = TOWNS.length;
+  let reel = null, items = [], itemH = 0, widths = [], pos = N * 2, anim = 0;
+  function build(){
+    if(reel) return;
+    em.textContent = "";
+    reel = document.createElement("span"); reel.className = "reel"; reel.setAttribute("aria-hidden", "true");
+    reel.innerHTML = Array.from({length: COPIES}, () => TOWNS.map(t => `<span class="it"><i>${t}</i></span>`).join("")).join("");
+    em.appendChild(reel);
+    em.closest("h1").setAttribute("aria-label", "What's on in Nice");
+    items = [...reel.children];
+    measure();
+    addEventListener("resize", measure);
+  }
+  function measure(){
+    const h1 = em.closest("h1"), l2 = em.parentNode;
+    const room = h1.clientWidth - (l2.getBoundingClientRect().width - em.getBoundingClientRect().width) - 2;
+    items.forEach(it => { const w = it.firstElementChild; w.style.fontSize = "";
+      const n = w.scrollWidth; if(n > room) w.style.fontSize = (room / n) + "em"; });
+    // Exact, not offsetHeight: a rounded height drifts a little per slot.
+    itemH = items[0].getBoundingClientRect().height;
+    widths = items.map(it => it.firstElementChild.getBoundingClientRect().width);
+    paint();
+  }
+  function paint(){
+    while(pos < N) pos += N;
+    while(pos > N * (COPIES - 1)) pos -= N;
+    reel.style.transform = `translateY(${-pos * itemH}px)`;
+    const i = Math.floor(pos), f = pos - i;
+    em.style.width = (widths[i] + ((widths[i + 1] || widths[i]) - widths[i]) * f) + "px";
+  }
+  const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function spinTo(target, ms){
+    cancelAnimationFrame(anim);
+    if(REDUCE){ pos = target; paint(); tick(); return; }
+    const from = pos, t0 = performance.now();
+    const ease = t => { const c = 1.35, u = t - 1; return 1 + (c + 1) * u * u * u + c * u * u; };
+    const step = now => {
+      const t = Math.min(1, (now - t0) / ms);
+      pos = from + (target - from) * ease(t); paint();
+      if(t < 1) anim = requestAnimationFrame(step); else tick(10);
+    };
+    anim = requestAnimationFrame(step);
+  }
+  let drag = null, hold = 0;
+  em.addEventListener("pointerdown", e => {
+    build(); cancelAnimationFrame(anim);
+    drag = {y: e.clientY, pos, t: performance.now(), v: 0, lastY: e.clientY, moved: 0};
+    em.setPointerCapture(e.pointerId);
+    // Press and hold, without moving: the secret.
+    clearTimeout(hold);
+    hold = setTimeout(() => { if(drag && drag.moved < 6){ drag = null; openEgg(); } }, 900);
+  });
+  em.addEventListener("pointermove", e => {
+    if(!drag) return;
+    const now = performance.now(), dy = e.clientY - drag.lastY;
+    drag.v = dy / Math.max(1, now - drag.t) * .8 + drag.v * .2;
+    drag.t = now; drag.lastY = e.clientY; drag.moved += Math.abs(dy);
+    if(drag.moved >= 6) clearTimeout(hold);
+    pos = drag.pos - (e.clientY - drag.y) / itemH; paint();
+  });
+  const release = () => {
+    clearTimeout(hold);
+    if(!drag) return;
+    const d = drag; drag = null;
+    if(d.moved < 6) spinTo(Math.round(pos) + 6 + Math.floor(Math.random() * 9), 1300);   // a tap pulls the lever
+    else { const extra = -d.v * 9; spinTo(Math.round(pos + extra), Math.min(1400, 420 + Math.abs(extra) * 90)); }
+  };
+  em.addEventListener("pointerup", release);
+  em.addEventListener("pointercancel", release);
+  em.addEventListener("contextmenu", e => e.preventDefault());
+})();
+
+// ---------- the Easter egg ----------
+let eggPick = null;
+function pickTonight(){
+  const now = new Date(), hm = String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
+  const ok = e => !e.cancelled && !e.online && !isStanding(e) && e.time;
+  let pool = EVENTS.filter(e => ok(e) && e.start === TODAY && e.time >= hm && e.time >= "17:00");
+  if(!pool.length) pool = EVENTS.filter(e => ok(e) && e.start === TODAY && e.time >= hm);
+  let when = "Tonight, go to";
+  if(!pool.length){ pool = EVENTS.filter(e => ok(e) && e.start === addDays(TODAY, 1) && e.time >= "17:00"); when = "Tomorrow night, go to"; }
+  if(!pool.length) return null;
+  // Prefer the towns the visitor is already looking at.
+  const near = townSel.size ? pool.filter(e => townSel.has(e.town)) : pool;
+  const from = near.length ? near : pool;
+  return {e: from[Math.floor(Math.random() * from.length)], when};
+}
+function openEgg(){
+  const p = pickTonight(); if(!p) return;
+  eggPick = p.e;
+  document.querySelector("#egg .egg-q").textContent = p.when;
+  $("egg-title").textContent = p.e.title;
+  $("egg-m").textContent = [p.e.time, p.e.venue, p.e.town].filter(Boolean).join(" · ");
+  if(!$("egg").open) $("egg").showModal();
+  tick([12, 40, 12]);
+}
+$("egg-x").onclick = () => $("egg").close();
+$("egg-again").onclick = openEgg;
+$("egg-go").onclick = () => {
+  $("egg").close();
+  if(PHONE.matches) openEvent(eggPick.fingerprint, true);
+  else if(eggPick.url) window.open(eggPick.url, "_blank", "noopener");
+};
+$("egg").addEventListener("click", e => { if(e.target === $("egg")) $("egg").close(); });
+// Shake: Android only. An iPhone would first show a permission prompt, which
+// would announce the secret, so there the long press is the way in.
+if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission !== "function"){
+  let prev = null, jolts = [], last = 0;
+  addEventListener("devicemotion", ev => {
+    const a = ev.accelerationIncludingGravity; if(!a || a.x == null) return;
+    if(prev){
+      const j = Math.abs(a.x - prev.x) + Math.abs(a.y - prev.y) + Math.abs(a.z - prev.z), t = performance.now();
+      if(j > 28){ jolts = jolts.filter(x => t - x < 700); jolts.push(t);
+        if(jolts.length >= 3 && t - last > 2500 && !document.querySelector("dialog[open]")){ last = t; jolts = []; openEgg(); } }
+    }
+    prev = {x: a.x, y: a.y, z: a.z};
+  });
+}
 
 // Opened via a shared ?e=… link — on a phone, open its page; everywhere, bring
 // the row into view once.

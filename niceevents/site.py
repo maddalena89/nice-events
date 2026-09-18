@@ -1302,7 +1302,10 @@ def _sitemap(base: str, updated: date, extra: list[str] | None = None) -> str:
     )
 
 
-def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
+def build(conn: sqlite3.Connection, out_dir: str = "dist",
+          weather: Optional[dict] = None) -> tuple[int, str]:
+    """`weather`: {"YYYY-MM-DD": "sun"|"part"|...} from weather.fetch_forecast, drawn
+    as a small mark beside each day's heading. None (tests, no network) = no marks."""
     rows = db.upcoming(conn)
     # Remove phantom / dead listings first, before anything else looks at them.
     dicts = mark_cancelled(drop_suppressed([_row_to_dict(r) for r in rows]))
@@ -1426,6 +1429,7 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
         # chip; the template prepends an "All the events" chip in front of these.
         categories=DISPLAY_CATEGORIES,
         cat_json=json.dumps(DISPLAY_CATEGORIES, ensure_ascii=False),
+        weather_json=json.dumps(weather or {}),
         stats=stats,
         updated=updated,
         submit_mode=submit_mode,
