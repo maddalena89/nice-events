@@ -71,13 +71,14 @@
    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='g' x='0' y='0'><feTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 2.6 -1.55'/></filter><rect width='100%25' height='100%25' filter='url(%23g)' opacity='.5'/></svg>")}
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--paper);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:var(--paper);color:var(--ink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:0.9375rem;line-height:1.45;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px 80px}
 a{color:var(--accent-text)}
 .hero{padding:44px 0 0}
 /* padding-right clears the fixed add-event button (52px wide at right:24px = 76px
    of occupied gutter). Without it the button sits on top of "· 5 SOURCES". */
-.eyebrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:10px;padding-right:76px}
+.eyebrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;font-size:0.6875rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:10px;padding-right:76px}
 .eyebrow b{color:var(--ink);font-weight:600}
 /* A button that reads as a text link — for "About" in the eyebrow and footer. */
 .linklike{border:0;background:none;padding:0;margin:0;min-height:0;font:inherit;
@@ -85,7 +86,7 @@ a{color:var(--accent-text)}
   text-decoration:underline;text-underline-offset:2px}
 .linklike:hover{background:none;color:var(--accent-text)}
 /* About dialog reads as prose, not a form. */
-.about-body p{margin:0 0 14px;font-size:15.5px;line-height:1.6;max-width:60ch}
+.about-body p{margin:0 0 14px;font-size:0.9688rem;line-height:1.6;max-width:60ch}
 .about-body p:last-child{margin-bottom:0}
 .about-body a{color:var(--accent-text)}
 .about-body .sign{font-weight:600;color:var(--ink)}
@@ -103,13 +104,13 @@ h1 .reel{display:block;will-change:transform}
 h1 .reel .it{display:flex;align-items:flex-end;height:1em;line-height:1}
 h1 .reel .it i{font-style:normal;white-space:nowrap}
 .standfirst{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:30px 0 0;padding-bottom:28px}
-.standfirst p{font-size:17px;line-height:1.4;max-width:46ch}
+.standfirst p{font-size:1.0625rem;line-height:1.4;max-width:46ch}
 .stats{display:flex;gap:38px;align-self:end;justify-content:flex-end}
 .stat b{display:block;font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1}
 .stat span{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .marquee{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);overflow:hidden;white-space:nowrap;padding:11px 0;margin-bottom:34px;background:var(--ink);color:var(--paper)}
 .marquee-inner{display:inline-block;animation:slide 38s linear infinite}
-.marquee span{font-size:12.5px;letter-spacing:.2em;text-transform:uppercase;padding:0 16px}
+.marquee span{font-size:0.7812rem;letter-spacing:.2em;text-transform:uppercase;padding:0 16px}
 .marquee span::after{content:"◆";margin-left:32px;color:var(--accent-text)}
 /* Each word is a shortcut into search; it looks exactly as it did as plain text. */
 .marquee a{color:inherit;text-decoration:none}
@@ -132,7 +133,7 @@ h1 .reel .it i{font-style:normal;white-space:nowrap}
    overrides font-size and display but never declared those two, so label won. */
 .chk{display:flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer;
      margin:0;color:var(--ink);
-     border:1px solid var(--ink);padding:10px 12px;font-size:14.5px;font-weight:400;
+     border:1px solid var(--ink);padding:10px 12px;font-size:0.9062rem;font-weight:400;
      letter-spacing:normal;text-transform:none;user-select:none}
 .chk:hover{background:var(--hover)}
 /* Native checkboxes draw themselves rounded on macOS, which fights a site with
@@ -145,7 +146,7 @@ h1 .reel .it i{font-style:normal;white-space:nowrap}
 .chk input:checked::after{content:"";position:absolute;left:4.5px;top:1px;
   width:4px;height:8.5px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
 .chk input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-input,select,textarea{font:inherit;font-size:14.5px;padding:10px 12px;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink)}
+input,select,textarea{font:inherit;font-size:0.9062rem;padding:10px 12px;border:1px solid var(--ink);border-radius:0;background:transparent;color:var(--ink)}
 input[type=search]{flex:1;min-width:190px}
 /* The native macOS chevron is painted hard against the control's right edge and
    ignores padding-right. Take it off, draw our own, and reserve 34px for it so
@@ -171,7 +172,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
    Every declaration here that looks redundant is overriding the global
    button{} rule (11px uppercase 600, and a hover that inverts to solid ink). */
 #town-btn{display:flex;align-items:center;width:100%;
-  font-size:14.5px;font-weight:400;letter-spacing:normal;text-transform:none;text-align:left;
+  font-size:0.9062rem;font-weight:400;letter-spacing:normal;text-transform:none;text-align:left;
   padding:10px 34px 10px 12px;background-color:transparent;color:var(--ink);
   background-image:var(--chev);
   background-repeat:no-repeat;background-position:right 12px center;background-size:11px 11px}
@@ -189,18 +190,18 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
 .multi-panel[hidden]{display:none}
 .multi-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
   padding:9px 12px;border-bottom:1px solid var(--ink);
-  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  font-size:0.5938rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 /* 109 communes will not fit on a phone screen, so the list scrolls inside the
    panel. Capped in vh as well as px so a short viewport never gets a panel
    taller than the window it is drawn in. */
 .multi-list{max-height:min(330px,50vh);overflow-y:auto;padding:4px 0}
 .opt{display:flex;align-items:center;gap:9px;margin:0;padding:7px 12px;cursor:pointer;
-  font-size:14px;font-weight:400;letter-spacing:normal;text-transform:none;color:var(--ink)}
+  font-size:0.875rem;font-weight:400;letter-spacing:normal;text-transform:none;color:var(--ink)}
 .opt:hover{background:var(--hover)}
 .opt span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The count is the whole point of the ordering -- it shows why Grasse outranks
    Villefranche -- so it is dimmed but never hidden. */
-.opt i{font-style:normal;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.opt i{font-style:normal;font-size:0.6875rem;color:var(--muted);font-variant-numeric:tabular-nums}
 /* Same square tick as the "Online too" checkboxes in the bar. */
 .opt input{appearance:none;-webkit-appearance:none;flex:none;position:relative;
   width:15px;height:15px;margin:0;padding:0;cursor:pointer;
@@ -213,7 +214,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;
    alphabetical tail. Labelled, because an unexplained rule in a sorted list
    just looks like the sort broke. */
 .multi-div{display:flex;align-items:center;gap:9px;margin:5px 12px;
-  font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  font-size:0.5625rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .multi-div::after{content:"";flex:1;border-top:1px solid var(--rule)}
 /* Reset: an eraser glyph, not a word. It's the least-used control in the bar and
    was the only thing forcing a second row. Square so it reads as an icon button;
@@ -234,20 +235,20 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
    The container draws top+left; each cell draws its own right+bottom. That way
    the outer edges are single hairlines, not doubled. */
 .cats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--ink);border-right:0;border-bottom:0;margin-bottom:22px}
-.cat{display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:pointer;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);user-select:none;white-space:nowrap;font-weight:600}
+.cat{display:flex;align-items:center;justify-content:center;text-align:center;font-size:0.6875rem;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:pointer;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);user-select:none;white-space:nowrap;font-weight:600}
 .cat:hover{background:var(--hover)}
 .cat.on{background:var(--ink);color:var(--paper)}
 .cat i{font-style:normal;opacity:.5;margin-left:5px;font-weight:400}
-button{font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:9px 16px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+button{font:inherit;font-size:0.6875rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:9px 16px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
 button:hover{background:var(--ink);color:var(--paper)}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.tally{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.tally{font-size:0.6875rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
 .daymark{display:flex;align-items:baseline;gap:14px;margin:34px 0 0;padding-bottom:7px;border-bottom:2px solid var(--ink)}
-.daymark b{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.daymark b{font-size:1.375rem;font-weight:800;letter-spacing:-.02em}
 /* The day's forecast: one small line drawing in ink, nothing more. */
 .wx{display:inline-flex;align-self:center;color:var(--ink)}
 .wx svg{width:17px;height:17px;display:block}
-.daymark span{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.daymark span{font-size:0.6562rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 /* A wide filter can put well over a thousand rows in the list. content-visibility
    lets the browser skip layout and paint for the ones scrolled out of view, and
    contain-intrinsic-size gives it a height to reserve for them so the scrollbar
@@ -256,20 +257,20 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
    markup, find-in-page or scroll-to-event changes. */
 .row{content-visibility:auto;contain-intrinsic-size:auto 62px;display:grid;grid-template-columns:46px 1fr 210px 120px;gap:18px;align-items:baseline;padding:15px 0;border-bottom:1px solid var(--rule)}
 .row:hover{background:var(--hover)}
-.idx{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-.ttl{font-size:19px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+.idx{font-size:0.6875rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.ttl{font-size:1.1875rem;font-weight:700;letter-spacing:-.015em;line-height:1.2}
 .ttl a{color:var(--ink);text-decoration:none}
 .ttl a:hover{color:var(--accent-text);text-decoration:underline;text-underline-offset:3px}
-.sub{font-size:12.5px;color:var(--muted);margin-top:4px}
+.sub{font-size:0.7812rem;color:var(--muted);margin-top:4px}
 .sub .etime{font-weight:700;color:var(--ink)}
 /* Price rides alongside the time. Same weight as the time so the pair reads
    as one unit, but not the ink colour: what it costs is secondary to when. */
 .sub .eprice{font-weight:700}
-.where{font-size:12.5px}
+.where{font-size:0.7812rem}
 .where b{display:block;font-weight:600}
 .where span{color:var(--muted)}
-.kind{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;text-align:right;color:var(--muted)}
-.pill{display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:2px 6px;margin-right:5px;vertical-align:2px;background:var(--accent);color:#fff}
+.kind{font-size:0.5938rem;letter-spacing:.13em;text-transform:uppercase;font-weight:700;text-align:right;color:var(--muted)}
+.pill{display:inline-block;font-size:0.5625rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:2px 6px;margin-right:5px;vertical-align:2px;background:var(--accent);color:#fff}
 .pill.out{background:transparent;color:var(--muted);border:1px solid var(--rule)}
 /* Run-length sticker for exhibitions and other multi-day events. */
 .pill.run{background:transparent;color:var(--accent-text);border:1px solid var(--accent)}
@@ -278,15 +279,15 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .pill.new{background:var(--accent);color:#fff}
 /* Standing "Exhibitions on now" section header — set apart from day marks. */
 .exhib-head{display:flex;align-items:baseline;gap:12px;margin:30px 0 0;padding-bottom:7px;border-bottom:2px solid var(--accent)}
-.exhib-head b{font-size:18px;font-weight:800;letter-spacing:-.02em}
-.exhib-head span{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-.exhib-note{font-size:12px;color:var(--muted);margin:8px 0 2px}
+.exhib-head b{font-size:1.125rem;font-weight:800;letter-spacing:-.02em}
+.exhib-head span{font-size:0.6562rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.exhib-note{font-size:0.75rem;color:var(--muted);margin:8px 0 2px}
 /* "Show all" lives in the section header, quiet and off to the right. The
    chevron carries the meaning, so the label stays short enough for a phone.
    The ::after pad grows the tap target to a thumb without bulking up the look. */
 .exhib-toggle{position:relative;margin-left:auto;border:0;background:none;padding:2px 0;
   display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
-  font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
+  font-size:0.6562rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;
   color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .exhib-toggle::after{content:"";position:absolute;inset:-14px -8px}
 .exhib-toggle:hover{background:none;color:var(--accent-text)}
@@ -314,24 +315,24 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .row.hl{background:rgba(31,59,255,.10);box-shadow:inset 3px 0 0 var(--accent)}
 .sec{margin-top:76px}
 .sechead{display:flex;align-items:flex-start;gap:20px;border-top:2px solid var(--ink);padding-top:14px;margin-bottom:24px}
-.secnum{font-size:11px;letter-spacing:.16em;color:var(--muted);padding-top:9px}
+.secnum{font-size:0.6875rem;letter-spacing:.16em;color:var(--muted);padding-top:9px}
 .sechead h2{font-size:clamp(30px,4.6vw,54px);font-weight:800;letter-spacing:-.035em;line-height:.95;text-transform:uppercase}
-.sechead p{font-size:13.5px;color:var(--muted);max-width:40ch;margin-left:auto;padding-top:8px}
+.sechead p{font-size:0.8438rem;color:var(--muted);max-width:40ch;margin-left:auto;padding-top:8px}
 .form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .f-full{grid-column:1/-1}.f-half{grid-column:span 2}
-label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-weight:600}
+label{display:block;font-size:0.6875rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-weight:600}
 label i{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400;opacity:.6}
 .form input,.form select,.form textarea{width:100%}
-.callout{border-left:3px solid var(--accent);background:rgba(31,59,255,.05);padding:14px 16px;font-size:15px;line-height:1.5;color:var(--soft-ink);margin-bottom:22px;max-width:56ch}
+.callout{border-left:3px solid var(--accent);background:rgba(31,59,255,.05);padding:14px 16px;font-size:0.9375rem;line-height:1.5;color:var(--soft-ink);margin-bottom:22px;max-width:56ch}
 .callout b{color:var(--ink)}
 /* Snap-a-flyer */
 .snap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
-.snap-btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13.5px;
+.snap-btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:0.8438rem;
   background:var(--accent);color:#fff;border:1px solid var(--accent);
-  font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;
+  font-size:0.75rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;
   padding:11px 16px;min-height:44px}
 .snap-btn:hover{background:var(--ink);border-color:var(--ink)}
-.snap-msg{font-size:14px;color:var(--muted);flex:1;min-width:180px}
+.snap-msg{font-size:0.875rem;color:var(--muted);flex:1;min-width:180px}
 .snap-msg.busy{color:var(--accent-text)}
 .snap-msg.done{color:#0a7a3f}
 
@@ -369,15 +370,15 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
   padding:22px 24px 14px;border-bottom:2px solid var(--ink);flex:none;
 }
-.dlg-head h2{font-size:34px;font-weight:800;letter-spacing:-.035em;line-height:.95;text-transform:uppercase}
-.dlg-head p{font-size:15px;color:var(--ink);margin-top:8px;max-width:40ch}
+.dlg-head h2{font-size:2.125rem;font-weight:800;letter-spacing:-.035em;line-height:.95;text-transform:uppercase}
+.dlg-head p{font-size:0.9375rem;color:var(--ink);margin-top:8px;max-width:40ch}
 .dlg-x{width:34px;height:34px;padding:0;border:1px solid var(--ink);background:transparent;
-  font-size:17px;line-height:1;cursor:pointer;flex:none}
+  font-size:1.0625rem;line-height:1;cursor:pointer;flex:none}
 .dlg-x:hover{background:var(--ink);color:var(--paper)}
 .dlg-body{padding:20px 24px 24px;overflow-y:auto;flex:1}
 @media(max-width:860px){.addbtn{top:12px;right:12px;width:46px;height:46px}}
-.err{color:#b00020;font-size:12.5px;margin-top:8px}
-.ok{color:#0a7a3f;font-size:12.5px;margin-top:8px}
+.err{color:#b00020;font-size:0.7812rem;margin-top:8px}
+.ok{color:#0a7a3f;font-size:0.7812rem;margin-top:8px}
 /* "New listings" nudge, shown only when the service worker reports that the
    cached page it served has since changed on the server. Fixed to the bottom so
    it never displaces the listings, and clear of the iOS home indicator. */
@@ -385,11 +386,11 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   bottom:max(16px,env(safe-area-inset-bottom));
   display:flex;align-items:center;gap:12px;
   background:var(--ink);color:var(--paper);padding:10px 12px 10px 16px;
-  font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.22);max-width:calc(100vw - 32px)}
-#freshbar button{border:0;background:var(--accent);color:#fff;font-size:10.5px;
+  font-size:0.8125rem;box-shadow:0 6px 24px rgba(0,0,0,.22);max-width:calc(100vw - 32px)}
+#freshbar button{border:0;background:var(--accent);color:#fff;font-size:0.6562rem;
   letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:8px 12px;min-height:36px}
 #freshbar button:hover{background:#fff;color:var(--ink)}
-#freshbar #freshno{background:transparent;color:var(--paper);padding:8px 4px;font-size:13px;letter-spacing:0}
+#freshbar #freshno{background:transparent;color:var(--paper);padding:8px 4px;font-size:0.8125rem;letter-spacing:0}
 #freshbar #freshno:hover{background:transparent;color:var(--accent-text)}
 /* NOTE the space after the opening brace, and keep it there. A brace followed
    immediately by a hash is how Jinja opens a comment, so a CSS rule that puts
@@ -399,7 +400,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    together even in prose. */
 @media(max-width:600px),(pointer:coarse) and (max-width:900px){ #freshbar{left:16px;right:16px;transform:none;max-width:none} }
 
-.foot{margin-top:70px;border-top:1px solid var(--ink);padding-top:16px;font-size:11.5px;color:var(--muted)}
+.foot{margin-top:70px;border-top:1px solid var(--ink);padding-top:16px;font-size:0.7188rem;color:var(--muted)}
 .foot a{color:var(--muted)}
 /* Browse-by links to the town and category pages. Rendered server-side as real
    anchors, not built by the filter JS: a crawler has to be able to follow them
@@ -407,13 +408,13 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    pages. Visitors get a use out of them too — a bookmarkable /in/antibes/ is
    easier to send someone than "open the site and tick two boxes". */
 .browse{margin-top:52px;border-top:1px solid var(--ink);padding-top:16px}
-.browse h2{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+.browse h2{font-size:0.6562rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
   font-weight:600;margin:0 0 10px}
 .browse ul{list-style:none;display:flex;flex-wrap:wrap;gap:7px 8px;margin:0 0 20px;padding:0}
-.browse a{display:inline-block;border:1px solid var(--rule);padding:6px 10px;font-size:12.5px;
+.browse a{display:inline-block;border:1px solid var(--rule);padding:6px 10px;font-size:0.7812rem;
   color:var(--ink);text-decoration:none}
 .browse a:hover{border-color:var(--ink);background:var(--hover)}
-.browse a i{font-style:normal;color:var(--muted);font-size:11px}
+.browse a i{font-style:normal;color:var(--muted);font-size:0.6875rem}
 .empty{padding:60px 0;text-align:center;color:var(--muted)}
 /* ---------------- tablet ---------------- */
 @media(max-width:860px){
@@ -437,7 +438,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
    - the dialog goes near-fullscreen; a centred modal on a 390px screen is
      just a cramped box.                                                     */
 @media(max-width:600px),(pointer:coarse) and (max-width:900px){
- body{font-size:16px}
+ body{font-size:1rem}
  .wrap{padding:0 16px 64px}
 
  .hero{padding:14px 0 0}
@@ -452,7 +453,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .stat span{font-size:9px;letter-spacing:.1em}
 
  .marquee{padding:9px 0;margin-bottom:22px}
- .marquee span{font-size:10.5px;letter-spacing:.16em;padding:0 12px}
+ .marquee span{font-size:0.6562rem;letter-spacing:.16em;padding:0 12px}
  .marquee span::after{margin-left:22px}
 
  /* Filters in three tidy rows: search (full), town+date (half each), then
@@ -461,14 +462,21 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .bar{gap:7px;margin-bottom:12px}
  input[type=search]{flex:1 0 100%;min-width:0}
  #town-wrap,#when{flex:1 1 calc(50% - 4px);width:auto;min-width:0}
- #day{flex:1 0 100%;min-width:0}
+ /* The calendar box sits right under the date buttons, and Town / Filters /
+    Running now stay together below it. iOS gives a date field a wide minimum
+    size of its own, which pushed it past the right edge; appearance:none and
+    an explicit width take that away. */
+ #day{flex:1 0 100%;min-width:0;width:100%;max-width:100%;-webkit-appearance:none;appearance:none;
+   text-align:left;display:block}
+ #day::-webkit-date-and-time-value{text-align:left}
+ #q{order:1} .whenrow{order:2} #day{order:3} #town-wrap{order:4} #fbtn{order:5} #onnow{order:6}
  /* 16px on the trigger for the same reason as the inputs: anything smaller and
     iOS Safari zooms the page and never zooms back. */
- #town-btn{font-size:16px;padding:11px 34px 11px 12px;min-height:44px}
+ #town-btn{font-size:max(16px,1rem);padding:11px 34px 11px 12px;min-height:44px}
  .opt{padding:10px 12px;min-height:44px}
  .chk{flex:1 1 auto;justify-content:center;white-space:nowrap;min-height:44px}
  #reset{flex:0 0 44px;width:44px;min-width:44px;max-width:44px;height:auto;min-height:44px}
- input,select,textarea{font-size:16px;padding:11px 12px}   /* 16px: no iOS zoom */
+ input,select,textarea{font-size:max(16px,1rem);padding:11px 12px}   /* 16px: no iOS zoom */
  button{padding:11px 14px;min-height:44px}                  /* 44px touch target */
 
  /* Category filter: WRAPPING chips, so all 12 are visible and tappable at once.
@@ -479,39 +487,39 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  }
  .cat{
    flex:0 0 auto;border:1px solid var(--ink);padding:8px 11px;
-   font-size:10.5px;min-height:38px;
+   font-size:0.6562rem;min-height:38px;
    display:flex;align-items:center;justify-content:center;
  }
 
  .daymark{margin-top:26px;gap:9px}
- .daymark b{font-size:19px}
- .daymark span{font-size:9.5px}
+ .daymark b{font-size:1.1875rem}
+ .daymark span{font-size:0.5938rem}
 
  /* Exhibitions header: smaller heading and label so "Exhibitions on now · 32 ·
     Show all" still fits one line on a 360px phone. The generic 44px button rule
     above would turn the quiet toggle into a slab, so it is undone here — the
     invisible ::after pad is what gives it a real touch target. */
- .exhib-head b{font-size:16px}
- .exhib-toggle{min-height:0;padding:2px 0;font-size:10px;letter-spacing:.1em}
+ .exhib-head b{font-size:1rem}
+ .exhib-toggle{min-height:0;padding:2px 0;font-size:0.625rem;letter-spacing:.1em}
 
  .row{padding:16px 0;gap:4px}                    /* more breathing room between events */
- .ttl{font-size:20px;line-height:1.3}            /* bigger, easier to read while scrolling */
+ .ttl{font-size:1.25rem;line-height:1.3}            /* bigger, easier to read while scrolling */
  .ttl a{
    /* Bigger tap area without visibly changing the layout. */
    display:inline-block;padding:2px 0;
  }
  /* Clamp the long museum blurbs to 2 lines so the list stays scannable — the
     full text is one tap away on the source page. */
- .sub{font-size:14px;line-height:1.45;margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+ .sub{font-size:0.875rem;line-height:1.45;margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
  /* Town and venue collapse onto one line. The separator hangs off the venue,
     not the town — otherwise an event with no venue renders "Nice · " with a
     dangling dot. */
- .where{font-size:13.5px;margin-top:2px}
+ .where{font-size:0.8438rem;margin-top:2px}
  .where b{display:inline}
  .where span{display:inline}
  .where span:not(:empty)::before{content:" · ";color:var(--muted)}
  /* Category label moves inline under the title rather than eating a column. */
- .kind{display:block;text-align:left;font-size:10px;margin-top:3px}
+ .kind{display:block;text-align:left;font-size:0.625rem;margin-top:3px}
 
  .addbtn{top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));
          width:44px;height:44px}
@@ -523,9 +531,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  }
  dialog[open]{position:fixed;inset:0}
  .dlg-head{padding:16px 16px 12px;padding-top:max(16px,env(safe-area-inset-top))}
- .dlg-head h2{font-size:24px}
- .dlg-head p{font-size:12px}
- .dlg-x{width:44px;height:44px;font-size:19px}
+ .dlg-head h2{font-size:1.5rem}
+ .dlg-head p{font-size:0.75rem}
+ .dlg-x{width:44px;height:44px;font-size:1.1875rem}
  .dlg-body{padding:16px;overflow-y:auto;flex:1;
            padding-bottom:max(16px,env(safe-area-inset-bottom))}
  .form{grid-template-columns:1fr;gap:12px}
@@ -533,8 +541,8 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .form button{width:100%}
  .form .f-full[style]{flex-direction:column;align-items:stretch!important}
 
- .callout{padding-left:12px;font-size:12.5px}
- .foot{margin-top:44px;font-size:11px}
+ .callout{padding-left:12px;font-size:0.7812rem}
+ .foot{margin-top:44px;font-size:0.6875rem}
 }
 
 /* ---------- phone layout, September 2026 redesign ----------
@@ -546,7 +554,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 #slimbar,.whenrow,#fbtn,#onnow,#fsheet:not([open]){display:none}
 @media(max-width:600px),(pointer:coarse) and (max-width:900px){
  .hero{position:relative}
- .hero::before{content:"Alpes-Maritimes · 06";display:block;font-size:10.5px;font-weight:700;
+ .hero::before{content:"Alpes-Maritimes · 06";display:block;font-size:0.6562rem;font-weight:700;
    letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-right:60px}
  h1{font-size:clamp(44px,13.4vw,58px);margin-top:8px;line-height:.88}
  .standfirst{display:none}
@@ -580,13 +588,13 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .whenchips{flex:1 1 auto;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;
    -webkit-overflow-scrolling:touch}
  .whenchips::-webkit-scrollbar{display:none}
- .whenchips button,.whencal{flex:none;min-height:40px;height:40px;padding:0 13px;font-size:11.5px;
+ .whenchips button,.whencal{flex:none;min-height:40px;height:auto;padding:0 13px;font-size:0.7188rem;
    font-weight:700;letter-spacing:.08em}
  /* The chosen date is marked by one black block that glides from button to
     button, rather than each button filling in on its own. The only animation
     Maddalena kept from the motion prototype (18 Sep 2026). */
  .whenchips{position:relative}
- .whenind{position:absolute;top:0;left:0;height:40px;width:0;background:var(--ink);opacity:0;
+ .whenind{position:absolute;top:0;left:0;height:100%;width:0;background:var(--ink);opacity:0;
    pointer-events:none;transition:transform .38s cubic-bezier(.3,1.35,.45,1),width .38s cubic-bezier(.3,1.35,.45,1),opacity .15s}
  .whenchips button{position:relative;z-index:1;background:transparent;transition:color .25s}
  .whenchips button:hover{background:transparent;color:var(--ink)}
@@ -601,7 +609,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  /* The town takes what is left; the two buttons size to their words, so
     "Running now 59" never wraps on a 360px phone. */
  .barbtn{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:5px;
-   min-height:44px;padding:0 8px;font-size:11.5px;letter-spacing:.02em;white-space:nowrap}
+   min-height:44px;padding:0 8px;font-size:0.7188rem;letter-spacing:.02em;white-space:nowrap}
  #town-wrap{min-width:92px}
  #town-btn{padding-right:28px;background-position:right 9px center}
  .barbtn i{font-style:normal;font-weight:700;color:var(--accent-text)}
@@ -622,15 +630,15 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  @media(prefers-reduced-motion:reduce){ #fsheet[open]{animation:none}}
  .fs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
    padding:10px 16px;border-bottom:2px solid var(--ink);flex:none}
- .fs-head h2{font-size:19px;font-weight:800;letter-spacing:-.02em}
- .fs-reset{font-size:14px;color:var(--accent-text);text-decoration:none;letter-spacing:0;text-transform:none;min-height:44px}
+ .fs-head h2{font-size:1.1875rem;font-weight:800;letter-spacing:-.02em}
+ .fs-reset{font-size:0.875rem;color:var(--accent-text);text-decoration:none;letter-spacing:0;text-transform:none;min-height:44px}
  .fs-body{padding:14px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px}
- .fs-label{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+ .fs-label{font-size:0.6562rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
  #fs-cats .cats{display:flex;margin:0}
  #fs-opts{display:flex;flex-direction:column;gap:8px}
  #fs-opts .chk{min-height:48px;justify-content:flex-start;padding:0 12px}
  .fs-foot{flex:none;padding:12px 16px max(14px,env(safe-area-inset-bottom));border-top:1px solid var(--rule)}
- .fs-foot button{width:100%;min-height:52px;font-size:12px;letter-spacing:.1em}
+ .fs-foot button{width:100%;min-height:52px;font-size:0.75rem;letter-spacing:.1em}
 }
 
 /* ---------- phone event cards + event page (step 2) ----------
@@ -641,20 +649,20 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 .rtime{display:none}
 #evsheet:not([open]){display:none}
 @media(max-width:600px),(pointer:coarse) and (max-width:900px){
- .row{display:grid;grid-template-columns:46px minmax(0,1fr) 12px;
+ .row{display:grid;grid-template-columns:2.9rem minmax(0,1fr) 12px;
    grid-template-areas:"time body chev" "time where chev" "time kind chev";
    column-gap:12px;row-gap:3px;padding:13px 0;cursor:pointer;
    -webkit-tap-highlight-color:transparent}
  .row:active{background:var(--press)}
  .row.exrow{grid-template-columns:minmax(0,1fr) 12px;grid-template-areas:"body chev" "where chev" "kind chev"}
- .rtime{display:block;grid-area:time;font-size:15px;font-weight:700;line-height:1.3;
+ .rtime{display:block;grid-area:time;font-size:0.9375rem;font-weight:700;line-height:1.3;
    font-variant-numeric:tabular-nums;padding-top:1px}
  .rbody{grid-area:body;min-width:0}
- .row .where{grid-area:where;margin-top:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .row .where{grid-area:where;margin-top:0;font-size:0.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .row .kind{grid-area:kind;margin-top:1px}
  .row::after{content:"";grid-area:chev;align-self:center;width:7px;height:7px;
    border-top:2px solid var(--muted);border-right:2px solid var(--muted);transform:rotate(45deg)}
- .ttl{font-size:16.5px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;
+ .ttl{font-size:1.0312rem;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;
    -webkit-box-orient:vertical;overflow:hidden}
  .ttl button{display:none}
  .ttl .pill{vertical-align:1px}
@@ -671,36 +679,36 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .ev-head{flex:none;display:flex;align-items:center;justify-content:space-between;
    padding:max(8px,env(safe-area-inset-top)) 8px 8px;border-bottom:2px solid var(--ink)}
  .ev-back{display:flex;align-items:center;gap:8px;border:0;background:none;min-height:44px;
-   padding:0 8px;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
+   padding:0 8px;font-size:0.875rem;letter-spacing:0;text-transform:none;font-weight:600}
  .ev-back:hover{background:none;color:var(--accent-text)}
  .ev-body:focus{outline:none}
  .ev-body{flex:1;overflow-y:auto;padding:18px 16px max(24px,env(safe-area-inset-bottom));
    display:flex;flex-direction:column;gap:16px}
- .ev-kind{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
- .ev-body h2{font-size:27px;font-weight:800;letter-spacing:-.025em;line-height:1.12}
+ .ev-kind{font-size:0.625rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+ .ev-body h2{font-size:1.6875rem;font-weight:800;letter-spacing:-.025em;line-height:1.12}
  .ev-body h2 a{color:var(--ink);text-decoration:none}
  .ev-cancel{color:#c8102e;font-weight:700}
  .ev-facts{border-top:2px solid var(--ink)}
  .ev-fact{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--rule)}
  .ev-fact svg{flex:none;margin-top:1px}
  .ev-fact div{flex:1;display:flex;flex-direction:column;gap:2px}
- .ev-fact b{font-size:16px}
- .ev-fact span{font-size:14px;color:var(--muted)}
- .ev-fact a{font-size:13px;font-weight:600;padding:2px 0}
- .ev-note{font-size:15px;line-height:1.55;white-space:pre-line}
+ .ev-fact b{font-size:1rem}
+ .ev-fact span{font-size:0.875rem;color:var(--muted)}
+ .ev-fact a{font-size:0.8125rem;font-weight:600;padding:2px 0}
+ .ev-note{font-size:0.9375rem;line-height:1.55;white-space:pre-line}
  .ev-acts{display:flex;gap:8px}
  .ev-acts button{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;
    gap:6px;min-height:64px;margin:0;padding:8px 4px;border:1px solid var(--ink);color:var(--ink);
-   font-size:11px;letter-spacing:.08em;line-height:1;vertical-align:0}
+   font-size:0.6875rem;letter-spacing:.08em;line-height:1;vertical-align:0}
  .ev-acts button svg{width:20px;height:20px}
  .ev-go{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;
-   background:var(--ink);color:var(--paper);text-decoration:none;font-size:12px;font-weight:700;
+   background:var(--ink);color:var(--paper);text-decoration:none;font-size:0.75rem;font-weight:700;
    letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:0 12px}
- .ev-also-h{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+ .ev-also-h{font-size:0.6562rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
    padding:6px 0 7px;border-bottom:2px solid var(--ink)}
- .ev-also{display:grid;grid-template-columns:46px minmax(0,1fr);gap:12px;width:100%;text-align:left;
+ .ev-also{display:grid;grid-template-columns:2.9rem minmax(0,1fr);gap:12px;width:100%;text-align:left;
    border:0;border-bottom:1px solid var(--rule);background:none;padding:12px 0;min-height:0;
-   font-size:15px;letter-spacing:0;text-transform:none;font-weight:700;color:var(--ink)}
+   font-size:0.9375rem;letter-spacing:0;text-transform:none;font-weight:700;color:var(--ink)}
  .ev-also:hover{background:none;color:var(--accent-text)}
  .ev-also span{font-variant-numeric:tabular-nums}
 }
@@ -714,10 +722,10 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 @keyframes eggpop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
 @media(prefers-reduced-motion:reduce){ #egg[open]{animation:none}}
 .egg-in{position:relative;padding:22px 20px 20px;display:flex;flex-direction:column;gap:8px}
-.egg-k{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.8}
-.egg-q{font-size:13px;opacity:.85;margin-top:6px}
-#egg h2{font-size:26px;font-weight:900;letter-spacing:-.03em;line-height:1.05;text-transform:uppercase;padding-right:30px}
-.egg-m{font-size:14px;opacity:.9}
+.egg-k{font-size:0.6562rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;opacity:.8}
+.egg-q{font-size:0.8125rem;opacity:.85;margin-top:6px}
+#egg h2{font-size:1.625rem;font-weight:900;letter-spacing:-.03em;line-height:1.05;text-transform:uppercase;padding-right:30px}
+.egg-m{font-size:0.875rem;opacity:.9}
 .egg-acts{display:flex;gap:8px;margin-top:10px}
 .egg-acts button{flex:1;min-height:46px;border:1px solid #fff;background:transparent;color:#fff}
 .egg-acts button.primary{background:#fff;color:#0e0e0e;border-color:#fff}
@@ -732,23 +740,23 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 }
 
 /* ---------- Add-event form: friendlier "Option B" styling ---------- */
-.form label{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600;color:var(--soft-ink)}
+.form label{text-transform:none;letter-spacing:0;font-size:0.7812rem;font-weight:600;color:var(--soft-ink)}
 .form label i{opacity:.55}
-.form input,.form select,.form textarea{border:1px solid var(--field-line);border-radius:11px;background:var(--field);color:var(--ink);padding:11px 13px;font-size:15px}
+.form input,.form select,.form textarea{border:1px solid var(--field-line);border-radius:11px;background:var(--field);color:var(--ink);padding:11px 13px;font-size:0.9375rem}
 .form input:focus,.form select:focus,.form textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,59,255,.16)}
 .form input::placeholder,.form textarea::placeholder{color:var(--placeholder)}
 .form textarea{font:inherit;resize:vertical;min-height:92px;line-height:1.45}
-.form .hint{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4;text-transform:none;letter-spacing:0}
-.form button.primary{border-radius:11px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:700;padding:14px 18px}
+.form .hint{font-size:0.75rem;color:var(--muted);margin-top:5px;line-height:1.4;text-transform:none;letter-spacing:0}
+.form button.primary{border-radius:11px;text-transform:none;letter-spacing:0;font-size:0.875rem;font-weight:700;padding:14px 18px}
 .form button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
 /* the snap area becomes a soft, dashed "drop a flyer" panel */
 .snap{display:block;margin-bottom:20px}
 .snap-btn{display:flex;align-items:center;gap:12px;width:100%;justify-content:flex-start;
   background:var(--field);color:var(--soft-ink);border:1.5px dashed var(--dash);border-radius:12px;
-  padding:12px 15px;font-size:13.5px;letter-spacing:0;text-transform:none;font-weight:600;min-height:0}
-.snap-btn::before{content:"📸";background:var(--accent);color:#fff;border-radius:9px;padding:7px 9px;font-size:15px;line-height:1}
+  padding:12px 15px;font-size:0.8438rem;letter-spacing:0;text-transform:none;font-weight:600;min-height:0}
+.snap-btn::before{content:"📸";background:var(--accent);color:#fff;border-radius:9px;padding:7px 9px;font-size:0.9375rem;line-height:1}
 .snap-btn:hover{background:#fff;border-color:var(--accent);color:var(--ink)}
-.snap-msg{display:block;flex:none;font-size:12.5px;color:var(--muted);margin-top:8px;min-width:0}
+.snap-msg{display:block;flex:none;font-size:0.7812rem;color:var(--muted);margin-top:8px;min-width:0}
 /* bold black header band on the add-event form (keeps the black up top) */
 #dlg .dlg-head{background:var(--ink);border-bottom:0}
 #dlg .dlg-head h2{color:var(--paper)}
@@ -756,6 +764,25 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 #dlg .dlg-x{border-color:var(--paper);color:var(--paper)}
 #dlg .dlg-x:hover{background:var(--paper);color:var(--ink)}
 </style>
+{#- iOS Dynamic Type. A web page is only told the phone's text-size setting
+    through the system "body" font, so measure it and scale the root size by it:
+    every text size above is in rem, so the whole page follows. 17px is iOS's
+    body size at the default setting, so at the default nothing changes, and
+    it only ever scales UP. Phones
+    and tablets only: Safari on a Mac reports its own, smaller body size, which
+    would shrink the computer layout. Capped at double. #}
+<script>
+(function(){try{
+  if(!(window.CSS&&CSS.supports("font","-apple-system-body"))||!matchMedia("(pointer:coarse)").matches) return;
+  var m=document.createElement("span");
+  m.style.cssText="font:-apple-system-body;position:absolute;visibility:hidden";
+  m.textContent="x"; document.documentElement.appendChild(m);
+  var px=parseFloat(getComputedStyle(m).fontSize); m.remove();
+  // Only ever larger: a Mac reports a smaller body size than a phone, and a
+  // smaller-than-default setting is not worth risking the layout for.
+  if(px>17) document.documentElement.style.fontSize=(16*Math.min(2,px/17))+"px";
+}catch(e){}})();
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -1632,6 +1659,7 @@ function syncPhoneBar(when, count){
     if(!ind.dataset.ready){ ind.style.transition = "none"; }
     ind.style.transform = `translateX(${on.offsetLeft}px)`;
     ind.style.width = on.offsetWidth + "px";
+    ind.style.height = on.offsetHeight + "px";
     ind.style.opacity = "1";
     if(!ind.dataset.ready){ ind.offsetWidth; ind.style.transition = ""; ind.dataset.ready = "1"; }
   } else ind.style.opacity = "0";
