@@ -170,13 +170,13 @@ class Submissions(HttpScraper):
             return
 
         today = date.today()
-        published: list[str] = []
+        published: list[tuple[str, str]] = []
 
         for row in rows:
             ev = self._to_event(row, today)
             if ev is None:
                 continue
-            published.append(row["id"])
+            published.append((row["id"], ev.fingerprint))
             yield ev
 
         # Mark what we published, so the Table Editor shows at a glance which
@@ -223,14 +223,32 @@ class Submissions(HttpScraper):
             approved=True,          # we only ever query approved=eq.true
         )
 
-    def _mark_published(self, base: str, headers: dict, ids: list[str]) -> None:
-        try:
-            ids_csv = ",".join(f'"{i}"' for i in ids)
-            self.client.patch(
-                f"{base}/rest/v1/submissions?id=in.({ids_csv})&published=eq.false",
-                headers={**headers, "Content-Type": "application/json",
-                         "Prefer": "return=minimal"},
-                json={"published": True},
-            )
-        except Exception as e:
-            log.info("%s: couldn't flag rows published (harmless) — %s", self.name, e)
+    def _mark_published(self, base: str, headers: dict,
+                        rows: list[tuple[str, str]]) -> None:
+        """Flag each newly published row, and record which event it became.
+
+        `live_fingerprint` is what lets Supabase email the submitter a link to
+        THEIR event (whatsonnice.com/?e=<fingerprint>) rather than the home page;
+        migration 009 sends that email when `published` flips to true.
+
+        One request per row, because each row gets its own fingerprint. There are
+        a handful at most. The `published=eq.false` filter is load-bearing: it
+        makes the flip happen once per row, so the "your event is live" email is
+        sent once and never again on later runs.
+
+        Before migration 009 is applied the column does not exist and PostgREST
+        rejects the whole request, which would leave rows unflagged. So on a
+        refusal, retry with `published` alone. Best-effort throughout: the events
+        are already yielded and the site is fine whatever happens here.
+        """
+        hdrs = {**headers, "Content-Type": "application/json", "Prefer": "return=minimal"}
+        for row_id, fp in rows:
+            url = f"{base}/rest/v1/submissions?id=eq.{row_id}&published=eq.false"
+            try:
+                r = self.client.patch(url, headers=hdrs,
+                                      json={"published": True, "live_fingerprint": fp})
+                if r.status_code >= 400:
+                    self.client.patch(url, headers=hdrs, json={"published": True})
+            except Exception as e:
+                log.info("%s: couldn't flag row %s published (harmless) — %s",
+                         self.name, row_id, e)

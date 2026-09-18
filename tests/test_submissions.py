@@ -272,3 +272,62 @@ def test_site_module_cannot_see_the_service_key(monkeypatch):
         val = getattr(site, name)
         if isinstance(val, str):
             assert "super-secret-do-not-ship" not in val
+
+
+# --- recording which event a submission became (for the "it's live" email) ---
+
+class _PatchResp:
+    def __init__(self, status):
+        self.status_code = status
+
+
+class _PatchRecorder:
+    """Stands in for httpx: records every PATCH, answers with scripted statuses."""
+    def __init__(self, statuses=None):
+        self.calls, self.statuses = [], list(statuses or [])
+
+    def patch(self, url, headers=None, json=None):
+        self.calls.append((url, json))
+        return _PatchResp(self.statuses.pop(0) if self.statuses else 204)
+
+
+def _scraper_with(client):
+    from niceevents.scrapers.submissions import Submissions
+    s = Submissions.__new__(Submissions)
+    s._client = client
+    return s
+
+
+def test_each_published_row_records_its_own_event():
+    c = _PatchRecorder()
+    _scraper_with(c)._mark_published("https://x.supabase.co", {},
+                                     [("id-1", "fpA"), ("id-2", "fpB")])
+    assert [j for _, j in c.calls] == [
+        {"published": True, "live_fingerprint": "fpA"},
+        {"published": True, "live_fingerprint": "fpB"},
+    ]
+
+
+def test_only_unpublished_rows_are_flipped_so_the_email_goes_once():
+    c = _PatchRecorder()
+    _scraper_with(c)._mark_published("https://x.supabase.co", {}, [("id-1", "fpA")])
+    assert "published=eq.false" in c.calls[0][0]
+    assert "id=eq.id-1" in c.calls[0][0]
+
+
+def test_before_the_new_column_exists_rows_are_still_flagged():
+    """Until migration 009 is applied, PostgREST rejects the unknown column. The
+    row must still be marked published, as it always was."""
+    c = _PatchRecorder(statuses=[400, 204])
+    _scraper_with(c)._mark_published("https://x.supabase.co", {}, [("id-1", "fpA")])
+    assert [j for _, j in c.calls] == [
+        {"published": True, "live_fingerprint": "fpA"},
+        {"published": True},
+    ]
+
+
+def test_a_network_failure_never_raises():
+    class Boom:
+        def patch(self, *a, **k):
+            raise RuntimeError("network down")
+    _scraper_with(Boom())._mark_published("https://x.supabase.co", {}, [("id-1", "fpA")])
