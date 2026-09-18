@@ -591,6 +591,78 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .fs-foot button{width:100%;min-height:52px;font-size:12px;letter-spacing:.1em}
 }
 
+/* ---------- phone event cards + event page (step 2) ----------
+   A card is: time on the left, the title in at most two lines (it goes to the
+   source site, hence the small arrow), then place and category. The blurb and
+   the three icons moved into the event page, which the rest of the card opens.
+   About twice as many events now fit on a screen. */
+.rtime{display:none}
+#evsheet:not([open]){display:none}
+@media(max-width:600px){
+ .row{display:grid;grid-template-columns:46px minmax(0,1fr) 12px;
+   grid-template-areas:"time body chev" "time where chev" "time kind chev";
+   column-gap:12px;row-gap:3px;padding:13px 0;cursor:pointer;
+   -webkit-tap-highlight-color:transparent}
+ .row:active{background:#ebe8e1}
+ .row.exrow{grid-template-columns:minmax(0,1fr) 12px;grid-template-areas:"body chev" "where chev" "kind chev"}
+ .rtime{display:block;grid-area:time;font-size:15px;font-weight:700;line-height:1.3;
+   font-variant-numeric:tabular-nums;padding-top:1px}
+ .rbody{grid-area:body;min-width:0}
+ .row .where{grid-area:where;margin-top:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .row .kind{grid-area:kind;margin-top:1px}
+ .row::after{content:"";grid-area:chev;align-self:center;width:7px;height:7px;
+   border-top:2px solid var(--muted);border-right:2px solid var(--muted);transform:rotate(45deg)}
+ .ttl{font-size:16.5px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;
+   -webkit-box-orient:vertical;overflow:hidden}
+ .ttl button{display:none}
+ .ttl .pill{vertical-align:1px}
+ .row .sub{display:none}
+ .ttl a.tt{display:inline;padding:0;color:var(--ink);text-decoration:none}
+ .ttl a.tt::after{content:"";display:inline-block;width:10px;height:10px;margin-left:5px;
+   background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231f3bff' stroke-width='3.2' stroke-linecap='square'><path d='M7 17L17 7M8 7h9v9'/></svg>") no-repeat center/contain}
+
+ /* The event page: full screen, slides in from the right like a page turning. */
+ #evsheet[open]{animation:evin .26s cubic-bezier(.2,.8,.2,1)}
+ @keyframes evin{from{transform:translateX(100%)}to{transform:none}}
+ @media(prefers-reduced-motion:reduce){ #evsheet[open]{animation:none}}
+ .ev-head{flex:none;display:flex;align-items:center;justify-content:space-between;
+   padding:max(8px,env(safe-area-inset-top)) 8px 8px;border-bottom:2px solid var(--ink)}
+ .ev-back{display:flex;align-items:center;gap:8px;border:0;background:none;min-height:44px;
+   padding:0 8px;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
+ .ev-back:hover{background:none;color:var(--accent)}
+ .ev-body:focus{outline:none}
+ .ev-body{flex:1;overflow-y:auto;padding:18px 16px max(24px,env(safe-area-inset-bottom));
+   display:flex;flex-direction:column;gap:16px}
+ .ev-kind{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+ .ev-body h2{font-size:27px;font-weight:800;letter-spacing:-.025em;line-height:1.12}
+ .ev-body h2 a{color:var(--ink);text-decoration:none}
+ .ev-body h2 svg{display:inline;vertical-align:-2px;margin-left:6px}
+ .ev-cancel{color:#c8102e;font-weight:700}
+ .ev-facts{border-top:2px solid var(--ink)}
+ .ev-fact{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--rule)}
+ .ev-fact svg{flex:none;margin-top:1px}
+ .ev-fact div{flex:1;display:flex;flex-direction:column;gap:2px}
+ .ev-fact b{font-size:16px}
+ .ev-fact span{font-size:14px;color:var(--muted)}
+ .ev-fact a{font-size:13px;font-weight:600;padding:2px 0}
+ .ev-note{font-size:15px;line-height:1.55;white-space:pre-line}
+ .ev-acts{display:flex;gap:8px}
+ .ev-acts button{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+   gap:6px;min-height:64px;margin:0;padding:8px 4px;border:1px solid var(--ink);color:var(--ink);
+   font-size:11px;letter-spacing:.08em;line-height:1;vertical-align:0}
+ .ev-acts button svg{width:20px;height:20px}
+ .ev-go{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;
+   background:var(--ink);color:var(--paper);text-decoration:none;font-size:12px;font-weight:700;
+   letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:0 12px}
+ .ev-also-h{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+   padding:6px 0 7px;border-bottom:2px solid var(--ink)}
+ .ev-also{display:grid;grid-template-columns:46px minmax(0,1fr);gap:12px;width:100%;text-align:left;
+   border:0;border-bottom:1px solid var(--rule);background:none;padding:12px 0;min-height:0;
+   font-size:15px;letter-spacing:0;text-transform:none;font-weight:700;color:var(--ink)}
+ .ev-also:hover{background:none;color:var(--accent)}
+ .ev-also span{font-variant-numeric:tabular-nums}
+}
+
 /* Landscape phone: don't let a 100dvh dialog trap the form. */
 @media(max-width:900px) and (orientation:landscape) and (max-height:500px){
  dialog{height:100dvh}
@@ -762,6 +834,18 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   {%- endfor %}
 {%- endfor %}
 </div>
+
+{# Phone only: the event page. Tapping a card anywhere but its title opens it;
+   the title itself still goes straight to the source site. Built from the event
+   in JS (openEvent), and it pushes ?e=<slug> so the phone's back button closes
+   it rather than leaving the site. #}
+<dialog id="evsheet" aria-labelledby="ev-title">
+  <div class="ev-head">
+    <button type="button" class="ev-back" id="ev-close" aria-label="Back to the list">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M20 12H5M11 6l-6 6 6 6"/></svg><span id="ev-day"></span></button>
+  </div>
+  <div class="ev-body" id="ev-body" tabindex="-1"></div>
+</dialog>
 
 {# The phone's filter panel. The category chips and the two checkboxes are MOVED
    in here on a phone (see placeFilters), not copied, so their handlers and
@@ -1218,11 +1302,11 @@ function exhibRow(e, i, soonCut, newCut){
     ? `<a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`
     : `<span class="tt">${esc(e.title)}</span>`;
   const desc = e.note?esc(e.note):"";
-  const r=document.createElement("div"); r.className="row"; r.dataset.fp=e.fingerprint;
+  const r=document.createElement("div"); r.className="row exrow"; r.dataset.fp=e.fingerprint;
   if(e.fingerprint===HL_FP) r.classList.add("hl");
   r.innerHTML=`
     <div class="idx">${String(i).padStart(2,"0")}</div>
-    <div>
+    <div class="rbody">
       <div class="ttl">
         ${e.free?'<span class="pill free">Free</span>':""}
         ${badge}
@@ -1415,7 +1499,8 @@ function render(){
     const sub = [tm, pr, desc].filter(Boolean).join(" · ");
     html.push(`<div class="${cls}" data-fp="${esc(e.fingerprint)}">
       <div class="idx">${String(i).padStart(2,"0")}</div>
-      <div>
+      <div class="rtime">${(!e.cancelled && e.time) ? esc(e.time) : ""}</div>
+      <div class="rbody">
         <div class="ttl">
           ${e.cancelled?'<span class="pill cancel">Annulé</span>':""}
           ${e.free?'<span class="pill free">Free</span>':""}
@@ -1733,7 +1818,87 @@ document.addEventListener("click", ev=>{
   const e=FP_MAP.get(b.dataset.fp); if(e) shareEventCard(e,b);
 });
 
-// Opened via a shared ?e=… link — bring that event into view once.
+// ---------- phone event page ----------
+const PIN_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+const CLOCK_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
+const OUT_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"/></svg>';
+const host = u => { try { return new URL(u).hostname.replace(/^www\./,""); } catch(_) { return "the source"; } };
+function whenLines(e){
+  const time = (!e.cancelled && e.time) ? e.time : "";
+  if(!isMultiDay(e)) return [fmtDay(e.start), time || "Time not given"];
+  const span = `${fmtShort(e.start)} – ${fmtShort(e.end)}`;
+  if(isWeekly(e)) return [`${e.days.map(n=>DAY_NAMES[n]+"s").join(", ")}`, `${span}${time?" · "+time:""}`];
+  return [e.start < TODAY ? `Until ${fmtDay(e.end)}` : span, time ? `From ${time}` : "Any day it is on"];
+}
+function openEvent(fp, push){
+  const e = FP_MAP.get(fp); if(!e) return;
+  const day = e.start < TODAY ? TODAY : e.start;
+  const [w1, w2] = whenLines(e);
+  const where1 = e.venue || e.town, where2 = e.venue ? e.town : "";
+  const map = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([e.venue, e.town].filter(Boolean).join(", "));
+  const title = e.url && !e.cancelled
+    ? `<a href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}<span style="color:var(--accent)">${OUT_SVG}</span></a>`
+    : esc(e.title);
+  // Everything else on at the same place that day, so one good venue leads to the next.
+  const also = e.venue ? EVENTS.filter(x => x !== e && x.venue === e.venue && x.town === e.town &&
+      !x.cancelled && overlaps(x, day, day) && !isStanding(x))
+    .sort((a,b)=>(a.time||"99").localeCompare(b.time||"99")).slice(0, 6) : [];
+  $("ev-day").textContent = fmtDay(day).split(" ").slice(0,2).join(" ");
+  $("ev-body").innerHTML = `
+    <div class="ev-kind">${tagsOf(e).map(t=>esc(CATNAME[t]||t)).join(" · ")}${e.free?' · <span style="color:var(--accent)">Free</span>':""}</div>
+    <h2 id="ev-title">${title}</h2>
+    ${e.cancelled?`<p class="ev-cancel">Annulé${e.cancel_note?" · "+esc(e.cancel_note):""}</p>`:""}
+    <div class="ev-facts">
+      <div class="ev-fact">${CLOCK_SVG}<div><b>${esc(w1)}</b><span>${esc(w2)}</span></div></div>
+      <div class="ev-fact">${PIN_SVG}<div><b>${esc(where1)}</b>${where2?`<span>${esc(where2)}</span>`:""}</div>
+        <a href="${esc(map)}" target="_blank" rel="noopener">Map</a></div>
+      ${(!e.free && e.price)?`<div class="ev-fact"><span style="width:20px;text-align:center;font-weight:700;color:var(--ink)">€</span><div><b>${esc(e.price)}</b></div></div>`:""}
+    </div>
+    ${e.note?`<p class="ev-note">${esc(e.note)}</p>`:""}
+    <div class="ev-acts">
+      <button type="button" class="calbtn" data-fp="${esc(e.fingerprint)}">${CAL_SVG}<span>Calendar</span></button>
+      <button type="button" class="sharebtn" data-fp="${esc(e.fingerprint)}" data-title="${esc(e.title)}">${SHARE_SVG}<span>Share</span></button>
+      <button type="button" class="cardbtn" data-fp="${esc(e.fingerprint)}">${CARD_SVG}<span>Card</span></button>
+    </div>
+    ${e.url?`<a class="ev-go" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">Full details on ${esc(host(e.url))}${OUT_SVG}</a>`:""}
+    ${also.length?`<div><div class="ev-also-h">Also at ${esc(e.venue)} that day</div>
+      ${also.map(x=>`<button type="button" class="ev-also" data-fp="${esc(x.fingerprint)}"><span>${esc(x.time||"")}</span>${esc(x.title)}</button>`).join("")}</div>`:""}`;
+  const sheet = $("evsheet");
+  if(!sheet.open) sheet.showModal();
+  // Focus the page itself, not the back button: a dialog focuses its first
+  // button on open, and on a phone that drew a blue frame around "Back".
+  $("ev-body").focus({preventScroll: true});
+  $("ev-body").scrollTop = 0;
+  if(push) history.pushState({ev: fp}, "", "?e=" + encodeURIComponent(e.slug || fp));
+}
+function closeEvent(){
+  // Opened from the list: step back, and popstate closes it. Opened from a shared
+  // link: there is nothing of ours to step back to, so close and tidy the address.
+  if(history.state && history.state.ev) history.back();
+  else { $("evsheet").close(); history.replaceState(null, "", SITE); }
+}
+$("ev-close").onclick = closeEvent;
+$("evsheet").addEventListener("cancel", ev => { ev.preventDefault(); closeEvent(); });
+addEventListener("popstate", () => {
+  const st = history.state;
+  if(st && st.ev) openEvent(st.ev, false);
+  else if($("evsheet").open) $("evsheet").close();
+});
+$("ev-body").addEventListener("click", ev => {
+  const b = ev.target.closest(".ev-also"); if(!b) return;
+  openEvent(b.dataset.fp, true);
+});
+// A tap anywhere on a card except its links and buttons opens the event page.
+document.addEventListener("click", ev => {
+  if(!PHONE.matches) return;
+  const row = ev.target.closest("#list .row[data-fp], #exhibs .row[data-fp]");
+  if(!row || ev.target.closest("a,button")) return;
+  openEvent(row.dataset.fp, true);
+});
+
+// Opened via a shared ?e=… link — on a phone, open its page; everywhere, bring
+// the row into view once.
+if(HL_FP && PHONE.matches && FP_MAP.has(HL_FP)) openEvent(HL_FP, false);
 if(HL_FP){
   const hit=$("list").querySelector('.row[data-fp="'+CSS.escape(HL_FP)+'"]');
   if(hit) setTimeout(()=>hit.scrollIntoView({block:"center",behavior:"smooth"}),80);
