@@ -629,8 +629,10 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .ttl .pill{vertical-align:1px}
  .row .sub{display:none}
  .ttl a.tt{display:inline;padding:0;color:var(--ink);text-decoration:none}
- .ttl a.tt::after{content:"";display:inline-block;width:10px;height:10px;margin-left:5px;
-   background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231f3bff' stroke-width='3.2' stroke-linecap='square'><path d='M7 17L17 7M8 7h9v9'/></svg>") no-repeat center/contain}
+ /* No arrow after the title (tried, felt like too much). Instead a title turns
+    blue the moment it is pressed and stays blue until the source opens, so the
+    tap is visibly heard. "opening" is added on tap by the script below. */
+ .ttl a.tt:active,.ttl a.tt.opening,.ev-body h2 a:active,.ev-body h2 a.opening{color:var(--accent)}
 
  /* The event page: full screen, and it simply appears. The slide-in was tried
     in the motion prototype and turned down. */
@@ -646,7 +648,6 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .ev-kind{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
  .ev-body h2{font-size:27px;font-weight:800;letter-spacing:-.025em;line-height:1.12}
  .ev-body h2 a{color:var(--ink);text-decoration:none}
- .ev-body h2 svg{display:inline;vertical-align:-2px;margin-left:6px}
  .ev-cancel{color:#c8102e;font-weight:700}
  .ev-facts{border-top:2px solid var(--ink)}
  .ev-fact{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--rule)}
@@ -1859,7 +1860,7 @@ function openEvent(fp, push){
   const where1 = e.venue || e.town, where2 = e.venue ? e.town : "";
   const map = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([e.venue, e.town].filter(Boolean).join(", "));
   const title = e.url && !e.cancelled
-    ? `<a href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}<span style="color:var(--accent)">${OUT_SVG}</span></a>`
+    ? `<a href="${esc(e.url)}" target="_blank" rel="noopener nofollow">${esc(e.title)}</a>`
     : esc(e.title);
   // Everything else on at the same place that day, so one good venue leads to the next.
   const also = e.venue ? EVENTS.filter(x => x !== e && x.venue === e.venue && x.town === e.town &&
@@ -1910,6 +1911,19 @@ $("ev-body").addEventListener("click", ev => {
   const b = ev.target.closest(".ev-also"); if(!b) return;
   openEvent(b.dataset.fp, true);
 });
+// A title stays blue from the tap until the source has opened. iOS only paints
+// :active when some touch listener exists, hence the empty one.
+document.addEventListener("touchstart", () => {}, {passive: true});
+document.addEventListener("click", ev => {
+  const a = ev.target.closest(".ttl a.tt, .ev-body h2 a"); if(!a) return;
+  a.classList.add("opening");
+  setTimeout(() => a.classList.remove("opening"), 1500);
+});
+addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "visible")
+    document.querySelectorAll("a.opening").forEach(a => a.classList.remove("opening"));
+});
+
 // A tap anywhere on a card except its links and buttons opens the event page.
 document.addEventListener("click", ev => {
   if(!PHONE.matches) return;
