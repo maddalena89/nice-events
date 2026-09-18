@@ -279,6 +279,153 @@ def _collapse_recurring(events: list[dict], today: Optional[date] = None) -> lis
     return out
 
 
+#: Filler that carries no identity: two titles differing only in these are the
+#: same event. Kept deliberately short, because a word left out of this list
+#: can only ever PREVENT a merge, while a word wrongly in it CAUSES one.
+#:
+#: NOT filler, and why each was taken back out: "guidée" and "libre", because a
+#: guided tour and a free visit of the same gardens are different activities
+#: (Villa Arson listed both, and treating "guidée" as filler merged them);
+#: "nocturne", because a night visit is not the day visit; "session", "séance"
+#: and "partie", because they are exactly what tells two sittings apart.
+_DUP_GENERIC = set((
+    "inauguration collective conference conferences dans auditorium rencontre "
+    "presentation edition journee journees europeennes patrimoine"
+).split())
+
+#: Words that mark a different VERSION of the same thing. If one title has one
+#: and the other does not, they are two events, however much else they share.
+#:
+#: This is what containment alone gets wrong. "Visite du château de Nice" sits
+#: entirely inside "Visite nocturne du château de Nice", so a shorter-inside-
+#: longer rule calls them the same, but a night visit is not the day visit. A
+#: lead-in like "Une visite du passé :" is harmless extra wording; "nocturne",
+#: "guidée", "libre", "enfants" change what you would be going to.
+#:
+#: "famille" is deliberately absent: "Matinées de jeux" and "Matinées de jeux en
+#: famille", same library, same hour, are one event described two ways.
+_VARIANT_WORDS = set((
+    "nocturne nuit guidee guidees libre enfant enfants adulte adultes junior "
+    "session seance partie"
+).split())
+
+#: Venue words that are addresses or kinds of building, so "Musée national Marc
+#: Chagall" and "Musée Marc Chagall Avenue du Docteur Ménard" reduce to the same
+#: thing: {marc, chagall}.
+_VENUE_GENERIC = set((
+    "musee museum national nationale municipal salle espace centre center place "
+    "avenue av rue boulevard bd quai chemin route allee impasse cours square "
+    "le la les l de du des d et en au aux docteur saint sainte st ste nice"
+).split())
+
+
+def _fold_words(text: Optional[str], drop: set) -> set:
+    t = unicodedata.normalize("NFD", (text or "").lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    t = re.sub(r"[^a-z0-9]+", " ", t)                  # underscores, quotes, colons
+    return {w for w in t.split() if len(w) >= 3 and w not in drop}
+
+
+def _dup_words(title: Optional[str]) -> set:
+    return _fold_words(title, _CARD_STOP | _DUP_GENERIC)
+
+
+def _venue_words(venue: Optional[str]) -> set:
+    return _fold_words(venue, _VENUE_GENERIC)
+
+
+def _same_listing(a: dict, b: dict) -> bool:
+    """Two rows describing one event, worded differently by two sources.
+
+    The prefix check in _collapse_overlaps only catches a shared START: "Coun -
+    Libera l'Art" inside "Coun. Libera l'Art au Palais Lascaris". It misses the
+    shared part sitting in the middle or at the end, which is the common case
+    when one source adds a lead-in: "Une visite du passé : comment les archives
+    peuvent redonner vie…" against "Comment les archives peuvent redonner vie…",
+    or "Inauguration de l'image_Satellite" against "Exposition collective de
+    L'Image Satellite". So: same dates, same place, and every distinctive word of
+    the shorter title present in the longer.
+
+    Built to under-merge. A false merge hides a real event, which is worse than
+    showing one twice, so each condition below refuses rather than guesses:
+      * identical date range, same town
+      * a venue on both, one's distinctive words contained in the other's
+      * at least TWO distinctive title words
+      * no version-marking word in one title but not the other (_VARIANT_WORDS),
+        so "Visite du château" does not swallow "Visite nocturne du château"
+      * for a single-day event, the same time if both give one. Two times on the
+        same day is most likely two sessions of the same talk.
+    """
+    if a["start"] != b["start"] or (a.get("end") or a["start"]) != (b.get("end") or b["start"]):
+        return False
+    if (a.get("town") or "") != (b.get("town") or ""):
+        return False
+    va, vb = _venue_words(a.get("venue")), _venue_words(b.get("venue"))
+    if not va or not vb:
+        return False
+    sv, lv = sorted((va, vb), key=len)
+    if not sv <= lv:
+        return False
+    ta, tb = _dup_words(a.get("title")), _dup_words(b.get("title"))
+    st, lt = sorted((ta, tb), key=len)
+    if len(st) < 2 or not st <= lt:
+        return False
+    if (ta ^ tb) & _VARIANT_WORDS:                     # a different version of it
+        return False
+    single_day = (a.get("end") or a["start"]) == a["start"]
+    if single_day and a.get("time") and b.get("time") and a["time"] != b["time"]:
+        return False
+    return True
+
+
+def _collapse_same_venue(events: list[dict]) -> list[dict]:
+    """Fold rows that _same_listing says are one event. The survivor is the row
+    carrying the most information, then the fuller title; gaps are filled from
+    the others, as _merge_cluster does."""
+    by_day: dict[tuple, list[int]] = {}
+    for i, e in enumerate(events):
+        by_day.setdefault((e["start"], e.get("town") or ""), []).append(i)
+
+    parent = list(range(len(events)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for idxs in by_day.values():
+        for x in range(len(idxs)):
+            for y in range(x + 1, len(idxs)):
+                i, j = idxs[x], idxs[y]
+                if _same_listing(events[i], events[j]):
+                    parent[find(i)] = find(j)
+
+    groups: dict[int, list[dict]] = {}
+    for i, e in enumerate(events):
+        groups.setdefault(find(i), []).append(e)
+
+    def richness(e: dict) -> tuple:
+        filled = sum(1 for f in ("venue", "note", "url", "time", "image") if e.get(f))
+        return (filled, len(e.get("title") or ""))
+
+    out: list[dict] = []
+    for members in groups.values():
+        if len(members) == 1:
+            out.append(members[0])
+            continue
+        members.sort(key=richness, reverse=True)
+        base = dict(members[0])
+        for m in members[1:]:
+            for f in ("venue", "note", "url", "time", "image"):
+                if not base.get(f) and m.get(f):
+                    base[f] = m[f]
+            base["free"] = bool(base.get("free") or m.get("free"))
+        out.append(base)
+    out.sort(key=lambda e: (e["start"], e.get("title", "")))
+    return out
+
+
 def _merge_cluster(members: list[dict], start: date, end: date) -> dict:
     """One event out of an overlapping cluster: earliest entry wins the copy,
     missing fields filled from the rest, date range widened to the union."""
@@ -1093,7 +1240,7 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist") -> tuple[int, str]:
     # otherwise-active run of the same event.
     cancelled = [e for e in dicts if e.get("cancelled")]
     active = [e for e in dicts if not e.get("cancelled")]
-    events = _collapse_recurring(_collapse_overlaps(active)) + cancelled
+    events = _collapse_recurring(_collapse_same_venue(_collapse_overlaps(active))) + cancelled
     for e in events:                      # no em dashes in any displayed title
         title, when = _time_from_title(e.get("title", ""), e.get("time"))
         e["title"] = _clean_title(title)
