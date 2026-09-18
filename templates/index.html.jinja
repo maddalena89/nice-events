@@ -551,7 +551,17 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .whenchips::-webkit-scrollbar{display:none}
  .whenchips button,.whencal{flex:none;min-height:40px;height:40px;padding:0 13px;font-size:11.5px;
    font-weight:700;letter-spacing:.08em}
- .whenchips button.on,.whencal.on{background:var(--ink);color:var(--paper)}
+ /* The chosen date is marked by one black block that glides from button to
+    button, rather than each button filling in on its own. The only animation
+    Maddalena kept from the motion prototype (18 Sep 2026). */
+ .whenchips{position:relative}
+ .whenind{position:absolute;top:0;left:0;height:40px;width:0;background:var(--ink);opacity:0;
+   pointer-events:none;transition:transform .38s cubic-bezier(.3,1.35,.45,1),width .38s cubic-bezier(.3,1.35,.45,1),opacity .15s}
+ .whenchips button{position:relative;z-index:1;background:transparent;transition:color .25s}
+ .whenchips button:hover{background:transparent;color:var(--ink)}
+ .whenchips button.on,.whenchips button.on:hover{color:var(--paper)}
+ .whencal.on{background:var(--ink);color:var(--paper)}
+ @media(prefers-reduced-motion:reduce){.whenind,.whenchips button{transition:none}}
  .whencal{width:44px;padding:0;display:flex;align-items:center;justify-content:center}
  .bar.searching .whenrow{opacity:.4}
 
@@ -622,10 +632,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .ttl a.tt::after{content:"";display:inline-block;width:10px;height:10px;margin-left:5px;
    background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231f3bff' stroke-width='3.2' stroke-linecap='square'><path d='M7 17L17 7M8 7h9v9'/></svg>") no-repeat center/contain}
 
- /* The event page: full screen, slides in from the right like a page turning. */
- #evsheet[open]{animation:evin .26s cubic-bezier(.2,.8,.2,1)}
- @keyframes evin{from{transform:translateX(100%)}to{transform:none}}
- @media(prefers-reduced-motion:reduce){ #evsheet[open]{animation:none}}
+ /* The event page: full screen, and it simply appears. The slide-in was tried
+    in the motion prototype and turned down. */
+ #evsheet[open]{animation:none}
  .ev-head{flex:none;display:flex;align-items:center;justify-content:space-between;
    padding:max(8px,env(safe-area-inset-top)) 8px 8px;border-bottom:2px solid var(--ink)}
  .ev-back{display:flex;align-items:center;gap:8px;border:0;background:none;min-height:44px;
@@ -745,6 +754,7 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
      the #when select below (hidden on phones), so render() has one source. #}
   <div class="whenrow" id="whenrow">
     <div class="whenchips" id="whenchips" role="group" aria-label="When">
+      <span class="whenind" id="whenind" aria-hidden="true"></span>
       <button type="button" data-w="today">Today</button>
       <button type="button" data-w="tomorrow">Tomorrow</button>
       <button type="button" data-w="weekend">Weekend</button>
@@ -1532,6 +1542,15 @@ function syncPhoneBar(when, count){
   // Keep the chosen date button in view: "30 days", the default, sits past the
   // right edge on a phone, and an unseen selection reads as no selection.
   const on = $("whenchips").querySelector(".on"), row = $("whenchips");
+  const ind = $("whenind");
+  if(on){
+    // No glide on the very first paint, only when the choice changes.
+    if(!ind.dataset.ready){ ind.style.transition = "none"; }
+    ind.style.transform = `translateX(${on.offsetLeft}px)`;
+    ind.style.width = on.offsetWidth + "px";
+    ind.style.opacity = "1";
+    if(!ind.dataset.ready){ ind.offsetWidth; ind.style.transition = ""; ind.dataset.ready = "1"; }
+  } else ind.style.opacity = "0";
   if(on && (on.offsetLeft < row.scrollLeft || on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth))
     row.scrollLeft = on.offsetLeft - row.offsetLeft - 8;
   const n = active.size + ($("freeonly").checked?1:0) + ($("online").checked?1:0);
