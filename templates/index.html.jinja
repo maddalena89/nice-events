@@ -799,6 +799,11 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 <script id="data" type="application/json">{{ events_json }}</script>
 <script>
 const EVENTS = JSON.parse(document.getElementById("data").textContent);
+// Every category an event belongs to, primary first. An event can be two things
+// (a guided visit OR an exhibition, a dance class that is also a workshop), and
+// the chips filter on this list so it appears under each. The fallback keeps an
+// older cached feed without `tags` working rather than blanking the chips.
+const tagsOf = e => e.tags || [e.category];
 const CATNAME = {{ cat_json }};
 const $ = id => document.getElementById(id);
 const iso = d => d.toISOString().slice(0,10);
@@ -856,7 +861,7 @@ allEl.onclick=()=>{
 };
 $("cats").appendChild(allEl);
 
-const cats = [...new Set(EVENTS.map(e=>e.category))]
+const cats = [...new Set(EVENTS.flatMap(tagsOf))]
   .sort((a,b)=>Object.keys(CATNAME).indexOf(a)-Object.keys(CATNAME).indexOf(b));
 cats.forEach(k=>{
   const el=document.createElement("div");
@@ -962,10 +967,22 @@ const fmtYr=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{year:"numeric
 const fmtShort=d=>new Date(d+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"});
 const addDays=(d,n)=>{const x=new Date(d+"T12:00:00");x.setDate(x.getDate()+n);return iso(x);};
 const isMultiDay=e=>e.end&&e.end!==e.start;
-const isExhib=e=>e.category==="expo";
-// A multi-day exhibition is "standing": it belongs in its own section, not
+// A "run" is something you can go to on any of many days: a play's season, a
+// festival, an exhibition. It belongs in its own section, shown once, not
 // stamped onto every day of the feed.
-const isStanding=e=>isExhib(e)&&isMultiDay(e);
+//
+// This used to be exhibitions only. Everything else that ran for weeks stayed in
+// the day feed, and with a category picked, occurrences() repeated it on every
+// single day for up to a month. A three-month theatre season buried the one-night
+// shows people actually plan an evening around. Whether something is a run is a
+// property of its dates, not of its category, so it is decided by the dates.
+//
+// Five calendar days is the line. A weekend festival still sits in the feed on
+// its days, where you plan each one. A three-week run does not. Weekly series
+// are excluded: those happen on particular days and occurrences() places them.
+const STANDING_MIN_SPAN = 4;   // end minus start, in days: 4 = five calendar days
+const runSpan=e=>e.end?Math.round((new Date(e.end+"T12:00:00")-new Date(e.start+"T12:00:00"))/864e5):0;
+const isStanding=e=>isMultiDay(e)&&!isWeekly(e)&&runSpan(e)>=STANDING_MIN_SPAN;
 
 // Weekly series (`days`, Monday=0, set by _mark_weekly at build time): a row
 // covering seven weeks that only actually happens on Wednesdays. JS counts from
@@ -990,11 +1007,12 @@ function runBadge(e){
   return `<span class="pill run">${txt}</span>`;
 }
 
-// When a category is being browsed, a running exhibition should appear on every
-// day it's open — so "what's on this Saturday" actually shows it. In the full
-// list (no category picked) it appears once, carrying the range badge instead,
-// or the page would drown in identical repeated rows.
-// Capped so "Any date" + a year-long show can't emit hundreds of rows.
+// Where an event is placed in the day feed. Runs of five days or more never
+// reach here (they are in Running now). Weekly series land on each of their
+// days. Everything else is listed once, on its first day in range.
+//
+// How far ahead a weekly series is expanded when a category is picked, so
+// "Any date" plus a year-long weekly series cannot emit fifty rows of it.
 const EXPAND_CAP_DAYS = 31;
 function occurrences(e, from, to, expand){
   const first = e.start < from ? from : e.start;
@@ -1012,32 +1030,24 @@ function occurrences(e, from, to, expand){
     }
     return out;
   }
-  if(!expand || !isMultiDay(e)) return [first];
-  const horizon = [to, addDays(TODAY, EXPAND_CAP_DAYS), e.end]
-    .reduce((a,b)=> a<b ? a : b);
-  const out=[]; let d=first;
-  while(d <= horizon){ out.push(d); d=addDays(d,1); }
-  return out.length ? out : [first];
+  // Anything else is listed ONCE, on its first day in range, and the run badge
+  // beside the title says how long it is on. It used to repeat on every day
+  // whenever a category was picked, so a play on for three nights appeared three
+  // times in a row under Stage & theatre, which read as a bug and pushed
+  // everything else down the page. Runs of five days or more are not here at
+  // all; they are in Running now. Weekly series are handled above and still land
+  // on each of their days, because each of those really is a separate date.
+  return [first];
 }
 
-// How much of the exhibitions block is open on arrival. Dozens of shows run for
-// months at a time, so listing them all pushed the day feed off the screen. The
-// ones closing soonest are the ones worth acting on, so those are the preview
-// and the rest wait behind "Show all". The floor stops the section looking empty
-// in a week when nothing is about to close; the ceiling stops a week when a lot
-// is closing from burying the feed again, which is the thing we're fixing.
-const EXHIB_PREVIEW_MIN = 3, EXHIB_PREVIEW_MAX = 8;
-
-// Whether the block was left open, remembered between visits. Safari in private
-// mode throws on localStorage: a remembered preference is a nicety and must
-// never take the page down, so every touch of it is wrapped.
-const EXHIB_OPEN_KEY = "won:exhibs-open";
-function exhibsOpen(){
-  try{ return localStorage.getItem(EXHIB_OPEN_KEY) === "1"; }catch(_){ return false; }
-}
-function rememberExhibsOpen(open){
-  try{ localStorage.setItem(EXHIB_OPEN_KEY, open ? "1" : "0"); }catch(_){}
-}
+// Running now always opens fully collapsed: the heading, the count and "Show
+// all", and no rows. It used to preview up to eight and to remember being opened
+// between visits, so once someone clicked "Show all" the whole list came back
+// expanded above the feed on every later visit. The feed is what people come
+// for; the runs are one click away. Deliberately NOT remembered.
+//
+// The old key is cleared once so nobody stays stuck with it open from before.
+try{ localStorage.removeItem("won:exhibs-open"); }catch(_){}
 
 // One exhibition row. Reuses the .row markup so the calendar / share / card
 // buttons work exactly as in the feed (their click handlers are delegated on
@@ -1072,10 +1082,9 @@ function exhibRow(e, i, soonCut, newCut){
   return r;
 }
 
-// The standing "Exhibitions on now" block: one card per show, soonest to close
-// first, with an "Ends soon" nudge when there's under ~10 days left and a "New"
-// tag for ones that opened this week. Only the closing-soonest few are open;
-// see EXHIB_PREVIEW_MIN above.
+// The standing "Running now" block: one card per run, soonest to close first,
+// with an "Ends soon" nudge when there's under ~10 days left and a "New" tag for
+// ones that opened this week. Always opens collapsed; see the note above.
 function renderExhibs(items){
   const box=$("exhibs"); box.innerHTML="";
   if(!items.length) return;
@@ -1083,18 +1092,13 @@ function renderExhibs(items){
   items=items.slice().sort((a,b)=>(a.end||a.start).localeCompare(b.end||b.start)||
     a.town.localeCompare(b.town,"fr")||a.title.localeCompare(b.title));
   const h=document.createElement("div"); h.className="exhib-head";
-  h.innerHTML=`<b>Exhibitions on now</b><span>${items.length}</span>`;
+  h.innerHTML=`<b>Running now</b><span>${items.length}</span>`;
   box.appendChild(h);
   const note=document.createElement("div"); note.className="exhib-note";
   note.textContent="Running now — visit any day. Sorted by what closes first.";
   box.appendChild(note);
 
-  // Someone who filtered to Exhibitions came here for exactly this list, so
-  // don't make them ask for it twice.
-  const wantsAll = active.size===1 && active.has("expo");
-  const closing = items.filter(e=>(e.end||e.start)<=soonCut).length;
-  const shown = wantsAll ? items.length : Math.min(items.length,
-    Math.max(EXHIB_PREVIEW_MIN, Math.min(EXHIB_PREVIEW_MAX, closing)));
+  const shown = 0;                               // always starts collapsed
 
   const more=document.createElement("div"); more.id="exhib-more";
   items.forEach((e,idx)=>{
@@ -1111,15 +1115,13 @@ function renderExhibs(items){
     // The visible label is deliberately short — the count is already in the
     // header beside it, and a long label wraps badly on a phone. Screen readers
     // get the full sentence instead.
-    btn.setAttribute("aria-label", open ? "Show fewer exhibitions"
-                                        : `Show all ${items.length} exhibitions`);
+    btn.setAttribute("aria-label", open ? "Show fewer"
+                                        : `Show all ${items.length} running now`);
     btn.innerHTML = `<span>${open ? "Show fewer" : "Show all"}</span>${CHEV_SVG}`;
   };
-  paint(exhibsOpen());
+  paint(false);
   btn.addEventListener("click", ()=>{
-    const open = btn.getAttribute("aria-expanded") !== "true";
-    rememberExhibsOpen(open);
-    paint(open);
+    paint(btn.getAttribute("aria-expanded") !== "true");
   });
   h.appendChild(btn);                           // in the header, not below the list
 }
@@ -1147,19 +1149,19 @@ function render(){
     (!q||`${e.title} ${e.town} ${e.venue||""} ${e.note||""}`.toLowerCase().includes(q)));
   [...$("cats").children].forEach(el=>{
     const c=el.querySelector("i"); if(!c) return;        // skip the "All" chip
-    c.textContent=base.filter(e=>e.category===el.dataset.k).length;});
+    c.textContent=base.filter(e=>tagsOf(e).includes(el.dataset.k)).length;});
 
   // Unique events that pass the category filter — this is what the tally counts,
   // so "42 listings" means 42 events, never 42 × the days they run.
-  const matched=base.filter(e=>!active.size||active.has(e.category));
+  const matched=base.filter(e=>!active.size||tagsOf(e).some(t=>active.has(t)));
 
   // Multi-day exhibitions are pulled OUT of the day feed — otherwise every one
   // that's open today lands on today's date and floods the page day after day.
-  // They live in their own standing section instead (shown when no category is
-  // picked, or when Exhibitions is the filter), and the feed keeps the one-off
-  // things people actually plan an evening around.
-  const showExhibs=!active.size||active.has("expo");
-  const standing = showExhibs ? base.filter(isStanding) : [];
+  // They live in their own standing section instead, and the feed keeps the
+  // one-off things people actually plan an evening around. The section follows
+  // the category filter like everything else: pick Stage & theatre and you see
+  // the theatre runs there, once each, rather than one per day below.
+  const standing = base.filter(e=>isStanding(e)&&(!active.size||tagsOf(e).some(t=>active.has(t))));
   const feed = matched.filter(e=>!isStanding(e));
 
   // Expand to (day, event) pairs. Only when a category is being browsed does a
@@ -1190,7 +1192,7 @@ function render(){
     (when?" in range":"")+
     (townSel.size===1?` · ${[...townSel][0]}`:townSel.size?` · ${townSel.size} towns`:"")+
     (active.size?" · filtered":"")+
-    (standing.length?` · ${standing.length} exhibition${standing.length===1?"":"s"} on now`:"");
+    (standing.length?` · ${standing.length} running now`:"");
 
   renderExhibs(standing);
 
