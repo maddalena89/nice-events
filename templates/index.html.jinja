@@ -713,6 +713,27 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .ev-also span{font-variant-numeric:tabular-nums}
 }
 
+/* ---------- large touch screens: list and event side by side ----------
+   A foldable opened up (roughly 640-900px wide) is two phones' worth of width.
+   The list keeps the phone layout in the left half; the event you tap opens in
+   the right half and stays there while you keep browsing, instead of a full-
+   screen page that hides the list. */
+#evpane[hidden]{display:none}
+@media (pointer:coarse) and (min-width:640px) and (max-width:900px){
+ h1{font-size:clamp(58px,10vw,92px)}
+ .feed{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);align-items:start}
+ .feedcol{min-width:0;padding-right:20px}
+ .feedcol .daymark{margin-right:-20px;padding-right:20px}
+ #evpane:not([hidden]){display:flex;position:sticky;top:calc(62px + env(safe-area-inset-top));
+   max-height:calc(100dvh - 62px - env(safe-area-inset-top));overflow-y:auto;
+   padding:22px 0 28px 20px;border-left:1px solid var(--rule)}
+ /* The highlight reaches a little left of the text, with the blue mark on its
+    edge, so the mark never touches the time. */
+ .row.sel{background:var(--hover);box-shadow:-10px 0 0 var(--hover),-13px 0 0 var(--accent)}
+ .row.sel::after{border-color:var(--accent)}
+ #fsheet[open]{width:min(560px,100%);margin:auto auto 0}
+}
+
 /* The Easter egg: a small blue card, whatever the screen size. */
 #egg{width:min(360px,calc(100% - 32px));max-width:none;height:fit-content;max-height:none;margin:auto;
   inset:0;border:0;padding:0;background:var(--accent);color:#fff}
@@ -893,6 +914,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 
 <div class="cats" id="cats"></div>
 <div class="tally" id="tally"></div>
+{#- On a large touch screen (a foldable opened up, a small tablet) the list and
+    the selected event sit side by side; everywhere else .feed is just a box. #}
+<div class="feed"><div class="feedcol">
 <div id="exhibs"></div>
 {#- The feed, written into the page rather than left for JavaScript to fill.
     render() replaces this wholesale on load, so a reader never sees both; a
@@ -923,6 +947,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   </div>
   {%- endfor %}
 {%- endfor %}
+</div>
+</div>
+<aside id="evpane" class="ev-body" aria-live="polite" aria-label="Selected event" hidden></aside>
 </div>
 
 {# Phone only: the event page. Tapping a card anywhere but its title opens it;
@@ -1641,6 +1668,7 @@ function render(){
       <div class="kind">${esc(CATNAME[e.category]||e.category)}</div></div>`);
   });
   list.innerHTML=html.join("");
+  syncPane();
 }
 
 // ---------- phone controls ----------
@@ -1964,8 +1992,10 @@ function whenLines(e){
   if(isWeekly(e)) return [`${e.days.map(n=>DAY_NAMES[n]+"s").join(", ")}`, `${span}${time?" · "+time:""}`];
   return [e.start < TODAY ? `Until ${fmtDay(e.end)}` : span, time ? `From ${time}` : "Any day it is on"];
 }
+var SPLIT = null, paneFp = null;               // set below; var so render() may run first
 function openEvent(fp, push){
   const e = FP_MAP.get(fp); if(!e) return;
+  const inPane = !!(SPLIT && SPLIT.matches);
   const day = e.start < TODAY ? TODAY : e.start;
   const [w1, w2] = whenLines(e);
   const where1 = e.venue || e.town, where2 = e.venue ? e.town : "";
@@ -1978,9 +2008,9 @@ function openEvent(fp, push){
       !x.cancelled && overlaps(x, day, day) && !isStanding(x))
     .sort((a,b)=>(a.time||"99").localeCompare(b.time||"99")).slice(0, 6) : [];
   $("ev-day").textContent = fmtDay(day).split(" ").slice(0,2).join(" ");
-  $("ev-body").innerHTML = `
+  const html = `
     <div class="ev-kind">${tagsOf(e).map(t=>esc(CATNAME[t]||t)).join(" · ")}${e.free?' · <span style="color:var(--accent-text)">Free</span>':""}</div>
-    <h2 id="ev-title">${title}</h2>
+    <h2${inPane ? "" : ' id="ev-title"'}>${title}</h2>
     ${e.cancelled?`<p class="ev-cancel">Annulé${e.cancel_note?" · "+esc(e.cancel_note):""}</p>`:""}
     <div class="ev-facts">
       <div class="ev-fact">${CLOCK_SVG}<div><b>${esc(w1)}</b><span>${esc(w2)}</span></div></div>
@@ -1997,6 +2027,14 @@ function openEvent(fp, push){
     ${e.url?`<a class="ev-go" href="${esc(e.url)}" target="_blank" rel="noopener nofollow">Full details on ${esc(host(e.url))}${OUT_SVG}</a>`:""}
     ${also.length?`<div><div class="ev-also-h">Also at ${esc(e.venue)} that day</div>
       ${also.map(x=>`<button type="button" class="ev-also" data-fp="${esc(x.fingerprint)}"><span>${esc(x.time||"")}</span>${esc(x.title)}</button>`).join("")}</div>`:""}`;
+  if(inPane){
+    // Side by side: fill the right half, keep the list where it is.
+    paneFp = fp;
+    const pane = $("evpane"); pane.innerHTML = html; pane.hidden = false; pane.scrollTop = 0;
+    markSelected();
+    return;
+  }
+  $("ev-body").innerHTML = html;
   const sheet = $("evsheet");
   if(!sheet.open) sheet.showModal();
   // Focus the page itself, not the back button: a dialog focuses its first
@@ -2021,6 +2059,28 @@ addEventListener("popstate", () => {
 $("ev-body").addEventListener("click", ev => {
   const b = ev.target.closest(".ev-also"); if(!b) return;
   openEvent(b.dataset.fp, true);
+});
+$("evpane").addEventListener("click", ev => {
+  const b = ev.target.closest(".ev-also"); if(!b) return;
+  openEvent(b.dataset.fp, false);
+});
+function markSelected(){
+  document.querySelectorAll(".row.sel").forEach(r => r.classList.remove("sel"));
+  if(paneFp) document.querySelectorAll('.row[data-fp="' + CSS.escape(paneFp) + '"]').forEach(r => r.classList.add("sel"));
+}
+// After every redraw of the list: keep the event on the right if there is one,
+// otherwise show the first event of the list, so the right half is never blank.
+function syncPane(){
+  if(!SPLIT || !SPLIT.matches) return;
+  if(paneFp && FP_MAP.has(paneFp)){ markSelected(); return; }
+  const first = document.querySelector("#list .row[data-fp]");
+  if(first) openEvent(first.dataset.fp, false);
+  else { $("evpane").hidden = true; }
+}
+SPLIT = matchMedia("(pointer:coarse) and (min-width:640px) and (max-width:900px)");
+SPLIT.addEventListener("change", () => {
+  if(SPLIT.matches){ if($("evsheet").open) $("evsheet").close(); syncPane(); }
+  else { $("evpane").hidden = true; document.querySelectorAll(".row.sel").forEach(r => r.classList.remove("sel")); }
 });
 // A title stays blue from the tap until the source has opened. iOS only paints
 // :active when some touch listener exists, hence the empty one.
@@ -2176,6 +2236,7 @@ if(typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestP
 // Opened via a shared ?e=… link — on a phone, open its page; everywhere, bring
 // the row into view once.
 if(HL_FP && PHONE.matches && FP_MAP.has(HL_FP)) openEvent(HL_FP, false);
+else syncPane();
 if(HL_FP){
   const hit=$("list").querySelector('.row[data-fp="'+CSS.escape(HL_FP)+'"]');
   if(hit) setTimeout(()=>hit.scrollIntoView({block:"center",behavior:"smooth"}),80);
