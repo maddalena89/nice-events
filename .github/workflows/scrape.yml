@@ -4,6 +4,14 @@ on:
   schedule:
     - cron: "0 4 * * *"        # 04:00 UTC = 06:00 Nice in summer (05:00 in winter)
   workflow_dispatch:           # manual "Run workflow" button
+    inputs:
+      mode:
+        description: >-
+          full = re-read every source (about 35 minutes).
+          submissions = only publish approved submissions (about 3 minutes).
+        type: choice
+        options: [full, submissions]
+        default: full
   push:
     branches: [main]
     paths: ["niceevents/**", "templates/**", ".github/workflows/**"]
@@ -29,10 +37,15 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      # Only a full scrape needs a browser. Installing Chromium and its system
+      # packages is a minute or two on its own, and approved submissions are a
+      # plain web request, so the fast mode skips it.
       - name: Install
         run: |
           pip install -r requirements.txt
-          playwright install --with-deps chromium
+          if [ "${{ inputs.mode }}" != "submissions" ]; then
+            playwright install --with-deps chromium
+          fi
 
       - name: Test
         run: pytest tests/ -q
@@ -49,7 +62,18 @@ jobs:
           PYTHONUNBUFFERED: "1"
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: python -m niceevents.run scrape -v 2>&1 | tee scrape.log || true
+        # mode=submissions is what Supabase asks for when a submission is approved
+        # (migration 008). It reads approved submissions only; every other source's
+        # events come from the database the last full run committed. --only also
+        # skips clearing out retired sources, so a fast run can never remove
+        # anything a full run put there. Scheduled and push runs have no inputs,
+        # so they always take the full branch.
+        run: |
+          if [ "${{ inputs.mode }}" = "submissions" ]; then
+            python -m niceevents.run scrape -v --only submissions 2>&1 | tee scrape.log || true
+          else
+            python -m niceevents.run scrape -v 2>&1 | tee scrape.log || true
+          fi
 
       # Only the anon key here. Both of these end up inside index.html by design;
       # see the note in site.py.
