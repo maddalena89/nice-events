@@ -1497,10 +1497,10 @@ function renderExhibs(items){
   items=items.slice().sort((a,b)=>(a.end||a.start).localeCompare(b.end||b.start)||
     a.town.localeCompare(b.town,"fr")||a.title.localeCompare(b.title));
   const h=document.createElement("div"); h.className="exhib-head";
-  h.innerHTML=`<b>Running now</b><span>${items.length}</span>`;
+  h.innerHTML=`<b>Exhibitions &amp; shows</b><span>${items.length}</span>`;
   box.appendChild(h);
   const note=document.createElement("div"); note.className="exhib-note";
-  note.textContent="Running now — visit any day. Sorted by what closes first.";
+  note.textContent="On for a while — visit any day. Sorted by what closes first.";
   box.appendChild(note);
 
   const shown = 0;                               // always starts collapsed
