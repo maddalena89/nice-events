@@ -14,6 +14,11 @@ out for, and which made the list feel like a dump:
     (Maddalena, 23 Sep 2026: "gym douce maison sport sante, presentation de
     saison, seance de relaxation... wtf"), a theatre's season presentation, and
     a gym's open days on repeat.
+  * Lessons and classes: anything whose title says cours, class or lesson, and
+    whatever a gym, dance school, dojo or sport-health centre puts on. Sport
+    people organise themselves — races, matches, tournaments — stays. So does a
+    real night out at one of those places: a milonga at a dance studio is a
+    party, not a lesson.
   * Fitness classes named as such in the TITLE: yoga, pilates, bootcamp... Read
     in the title only, because a milonga's description can mention stretching;
     and anything with dance, tango or milonga in it is always kept.
@@ -53,6 +58,26 @@ _WELLNESS = re.compile(
 _TRADE = re.compile(r"presentation de (?:la )?saison|lancement de saison|programmes sports? sante")
 _DANCE = re.compile(r"danse|dance|tango|milonga|salsa|bachata|kizomba|swing|ballet")
 
+#: A LESSON is not an event: "Cours d'essai gratuit de Maracatu", "Sailing
+#: Lessons", "Silver Swans - fitness & ballet moves class". "cours Saleya" is a
+#: street, hence the exception.
+_LESSON = re.compile(
+    r"\bcours\b(?! saleya)|cours d.essai|\bclasse?s?\b|\blessons?\b|\blecons?\b|"
+    r"entrainement|\bdebutants?\b.{0,20}\bstage\b|\bstage\b.{0,20}\bdebutants?\b")
+
+#: Venues that exist to teach or to train: a gym, a dance school, a dojo, a
+#: health-and-sport centre. Maddalena, 23 Sep 2026: "independent organised sport
+#: are good but not from gyms or dance schools".
+_TEACHING_VENUE = re.compile(
+    r"\becole\b|\bschool\b|\bstudio\b|academie|academy|\bgym\b|fitness|salle de sport|"
+    r"maison sport sante|\bdojo\b|centre de danse|danse club")
+
+#: ...but those places also host real nights out, and those stay. A milonga at
+#: Arty Studio is a dance party, not a lesson.
+_A_NIGHT_OUT = re.compile(
+    r"milonga|\bbal\b|soiree|\bapero\b|concert|spectacle|\bgala\b|festival|"
+    r"tournoi|competition|\bmatch\b|portes ouvertes|vernissage|projection")
+
 
 def why(e: dict) -> Optional[str]:
     url = e.get("url") or ""
@@ -70,6 +95,12 @@ def why(e: dict) -> Optional[str]:
         return "wellness session"
     if _TRADE.search(title):
         return "season presentation / gym promo"
+    if _A_NIGHT_OUT.search(title):
+        return None                      # a party at a dance school is still a party
+    if _LESSON.search(title):
+        return "a lesson, not an event"
+    if _TEACHING_VENUE.search(_fold(e.get("venue"))):
+        return "class at a gym or school"
     return None
 
 
