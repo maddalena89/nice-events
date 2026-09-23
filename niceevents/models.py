@@ -81,11 +81,22 @@ _CATEGORY_RULES: list[tuple[str, str]] = [
     # "\bcours\b", not "cours\b": without the leading boundary "Parcours" matched,
     # and an exhibition called "Fragments d'un Parcours" was tagged a workshop.
     (r"atelier|workshop|stage de|masterclass|initiation|\bcours\b|"
+     r"\b(?:\d+.week|online|free|beginners?) course\b|"
      r"conférence|conference|causerie|table ronde|rencontre littéraire", "atelier"),
     (r"expat|language exchange|échange linguistique|apéro|picnic|pique-nique|rencontre|social|hangout|"
      r"jeux de société|board game|quiz|blind test", "social"),
     (r"marché|market|fête|festa|foire|festin|procession|feu d'artifice|carnaval|transhumance", "marche"),
-    (r"course|trail|randonnée|match|tournoi|compétition|marathon|régate|pétanque|yoga|running|"
+    # Sport, named precisely. Three words used to drag in things that are not
+    # sport at all (23 Sep 2026): "compétition" made a short-film festival's
+    # competitions Sport, "marathon" did the same to a writing meetup's "Table
+    # Reads Marathon", and the English word "course" (a 6-week counselling
+    # course) reads as the French one, a race. So: no bare "course", no bare
+    # "compétition", and "marathon" only when nothing around it says otherwise.
+    (r"\bcourses? (?:à pied|nature|de c[ôo]te|hippique|cycliste|populaire)|corrida|foulées|"
+     r"\bcross\b|trail|randonnée|\bmatch\b|tournoi|championnat|compétition sportive|"
+     r"semi.?marathon|(?<!reads )\bmarathon\b(?!.{0,40}(?:reads|writing|film|series|coding))|"
+     r"triathlon|régate|pétanque|yoga|running|natation|escalade|judo|karaté|taekwondo|"
+     r"cyclisme|\bvtt\b|padel|aviron|\bvoile\b|water.?polo|"
      r"self.?d[ée]fense|autod[ée]fense|arts martiaux|krav maga|boxe|fitness|pilates", "sport"),
 ]
 

@@ -31,3 +31,18 @@ def test_real_events_are_kept():
               "Tropical twist : DJ sets", "Le Ventre de Paris : les halles de Baltard",
               "Visite guidée du Fort Carré", "Concert jazz manouche Paco"]:
         assert why(e(t)) is None, t
+
+
+def test_wellness_sessions_and_season_presentations_go():
+    assert why(e("Gym douce")) == "fitness class"
+    assert why(e("Séance de relaxation")) == "wellness session"
+    assert why(e("Morning Medical QiGong - Online session")) == "wellness session"
+    assert why(e("Free Pranayama Breathing Meditation")) == "wellness session"
+    assert why(e("Présentation de saison")) == "season presentation / gym promo"
+    assert why(e("Programmes Sports Santé Bien-Être avec Jofitsport06")) == "wellness session"
+
+
+def test_real_evenings_out_are_still_kept():
+    for t in ["Semaine de la Forme - Portes ouvertes", "Concert de musique sacrée",
+              "Milonga La Trésorerie", "Nuit des musées", "Marathon de Nice"]:
+        assert why(e(t)) is None, t
