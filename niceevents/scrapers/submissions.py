@@ -171,13 +171,23 @@ class Submissions(HttpScraper):
 
         today = date.today()
         published: list[tuple[str, str]] = []
+        over = 0
 
         for row in rows:
             ev = self._to_event(row, today)
             if ev is None:
+                over += 1
                 continue
             published.append((row["id"], ev.fingerprint))
             yield ev
+
+        # Say what was seen and what was left out. Without this line, "found 1"
+        # against three approved rows in the Table Editor is a mystery: on 23 Sep
+        # 2026 an approved submission was missing from the site and the log could
+        # not say whether it had been skipped, was already over, or had simply
+        # been approved after the run.
+        log.info("%s: %d approved row(s), %d live, %d already over or unusable",
+                 self.name, len(rows), len(published), over)
 
         # Mark what we published, so the Table Editor shows at a glance which
         # approved rows are actually live. Best-effort: if this fails the events
@@ -197,6 +207,8 @@ class Submissions(HttpScraper):
         # Past events aren't wrong, they're just over. Same rule as every other
         # source: an event is live until its END date passes.
         if (end or start) < today:
+            log.info("%s: row %s (%s) ended %s — already over, not published",
+                     self.name, row.get("id"), title[:40], (end or start).isoformat())
             return None
 
         cat = row.get("category") or "autre"
