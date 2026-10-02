@@ -468,6 +468,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     an explicit width take that away. */
  #day{flex:1 0 100%;min-width:0;width:100%;max-width:100%;-webkit-appearance:none;appearance:none;
    text-align:left;display:block}
+ /* display:block above would otherwise beat the hidden attribute, and the empty
+    dd/mm/yyyy box sat in the bar at all times (seen on 2 Oct 2026). */
+ #day[hidden]{display:none}
  #day::-webkit-date-and-time-value{text-align:left}
  #q{order:1} .whenrow{order:2} #day{order:3} #town-wrap{order:4} #fbtn{order:5} #onnow{order:6}
  /* 16px on the trigger for the same reason as the inputs: anything smaller and
