@@ -30,6 +30,7 @@ from . import db
 from .cancellations import mark_cancelled
 from .suppress import drop_suppressed
 from .noise import drop_noise
+from . import geocode
 from . import landing
 from .models import (DISPLAY_CATEGORIES, _title_key, classify, extra_categories, slugify,
                      weekly_weekdays)
@@ -1440,6 +1441,17 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist",
         e["title"] = _clean_title(title)
         if when:
             e["time"] = when
+    # Where each event is, for the map. Looked up once per venue and cached in
+    # the database (geocode.py); an event whose venue cannot be placed falls back
+    # to the town centre and is marked approximate, so the map can say so.
+    places = geocode.load(conn)
+    for e in events:
+        pt = geocode.point_for(e.get("venue"), e.get("town"), places)
+        if pt:
+            e["lat"], e["lon"] = pt["lat"], pt["lon"]
+            if pt.get("approx"):
+                e["approx"] = True
+
     _mark_weekly(events)                  # a weekly series is not an every-day one
     events = _group_stage_runs(events)    # a play on several nights: one entry
     _assign_slugs(events)                 # stable, unique short link per event

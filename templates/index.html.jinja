@@ -626,6 +626,8 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
     a search is typed, when it says the search looks in every town and date. */
  .tally{display:none}
  .bar.searching ~ .tally{display:block}
+ #mapbox{height:60vh;margin-left:-16px;margin-right:-16px;border-left:0;border-right:0}
+ .viewrow{align-items:center}
  /* Running now opens from its button in the filter row, not from its own block. */
  #exhibs:not(.open){display:none}
  #exhibs .exhib-toggle{display:none}
@@ -740,6 +742,45 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
  .row.sel::after{border-color:var(--accent)}
  #fsheet[open]{width:min(560px,100%);margin:auto auto 0}
 }
+
+/* ---------------- the map ----------------
+   A second way to read the same events: dots instead of rows, narrowed to an
+   hour of the day. The tiles are plain grey so the blue dots carry the page. */
+.viewrow{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.viewswitch{display:flex;border:1px solid var(--ink);flex:none}
+.viewswitch button{min-height:34px;padding:0 14px;border:0;background:transparent;color:var(--ink);
+  font-size:.6875rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.viewswitch button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.viewswitch button:hover{background:var(--hover)}
+.viewswitch button[aria-pressed="true"]:hover{background:var(--ink)}
+/* Above the paper grain (z-index 90 in dark mode): speckles over a map read as
+   dirt, and could be mistaken for dots. */
+#mapwrap{margin-bottom:22px;position:relative;z-index:95}
+#mapbox{height:min(62vh,560px);border:1px solid var(--ink);background:var(--hover)}
+/* MapLibre paints its own white boxes; make them this page's. */
+.maplibregl-map{font:inherit}
+.maplibregl-popup-content{background:var(--paper);color:var(--ink);border-radius:0;
+  padding:12px 14px;box-shadow:0 10px 26px rgba(0,0,0,.2);font-size:.875rem;line-height:1.35}
+.maplibregl-popup-tip{border-top-color:var(--paper);border-bottom-color:var(--paper)}
+.maplibregl-popup-close-button{font-size:1.125rem;color:var(--muted);padding:2px 8px}
+.maplibregl-ctrl-group{border-radius:0;background:var(--paper)}
+.maplibregl-ctrl-group button{background:var(--paper)}
+.maplibregl-ctrl-attrib{background:var(--paper);font-size:.625rem}
+.maplibregl-ctrl-attrib a{color:var(--muted)}
+/* Where you are: a ring, not a dot, so it is never mistaken for an event. */
+.me-dot{width:16px;height:16px;border-radius:50%;background:var(--paper);
+  border:3px solid var(--ink);box-shadow:0 0 0 2px var(--paper)}
+.pop-t{font-size:1rem;font-weight:700;letter-spacing:-.01em;line-height:1.2;display:block;margin:2px 0 3px}
+.pop-m{color:var(--muted);font-size:.8125rem;display:block}
+.pop-go{display:inline-flex;align-items:center;min-height:36px;margin-top:8px;padding:0 12px;
+  background:var(--accent);border:1px solid var(--accent);color:#fff;font-size:.6875rem;
+  font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.mapbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+.maphour{flex:1 1 220px;display:flex;align-items:center;gap:10px;min-width:0;
+  font-size:.8125rem;color:var(--muted)}
+.maphour b{font-variant-numeric:tabular-nums;color:var(--ink);font-size:.875rem;white-space:nowrap}
+.maphour input{flex:1;min-width:0;accent-color:var(--accent);padding:0}
+.mapnote{margin-top:8px;font-size:.75rem;color:var(--muted)}
 
 /* The Easter egg: a small blue card, whatever the screen size. */
 #egg{width:min(360px,calc(100% - 32px));max-width:none;height:fit-content;max-height:none;margin:auto;
@@ -920,7 +961,29 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 </div>
 
 <div class="cats" id="cats"></div>
-<div class="tally" id="tally"></div>
+<div class="viewrow">
+  <div class="viewswitch" role="group" aria-label="How to look at the events">
+    <button type="button" id="view-list" aria-pressed="true">List</button>
+    <button type="button" id="view-map" aria-pressed="false">Map</button>
+  </div>
+  <div class="tally" id="tally"></div>
+</div>
+
+{#- The map. Leaflet is fetched the first time someone opens it, never on a plain
+    page load: most visitors read the list and should not pay for a map library.
+    Dots come from the same filtered events as the list, narrowed to a time of
+    day by the slider underneath. #}
+<div id="mapwrap" hidden>
+  <div id="mapbox" role="application" aria-label="Map of events"></div>
+  <div class="mapbar">
+    <button type="button" id="map-me" class="barbtn">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Near me</button>
+    <label class="maphour" for="map-hour"><b id="map-hour-l">18:00 – 20:00</b>
+      <input type="range" id="map-hour" min="6" max="25" step="1" value="18"
+             aria-label="Time of day"></label>
+  </div>
+  <div class="mapnote" id="map-note"></div>
+</div>
 {#- On a large touch screen (a foldable opened up, a small tablet) the list and
     the selected event sit side by side; everywhere else .feed is just a box. #}
 <div class="feed"><div class="feedcol">
@@ -1629,6 +1692,16 @@ function render(){
     (standing.length?` · ${standing.length} running now`:"");
 
   renderExhibs(standing);
+  // The map shows the same events as the list, plus the runs: a dot for an
+  // exhibition is as useful as a dot for tonight's concert.
+  lastShown = matched;
+  // What the dots cover, in words, so the map's note says "today" rather than
+  // leaving someone to guess which days those 120 events are spread over.
+  rangeLabel = when === "today" ? "today" : when === "tomorrow" ? "tomorrow"
+    : when === "weekend" ? "this weekend" : when === "7" ? "in the next 7 days"
+    : when === "30" ? "in the next 30 days" : when === "pick" ? `on ${fmtDay(from)}`
+    : "on any date";
+  if(mapOn) drawDots();
   syncPhoneBar(when, feed.length);
 
   const list=$("list"); list.innerHTML="";
@@ -1994,6 +2067,160 @@ document.addEventListener("click", ev=>{
   ev.preventDefault(); ev.stopPropagation();
   const e=FP_MAP.get(b.dataset.fp); if(e) shareEventCard(e,b);
 });
+
+// ---------- the map ----------
+// OpenFreeMap serves the basemap: free, no account, no limits, and its
+// "positron" style is the plain grey this page wants, so the blue dots are the
+// only colour. (CARTO's free tiles now stamp "API KEY REQUIRED" across the map,
+// and OpenStreetMap's own raster tiles ask small sites not to lean on them.)
+// MapLibre is fetched the first time someone opens the map, never on page load.
+const MAP_STYLE = {light: "https://tiles.openfreemap.org/styles/positron",
+                   dark:  "https://tiles.openfreemap.org/styles/dark"};
+const NICE = [7.2683, 43.7009];           // lon, lat — MapLibre's order
+var map = null, mapOn = false, hourFrom = 18, me = null, meMarker = null, pop = null;
+// Keep what render() already put here: a plain `= []` runs AFTER the first draw
+// and would wipe it, which is exactly what left the map empty first try.
+var lastShown = lastShown || [];
+var rangeLabel = rangeLabel || "";        // "today", "in the next 30 days", set by render()
+const DARKMQ = matchMedia("(prefers-color-scheme: dark)");
+
+function loadMapLibre(){
+  if(window.maplibregl) return Promise.resolve();
+  const css = document.createElement("link");
+  css.rel = "stylesheet";
+  css.href = "https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css";
+  document.head.appendChild(css);
+  return new Promise((ok, no) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js";
+    sc.onload = ok; sc.onerror = no; document.head.appendChild(sc);
+  });
+}
+
+// What the dots mean, in one place: a filled dot is an event starting in the
+// two hours the slider shows; a hollow one has no time given; a faded one sits
+// on its town rather than its venue, because the venue is not on the map yet.
+const DOT_PAINT = {
+  "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3.5, 13, 6, 16, 8],
+  "circle-color": "#1f3bff",
+  "circle-opacity": ["case", ["get", "notime"], 0, ["get", "approx"], 0.45, 0.9],
+  "circle-stroke-width": ["case", ["get", "notime"], 2, 1],
+  "circle-stroke-color": ["case", ["get", "notime"], "#1f3bff", "#0e0e0e"],
+};
+
+function initMap(){
+  map = new maplibregl.Map({
+    container: "mapbox",
+    style: DARKMQ.matches ? MAP_STYLE.dark : MAP_STYLE.light,
+    center: NICE, zoom: 12, attributionControl: {compact: true},
+  });
+  map.addControl(new maplibregl.NavigationControl({showCompass: false}), "bottom-right");
+  map.on("load", () => {
+    map.addSource("events", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+    map.addLayer({id: "dots", type: "circle", source: "events", paint: DOT_PAINT});
+    map.on("click", "dots", showPopup);
+    map.on("mouseenter", "dots", () => map.getCanvas().style.cursor = "pointer");
+    map.on("mouseleave", "dots", () => map.getCanvas().style.cursor = "");
+    drawDots();
+  });
+  DARKMQ.addEventListener("change", () => {
+    if(!map) return;
+    map.setStyle(DARKMQ.matches ? MAP_STYLE.dark : MAP_STYLE.light);
+    map.once("styledata", () => {
+      if(!map.getSource("events")){
+        map.addSource("events", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+        map.addLayer({id: "dots", type: "circle", source: "events", paint: DOT_PAINT});
+      }
+      drawDots();
+    });
+  });
+}
+
+// Distance in a straight line, which is all a dot on a map ever promises.
+function metres(a, b){
+  const R = 6371000, p = Math.PI / 180;
+  const dLat = (b[0] - a[0]) * p, dLon = (b[1] - a[1]) * p;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * p) * Math.cos(b[0] * p) * Math.sin(dLon / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(x)));
+}
+const walk = m => m < 950 ? `${m} m away` : `${(m / 1000).toFixed(1)} km away`;
+const hh = h => String(h % 24).padStart(2, "0") + ":00";
+
+function drawDots(){
+  if(!map || !map.getSource("events")) return;
+  const from = hourFrom, to = hourFrom + 2;
+  const placed = lastShown.filter(e => typeof e.lat === "number");
+  let shown = 0, noTime = 0;
+  const features = [];
+  placed.forEach(e => {
+    let notime = false;
+    if(e.time){
+      const h = +e.time.slice(0, 2) + (+e.time.slice(3, 5)) / 60;
+      const hNight = h < 6 ? h + 24 : h;      // half past midnight belongs to the night before
+      if(hNight < from || hNight >= to) return;
+      shown++;
+    } else { notime = true; noTime++; }
+    features.push({type: "Feature", geometry: {type: "Point", coordinates: [e.lon, e.lat]},
+                   properties: {fp: e.fingerprint, notime, approx: !!e.approx}});
+  });
+  map.getSource("events").setData({type: "FeatureCollection", features});
+  $("map-hour-l").textContent = `${hh(from)} – ${hh(to)}`;
+  $("map-note").textContent =
+    `${shown} event${shown === 1 ? "" : "s"} ${rangeLabel} starting between ${hh(from)} and ${hh(to)}` +
+    (noTime ? ` · ${noTime} with no time given (hollow)` : "") +
+    (placed.length < lastShown.length
+      ? ` · ${lastShown.length - placed.length} not placed on the map yet` : "");
+}
+
+function showPopup(ev){
+  const f = ev.features[0], e = FP_MAP.get(f.properties.fp);
+  if(!e) return;
+  const at = [e.lat, e.lon];
+  const far = me ? `<span class="pop-m">${walk(metres(me, at))}</span>` : "";
+  if(pop) pop.remove();
+  pop = new maplibregl.Popup({closeButton: true, maxWidth: "260px"})
+    .setLngLat(f.geometry.coordinates)
+    .setHTML(`<span class="pop-m">${esc(e.time || "Time not given")}${e.approx ? " · place approximate" : ""}</span>
+      <span class="pop-t">${esc(e.title)}</span>
+      <span class="pop-m">${esc(e.venue || "")}${e.venue ? " · " : ""}${esc(e.town)}</span>${far}
+      <button type="button" class="pop-go" data-fp="${esc(e.fingerprint)}">See the event</button>`)
+    .addTo(map);
+}
+
+document.addEventListener("click", ev => {
+  const b = ev.target.closest(".pop-go"); if(!b) return;
+  const e = FP_MAP.get(b.dataset.fp); if(!e) return;
+  if(PHONE.matches || (SPLIT && SPLIT.matches)) openEvent(b.dataset.fp, true);
+  else if(e.url) window.open(e.url, "_blank", "noopener");
+});
+
+function showMap(on){
+  mapOn = on;
+  $("view-map").setAttribute("aria-pressed", on ? "true" : "false");
+  $("view-list").setAttribute("aria-pressed", on ? "false" : "true");
+  $("mapwrap").hidden = !on;
+  document.querySelector(".feed").hidden = on;
+  if(!on) return;
+  loadMapLibre().then(() => {
+    if(!map) initMap(); else { map.resize(); drawDots(); }
+  }).catch(() => { $("map-note").textContent = "The map could not load. The list still works."; });
+}
+$("view-map").onclick = () => showMap(true);
+$("view-list").onclick = () => showMap(false);
+$("map-hour").oninput = e => { hourFrom = +e.target.value; drawDots(); };
+$("map-me").onclick = () => {
+  if(!navigator.geolocation){ $("map-note").textContent = "This browser will not share where you are."; return; }
+  $("map-note").textContent = "Finding where you are…";
+  navigator.geolocation.getCurrentPosition(pos => {
+    me = [pos.coords.latitude, pos.coords.longitude];
+    const el = document.createElement("div"); el.className = "me-dot";
+    if(meMarker) meMarker.remove();
+    meMarker = new maplibregl.Marker({element: el}).setLngLat([me[1], me[0]]).addTo(map);
+    map.easeTo({center: [me[1], me[0]], zoom: 14.5});
+    drawDots();
+  }, () => { $("map-note").textContent = "You said no to sharing where you are, which is fine — drag the map instead."; },
+  {enableHighAccuracy: true, timeout: 8000});
+};
 
 // ---------- phone event page ----------
 const PIN_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';

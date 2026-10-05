@@ -169,6 +169,28 @@ def cmd_scrape(args) -> int:
         print(f"    {CATEGORIES.get(cat, cat):<28} {n:>4}")
     if s["pending"]:
         print(f"\n  {s['pending']} submission(s) awaiting review — `run.py pending`")
+    # New venues get a point on the map, a few per run. Only on a full scrape:
+    # the fast submissions-only run must stay a couple of minutes, and one
+    # lookup a second is the rule OpenStreetMap asks us to keep.
+    if not getattr(args, "only", None):
+        try:
+            from . import geocode
+            cache = geocode.load(conn)
+            pairs = [(r["venue"], r["town"]) for r in conn.execute(
+                "SELECT DISTINCT venue, town FROM events "
+                "WHERE start >= date('now') AND venue IS NOT NULL AND venue <> '' "
+                "AND town <> 'Online'")]
+            towns = [r["town"] for r in conn.execute(
+                "SELECT DISTINCT town FROM events WHERE start >= date('now')")]
+            before = len(cache)
+            cache = geocode.lookup_towns(towns, cache)
+            cache = geocode.lookup_missing(pairs, cache, budget=120)
+            if len(cache) != before:
+                geocode.save(cache, conn)
+                print(f"  {len(cache) - before} new venue(s) placed on the map")
+        except Exception as e:                 # never let the map stop a scrape
+            log.warning("geocode: skipped (%s)", e)
+
     if failures:
         print(f"\n  FAILED: {', '.join(failures)}")
         return 1

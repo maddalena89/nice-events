@@ -48,6 +48,18 @@ CREATE INDEX IF NOT EXISTS idx_town     ON events(town);
 CREATE INDEX IF NOT EXISTS idx_category ON events(category);
 CREATE INDEX IF NOT EXISTS idx_first    ON events(first_seen);
 
+-- Where each venue is, so events can be dots on a map. Looked up once from
+-- OpenStreetMap (niceevents/geocode.py) and kept HERE, in the database CI
+-- already commits, so the cache survives every night without a second file.
+CREATE TABLE IF NOT EXISTS places (
+    key       TEXT PRIMARY KEY,       -- venue|town, accents and case folded away
+    venue     TEXT,
+    town      TEXT,
+    lat       REAL,                   -- NULL = looked for and not found
+    lon       REAL,
+    seen_on   TEXT NOT NULL           -- when it was last looked up
+);
+
 CREATE TABLE IF NOT EXISTS runs (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     scraper    TEXT NOT NULL,
