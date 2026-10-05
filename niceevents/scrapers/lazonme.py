@@ -18,7 +18,7 @@ class LaZonme(GCalICS):
               "@group.calendar.google.com")
     VENUE = "La Zonmé"
     DEFAULT_TOWN = "Nice"
-    URL_FALLBACK = "https://www.lazonme.fr/evenements"
+    URL_FALLBACK = "https://www.lazonme.fr/programme"
     # Let the title decide, but when it's ambiguous assume a gig — La Zonmé is a
     # music venue, so "concert" beats a generic "autre".
     DEFAULT_CATEGORY = "concert"
