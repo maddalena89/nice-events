@@ -4,7 +4,7 @@ This bug produced *confident wrong data* rather than an error: brocabrac
 reported 64 brocantes all stamped with the last date on the page, and tango
 collapsed ~50 milongas onto one day. Pin it.
 """
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from niceevents.dom import cards_containing, in_order
 from niceevents.scrapers.brocabrac import Brocabrac

@@ -30,7 +30,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Iterator, Optional
 from zoneinfo import ZoneInfo
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from ..models import Event, canon_town, classify, slugify
 from .base import HttpScraper, register

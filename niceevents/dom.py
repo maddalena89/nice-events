@@ -24,7 +24,13 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from selectolax.parser import HTMLParser, Node
+# The lexbor backend, imported under the old names so every scraper reads the
+# same as before. selectolax 1.0 (3 Oct 2026) DELETED the old "modest" parser —
+# `from selectolax.parser import HTMLParser` raises ImportError — and because
+# requirements.txt asked for "any version from 0.3.21 up", every nightly build
+# failed at the test step from 4 October and the site sat frozen for ten days.
+# Versions are pinned now; this is the parser selectolax actually maintains.
+from selectolax.lexbor import LexborHTMLParser as HTMLParser, LexborNode as Node
 
 
 def in_order(tree: HTMLParser, tags: set[str]) -> Iterator[Node]:

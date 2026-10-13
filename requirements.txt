@@ -1,5 +1,8 @@
-httpx>=0.27
-selectolax>=0.3.21
-jinja2>=3.1
-playwright>=1.44
-pytest>=8.0
+# Upper bounds on purpose. selectolax 1.0 removed the parser every scraper used
+# (3 Oct 2026) and, with no bound here, ten nightly builds failed in a row and
+# nobody noticed until the site was ten days stale. Raise these deliberately.
+httpx>=0.27,<1
+selectolax>=0.4.9,<2
+jinja2>=3.1,<4
+playwright>=1.44,<2
+pytest>=8.0,<10

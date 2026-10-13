@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import datetime
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from niceevents.scrapers.departement06 import Departement06
 

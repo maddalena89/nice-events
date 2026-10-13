@@ -51,7 +51,7 @@ import re
 from datetime import date
 from typing import Iterator, Optional
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from ..dom import in_order
 from ..models import _safe_date, category_from_type, strip_accents

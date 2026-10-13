@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 from typing import Iterator, Optional
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from ..dom import in_order
 from ..models import Event, parse_date, parse_time

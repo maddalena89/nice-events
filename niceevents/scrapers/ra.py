@@ -13,7 +13,7 @@ import re
 from datetime import date
 from typing import Iterator, Optional
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from ..models import Event, parse_date, parse_time
 from .base import BrowserScraper, register

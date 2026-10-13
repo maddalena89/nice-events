@@ -25,7 +25,7 @@ from datetime import date, timedelta
 from html import unescape
 from typing import Iterator, Optional
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from ..models import Event, classify, parse_date
 from .base import HttpScraper, register
