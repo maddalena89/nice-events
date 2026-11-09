@@ -1546,6 +1546,11 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist",
     # every landing page is an orphan that only the sitemap mentions.
     town_pages, cat_pages = landing.collect(events)
     town_links, cat_links = landing.nav_links(town_pages, cat_pages)
+    # Pages for WHEN: ce soir, ce week-end, aujourd'hui, cette semaine, gratuit.
+    # Those phrases are the searches; the home page answers all of them at once
+    # and therefore ranks for none of them in particular.
+    when_pages = landing.collect_when(events)
+    when_links = landing.when_links(when_pages)
 
     html = tpl.render(
         title=SITE_TITLE,
@@ -1579,6 +1584,7 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist",
         events_jsonld=_events_jsonld(events, base),
         site_jsonld=_site_jsonld(base) if base else "",
         town_links=town_links,
+        when_links=when_links,
         cat_links=cat_links,
         week_count=week_count,
         seed_feed=_seed_feed(events),
@@ -1604,7 +1610,7 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist",
     extra = landing.render_all(
         TPL_DIR, town_pages, cat_pages, base, updated,
         og_image=f"{base}/og.png" if base else "",
-        out=out,
+        out=out, when_pages=when_pages,
     )
 
     # Sitemap last: it has to name the landing pages, so it cannot be written

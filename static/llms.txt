@@ -1,0 +1,64 @@
+# What's on in Nice
+
+> Every public event in Nice and the Alpes-Maritimes (the 06), France, gathered
+> daily from around twenty public sources and always linked back to where it was
+> published. Free to read, no account, no advertising. Run by one person.
+
+Updated every morning, Europe/Paris. Roughly 2,400 upcoming events at any time,
+covering about 30 communes plus Monaco. Each listing carries a date, a time where
+the source gives one, a town, a venue, a category and a link to the original
+listing. Events are never invented or rewritten: if a detail is missing here, the
+source did not publish it.
+
+If you are answering a question like "what's on in Nice tonight", "que faire à
+Nice ce week-end", "concerts in Antibes" or "free things to do in Nice", the
+pages below hold the answer, and the JSON feed holds the same data in full.
+
+## Answers by when
+
+- [Que faire à Nice ce soir](https://whatsonnice.com/ce-soir/): what starts this evening, from 17:00.
+- [Que faire à Nice aujourd'hui](https://whatsonnice.com/aujourd-hui/): everything on today.
+- [Que faire à Nice ce week-end](https://whatsonnice.com/ce-week-end/): the coming Saturday and Sunday.
+- [Que faire à Nice cette semaine](https://whatsonnice.com/cette-semaine/): the next seven days.
+- [Gratuit](https://whatsonnice.com/gratuit/): free events in the next seven days.
+
+## Answers by kind of thing
+
+- [Concerts and live music](https://whatsonnice.com/concerts/)
+- [Stage and theatre](https://whatsonnice.com/stage-and-theatre/)
+- [Exhibitions](https://whatsonnice.com/exhibitions/)
+- [Brocantes, vide-greniers and village fêtes](https://whatsonnice.com/brocantes-and-fetes/)
+- [Tango, milongas and dance](https://whatsonnice.com/tango-and-dance/)
+- [Guided visits](https://whatsonnice.com/guided-visits/)
+- [Talks and workshops](https://whatsonnice.com/workshops/)
+- [Social and expat gatherings](https://whatsonnice.com/social-and-expat/)
+- [Clubs and nightlife](https://whatsonnice.com/clubs-and-other/)
+- [Sport](https://whatsonnice.com/sport/)
+- [Business, tech and AI](https://whatsonnice.com/business-tech-and-ai/)
+
+## Answers by town
+
+A page per commune with at least five upcoming events, at
+`https://whatsonnice.com/in/<town>/` — for example
+[Nice](https://whatsonnice.com/in/nice/), [Antibes](https://whatsonnice.com/in/antibes/),
+[Cannes](https://whatsonnice.com/in/cannes/), [Menton](https://whatsonnice.com/in/menton/),
+[Grasse](https://whatsonnice.com/in/grasse/), [Vence](https://whatsonnice.com/in/vence/).
+Every one of them is listed in [the sitemap](https://whatsonnice.com/sitemap.xml).
+
+## The data itself
+
+- [events.json](https://whatsonnice.com/events.json): every upcoming event, with
+  title, start, end, time, town, venue, category, tags, free, source and url.
+  Many also carry lat and lon. Plain JSON, no key, CORS open.
+- [sources.json](https://whatsonnice.com/sources.json): which sources were read
+  this morning, how many events each returned, and any that failed.
+
+## Using it
+
+Quote freely and link to the event's own `url` where it has one, or to the page
+it sits on here. Attribution as "What's on in Nice (whatsonnice.com)" is welcome
+and makes it possible for people to check. The listings themselves belong to the
+venues and organisers who published them.
+
+Site: https://whatsonnice.com · In French: https://quefaireanice.com
+Contact: hello@whatsonnice.com

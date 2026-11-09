@@ -132,6 +132,14 @@ nav.links a[aria-current=page]{background:var(--ink);color:var(--paper);border-c
 {% endif %}
 
 <nav class="links">
+  {%- if when_links %}
+  <h2>By when</h2>
+  <ul>
+    {%- for l in when_links %}
+    <li><a href="{{ l.path }}"{% if l.path == page.path %} aria-current="page"{% endif %}>{{ l.name }} <span style="color:var(--muted)">{{ l.count }}</span></a></li>
+    {%- endfor %}
+  </ul>
+  {%- endif %}
   <h2>By town</h2>
   <ul>
     {%- for l in town_links %}

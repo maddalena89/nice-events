@@ -29,6 +29,7 @@ import json
 import os
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -292,6 +293,84 @@ def _plural(n: int, one: str, many: str) -> str:
     return one if n == 1 else many
 
 
+#: Pages for WHEN, not what or where. These are the words people actually type
+#: — "que faire à nice ce week-end" is a far commoner search than any category
+#: name — and until now the site had no page about any of them, only a home page
+#: that answers everything at once and therefore ranks for nothing in
+#: particular. French slugs on purpose: the French phrasing is what gets typed
+#: here, and the pages themselves read in both languages like the rest of the
+#: site. Their content changes every single day, which is exactly the freshness
+#: an events site should be showing.
+WHEN_PAGES = [
+    {"key": "tonight",  "slug": "ce-soir",       "name": "Tonight",
+     "fr": "Que faire à Nice ce soir",      "en": "What's on in Nice tonight"},
+    {"key": "today",    "slug": "aujourd-hui",   "name": "Today",
+     "fr": "Que faire à Nice aujourd'hui",  "en": "What's on in Nice today"},
+    {"key": "weekend",  "slug": "ce-week-end",   "name": "This weekend",
+     "fr": "Que faire à Nice ce week-end",  "en": "What's on in Nice this weekend"},
+    {"key": "week",     "slug": "cette-semaine", "name": "This week",
+     "fr": "Que faire à Nice cette semaine", "en": "What's on in Nice this week"},
+    {"key": "free",     "slug": "gratuit",       "name": "Free",
+     "fr": "Que faire à Nice gratuitement", "en": "Free things to do in Nice"},
+]
+
+#: An evening starts here. Earlier than this is an afternoon, whatever the
+#: listing calls it.
+EVENING_FROM = "17:00"
+
+
+def _weekend(today: date) -> tuple[str, str]:
+    """The coming Saturday and Sunday. On a Saturday or Sunday, this one."""
+    ahead = (5 - today.weekday()) % 7          # Monday is 0, Saturday is 5
+    sat = today + timedelta(days=ahead)
+    if today.weekday() == 6:                   # Sunday: the weekend is today
+        sat = today - timedelta(days=1)
+    return sat.isoformat(), (sat + timedelta(days=1)).isoformat()
+
+
+def _on_day(e: dict, day: str) -> bool:
+    return e.get("start", "") <= day <= (e.get("end") or e.get("start", ""))
+
+
+def collect_when(events: list[dict], today: Optional[date] = None) -> list[dict]:
+    """The when-pages, with the events each one is about.
+
+    A page with nothing on it is not built: an empty "tonight" in February says
+    nothing true about Nice, and an empty page is worse than no page.
+    """
+    today = today or date.today()
+    t = today.isoformat()
+    sat, sun = _weekend(today)
+    week_end = (today + timedelta(days=7)).isoformat()
+    live = [e for e in events if not e.get("online") and not e.get("cancelled")]
+
+    def pick(key):
+        if key == "tonight":
+            return [e for e in live if _on_day(e, t) and (e.get("time") or "") >= EVENING_FROM]
+        if key == "today":
+            return [e for e in live if _on_day(e, t)]
+        if key == "weekend":
+            return [e for e in live if _on_day(e, sat) or _on_day(e, sun)]
+        if key == "week":
+            return [e for e in live if e.get("start", "") <= week_end
+                    and (e.get("end") or e.get("start", "")) >= t]
+        if key == "free":
+            return [e for e in live if e.get("free") and e.get("start", "") <= week_end
+                    and (e.get("end") or e.get("start", "")) >= t]
+        return []
+
+    out = []
+    for spec in WHEN_PAGES:
+        evs = pick(spec["key"])
+        if len(evs) < 3:                       # too thin to be worth a page today
+            continue
+        out.append({"kind": "when", "key": spec["key"], "name": spec["name"],
+                    "path": f"/{spec['slug']}/", "events": evs,
+                    "fr": spec["fr"], "en": spec["en"],
+                    "dates": {"today": t, "sat": sat, "sun": sun}})
+    return out
+
+
 def collect(events: list[dict]) -> tuple[list[dict], list[dict]]:
     """Work out which town and category pages to build, biggest first.
 
@@ -338,6 +417,14 @@ def collect(events: list[dict]) -> tuple[list[dict], list[dict]]:
 NAV_TOWNS = 12
 
 
+def when_links(when_pages: list[dict]) -> list[dict]:
+    """The when-pages as nav entries, in the order they read as a day: tonight,
+    today, this weekend, this week, free."""
+    order = [w["key"] for w in WHEN_PAGES]
+    return [{"name": p["name"], "path": p["path"], "count": len(p["events"])}
+            for p in sorted(when_pages, key=lambda p: order.index(p["key"]))]
+
+
 def nav_links(town_pages: list[dict], cat_pages: list[dict], limit: int = NAV_TOWNS):
     """The cross-link lists, shared by the home page and every landing page.
 
@@ -360,7 +447,9 @@ def _copy_for(page: dict, total_towns: int) -> dict:
     if page["kind"] == "town":
         town = page["name"]
         return {
-            "title": f"What's on in {town} · events, concerts & brocantes · What's on in Nice",
+            # No brand suffix here: the town IS the brand phrase ("What's on in
+        # Nice · … · What's on in Nice" read as a stutter in search results).
+        "title": f"What's on in {town} · events, concerts & brocantes in the 06",
             "description": (
                 f"{n} {_plural(n, 'event', 'events')} coming up in {town} — concerts, "
                 f"brocantes, exhibitions, markets and more. Que faire à {town} : "
@@ -373,6 +462,29 @@ def _copy_for(page: dict, total_towns: int) -> dict:
                 f"linked back to the source."
             ),
             "lede_fr": f"Que faire à {town} ? L'agenda des événements, sorties et brocantes.",
+        }
+    if page["kind"] == "when":
+        n = page["count"] if "count" in page else len(page["events"])
+        d = page["dates"]
+        when_line = {
+            "tonight": f"this evening, from {EVENING_FROM}",
+            "today":   "today",
+            "weekend": "on Saturday and Sunday",
+            "week":    "over the next seven days",
+            "free":    "over the next seven days, free to walk into",
+        }[page["key"]]
+        return {
+            # The French phrase first: it is the query, and it is what someone
+            # scanning a page of search results recognises.
+            "title": f"{page['fr']} · {page['en']}",
+            "description": (
+                f"{n} events {when_line} in Nice and the 06, updated every morning. "
+                f"{page['fr']} ? Concerts, expos, brocantes, spectacles."
+            ),
+            "h1_pre": "", "h1_em": page["name"],
+            "lede": (f"Everything on {when_line} across Nice and the "
+                     f"Alpes-Maritimes, gathered daily and linked to its source."),
+            "lede_fr": f"{page['fr']} ? La liste, mise à jour chaque matin.",
         }
     label = page["name"]
     fr = CAT_FR.get(page["key"], "")
@@ -420,14 +532,16 @@ def _env(tpl_dir: Path) -> Environment:
 
 
 def render_all(tpl_dir: Path, town_pages: list[dict], cat_pages: list[dict],
-               base: str, updated: str, og_image: str, out: Path) -> list[str]:
+               base: str, updated: str, og_image: str, out: Path,
+               when_pages: Optional[list[dict]] = None) -> list[str]:
     """Write every landing page. Returns the site-root paths written.
 
     Takes the page lists rather than calling collect() itself so the caller can
     use the same lists for the home page's cross-links — computing them twice
     invites the two from drifting apart.
     """
-    if not town_pages and not cat_pages:
+    when_pages = when_pages or []
+    if not town_pages and not cat_pages and not when_pages:
         return []
 
     tpl = _env(tpl_dir).get_template("landing.html.jinja")
@@ -437,7 +551,7 @@ def render_all(tpl_dir: Path, town_pages: list[dict], cat_pages: list[dict],
     town_links, cat_links = nav_links(town_pages, cat_pages, limit=24)
 
     written = []
-    for page in town_pages + cat_pages:
+    for page in when_pages + town_pages + cat_pages:
         evs = sorted(page["events"], key=lambda e: (e["start"], e.get("time") or "99:99",
                                                     e.get("title", "")))
         truncated = len(evs) > MAX_ROWS
@@ -450,7 +564,10 @@ def render_all(tpl_dir: Path, town_pages: list[dict], cat_pages: list[dict],
             "path": page["path"],
             "url": url,
             "count": len(page["events"]),
-            "window_note": f"next {WINDOW_DAYS} days",
+            "window_note": ({"tonight": "this evening", "today": "today",
+                             "weekend": "this weekend", "week": "next 7 days",
+                             "free": "free, next 7 days"}[page["key"]]
+                            if page["kind"] == "when" else f"next {WINDOW_DAYS} days"),
             "window_days": WINDOW_DAYS,
             "truncated": truncated,
             "ongoing": ongoing,
@@ -462,6 +579,7 @@ def render_all(tpl_dir: Path, town_pages: list[dict], cat_pages: list[dict],
                                shown[:MAX_JSONLD], base),
         }
         html = tpl.render(page=ctx, town_links=town_links, cat_links=cat_links,
+                          when_links=when_links(when_pages),
                           updated=updated, og_image=og_image)
         dest = out / page["path"].strip("/") / "index.html"
         dest.parent.mkdir(parents=True, exist_ok=True)

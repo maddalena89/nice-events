@@ -1195,8 +1195,19 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   </div>
 </dialog>
 
-{%- if town_links or cat_links %}
-<nav class="browse" aria-label="Browse by town or category">
+{%- if town_links or cat_links or when_links %}
+<nav class="browse" aria-label="Browse by when, town or category">
+  {%- if when_links %}
+  {#- These five are the pages that answer the actual searches ("que faire à
+      Nice ce week-end"), so they come first and link from here: a page nothing
+      links to is one a crawler finds late and values little. #}
+  <h2>Browse by when</h2>
+  <ul>
+    {%- for l in when_links %}
+    <li><a href="{{ l.path }}">{{ l.name }} <i>{{ l.count }}</i></a></li>
+    {%- endfor %}
+  </ul>
+  {%- endif %}
   <h2>Browse by town</h2>
   <ul>
     {%- for l in town_links %}
