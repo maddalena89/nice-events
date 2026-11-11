@@ -772,6 +772,9 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
   border:3px solid var(--ink);box-shadow:0 0 0 2px var(--paper)}
 .pop-t{font-size:1rem;font-weight:700;letter-spacing:-.01em;line-height:1.2;display:block;margin:2px 0 3px}
 .pop-m{color:var(--muted);font-size:.8125rem;display:block}
+.pop-m:empty{display:none}
+/* The day and time lead the card, in ink: "which evening" is the first question. */
+.pop-d{display:block;font-size:.6875rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink)}
 .pop-go{display:inline-flex;align-items:center;min-height:36px;margin-top:8px;padding:0 12px;
   background:var(--accent);border:1px solid var(--accent);color:#fff;font-size:.6875rem;
   font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
@@ -2183,6 +2186,17 @@ function drawDots(){
       ? ` · ${lastShown.length - placed.length} not placed on the map yet` : "");
 }
 
+// The day on a map card. The map can show 30 days of dots at once, so a time
+// alone ("19:45") does not say WHICH evening. Runs say how long they last.
+function popDay(e){
+  const end = e.end && e.end !== e.start ? e.end : null;
+  if(end) return e.start <= TODAY ? `Until ${fmtShort(end)}` : `${fmtShort(e.start)} – ${fmtShort(end)}`;
+  const tmrw = iso(new Date(Date.now() + 864e5));
+  if(e.start === TODAY) return "Today";
+  if(e.start === tmrw) return "Tomorrow";
+  return new Date(e.start + "T12:00:00").toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short"});
+}
+
 function showPopup(ev){
   const f = ev.features[0], e = FP_MAP.get(f.properties.fp);
   if(!e) return;
@@ -2191,7 +2205,8 @@ function showPopup(ev){
   if(pop) pop.remove();
   pop = new maplibregl.Popup({closeButton: true, maxWidth: "260px"})
     .setLngLat(f.geometry.coordinates)
-    .setHTML(`<span class="pop-m">${esc(e.time || "Time not given")}${e.approx ? " · place approximate" : ""}</span>
+    .setHTML(`<span class="pop-d">${esc(popDay(e))}${e.time ? " · " + esc(e.time) : ""}</span>
+      <span class="pop-m">${e.time ? "" : "Time not given"}${!e.time && e.approx ? " · " : ""}${e.approx ? "Place approximate" : ""}</span>
       <span class="pop-t">${esc(e.title)}</span>
       <span class="pop-m">${esc(e.venue || "")}${e.venue ? " · " : ""}${esc(e.town)}</span>${far}
       <button type="button" class="pop-go" data-fp="${esc(e.fingerprint)}">See the event</button>`)
