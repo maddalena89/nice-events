@@ -1865,6 +1865,19 @@ $("reset").onclick=()=>{$("q").value="";$("when").value="30";$("day").value="";
   document.querySelectorAll("#cats .cat").forEach(c=>c.classList.remove("on"));
   $("cat-all").classList.add("on");                    // reset back to "All the events"
   render();};
+
+// A search carried in the address: /?q=opera. This exists so a link can show
+// someone their OWN listings — "here is your programme on the site" in one
+// click, which is the whole of the outreach pitch to a venue. It opens wide on
+// purpose: every town, any date, so a theatre in Antibes planning three months
+// out sees all of it instead of an empty page.
+(() => {
+  const q = new URLSearchParams(location.search).get("q");
+  if(!q) return;
+  $("q").value = q;
+  $("when").value = "";                 // any date, not the default 30 days
+  townSel.clear(); syncTown();          // every commune, not just Nice
+})();
 render();
 
 // Share a single event. Uses the native share sheet on phones; falls back to
