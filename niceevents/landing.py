@@ -371,11 +371,19 @@ def collect_when(events: list[dict], today: Optional[date] = None) -> list[dict]
     return out
 
 
-def collect(events: list[dict]) -> tuple[list[dict], list[dict]]:
+def collect(events: list[dict],
+            known_towns: Optional[dict[str, str]] = None) -> tuple[list[dict], list[dict]]:
     """Work out which town and category pages to build, biggest first.
 
     Only non-online events count towards a town: "Online" is a format, not a
     place, and a town page for it would be nonsense.
+
+    `known_towns` (slug -> name) is every town page published before today. A
+    town that has fallen below the threshold since keeps its page, marked
+    `thin`: it is rendered and served, but left out of the nav and the sitemap
+    until it has something on again. Dropping the page instead turned
+    /in/menton/ into a 404 the day Menton had four events rather than five —
+    breaking a URL Google had indexed and llms.txt advertises.
     """
     horizon = (date.today() + timedelta(days=WINDOW_DAYS)).isoformat()
     live = [e for e in events if e.get("start", "") <= horizon]
@@ -394,11 +402,25 @@ def collect(events: list[dict]) -> tuple[list[dict], list[dict]]:
             cats.setdefault("marche" if c == "brocante" else c, []).append(e)
 
     town_pages = [
-        {"kind": "town", "key": t, "name": t, "path": f"/in/{slugify(t)}/", "events": evs}
+        {"kind": "town", "key": t, "name": t, "path": f"/in/{slugify(t)}/",
+         "events": evs, "thin": False}
         for t, evs in towns.items()
         if len(evs) >= MIN_TOWN_EVENTS and slugify(t) and _looks_like_commune(t)
     ]
     town_pages.sort(key=lambda p: (-len(p["events"]), p["name"]))
+
+    # Pages that earned their place on an earlier day and must not 404 now.
+    # They carry whatever that town has today, which may well be nothing.
+    live_slugs = {p["path"].strip("/").split("/")[-1] for p in town_pages}
+    by_slug = {slugify(t): evs for t, evs in towns.items() if slugify(t)}
+    kept = [
+        {"kind": "town", "key": name, "name": name, "path": f"/in/{slug}/",
+         "events": by_slug.get(slug, []), "thin": True}
+        for slug, name in sorted((known_towns or {}).items())
+        if slug not in live_slugs
+    ]
+    kept.sort(key=lambda p: (-len(p["events"]), p["name"]))
+    town_pages += kept
 
     cat_pages = [
         {"kind": "cat", "key": k, "name": DISPLAY_CATEGORIES.get(k, k),
@@ -432,8 +454,11 @@ def nav_links(town_pages: list[dict], cat_pages: list[dict], limit: int = NAV_TO
     a page nothing links to is one search engines discover late and value little,
     and a sitemap entry alone is a weak substitute for a real link.
     """
+    # Kept-alive pages are deliberately not offered here: linking a visitor to
+    # a town with nothing on is a wasted click. The page stays reachable for
+    # anyone arriving from a search result or an old link.
     towns = [{"path": p["path"], "name": p["name"], "count": len(p["events"])}
-             for p in town_pages[:limit]]
+             for p in town_pages if not p.get("thin")][:limit]
     cats = [{"path": p["path"], "name": p["name"], "count": len(p["events"])}
             for p in cat_pages]
     return towns, cats
@@ -444,6 +469,34 @@ def _copy_for(page: dict, total_towns: int) -> dict:
     template string, because "Concerts in Nice & the 06" and "What's on in
     Antibes" are different sentences and a shared format makes both worse."""
     n = len(page["events"])
+    if page["kind"] == "town" and page.get("thin"):
+        # An honest empty page, not a dressed-up one. It says plainly that
+        # nothing is listed, says when that might change, and sends the visitor
+        # somewhere useful instead of leaving them on a dead end.
+        town = page["name"]
+        nothing = n == 0
+        return {
+            "title": f"What's on in {town} · events in the 06",
+            "description": (
+                f"Nothing listed in {town} just now. "
+                f"Que faire à {town} : la page est mise à jour chaque matin — "
+                f"et tout ce qui se passe dans le 06 est à côté."
+                if nothing else
+                f"{n} {_plural(n, 'event', 'events')} coming up in {town}, updated every "
+                f"morning. Que faire à {town} : l'agenda, et tout le 06 à côté."
+            ),
+            "h1_pre": "What's on in ", "h1_em": town,
+            "lede": (
+                f"Nothing is listed in {town} at the moment. This page is rebuilt "
+                f"every morning, so it fills up as soon as something is announced — "
+                f"and everything on across Nice and the Alpes-Maritimes is a click away."
+                if nothing else
+                f"A quiet spell in {town} — {n} {_plural(n, 'thing', 'things')} on. "
+                f"The page is rebuilt every morning, and the rest of the 06 is a click away."
+            ),
+            "lede_fr": f"Que faire à {town} ? Rien d'annoncé pour l'instant ; la page se met à jour chaque matin."
+                       if nothing else f"Que faire à {town} ? Peu de choses en ce moment.",
+        }
     if page["kind"] == "town":
         town = page["name"]
         return {
@@ -584,5 +637,9 @@ def render_all(tpl_dir: Path, town_pages: list[dict], cat_pages: list[dict],
         dest = out / page["path"].strip("/") / "index.html"
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(html, encoding="utf-8")
-        written.append(page["path"])
+        # Written, but not advertised: a sitemap is a list of pages worth
+        # crawling, and a town with nothing on today is not one of them. It
+        # returns to the sitemap the moment it has events again.
+        if not page.get("thin"):
+            written.append(page["path"])
     return written

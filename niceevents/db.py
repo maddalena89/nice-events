@@ -60,6 +60,20 @@ CREATE TABLE IF NOT EXISTS places (
     seen_on   TEXT NOT NULL           -- when it was last looked up
 );
 
+-- Which town pages have ever been published. A commune's page used to appear
+-- the day it reached five events and VANISH the day it dropped below — so
+-- /in/menton/ and /in/eze/ became 404s, after Google had indexed them and
+-- after llms.txt had told every AI crawler they existed. A URL that comes and
+-- goes is worse than one that is briefly thin: links to it rot, and search
+-- engines stop trusting the whole pattern. Once built, a town page is kept
+-- and served, empty if need be, pointing at what IS on nearby.
+CREATE TABLE IF NOT EXISTS landing_pages (
+    slug       TEXT PRIMARY KEY,      -- "menton", as it appears in /in/<slug>/
+    name       TEXT NOT NULL,         -- the town as it is spelled on the page
+    first_seen TEXT NOT NULL,         -- when it first earned a page
+    last_full  TEXT                   -- the last day it had enough events to earn one
+);
+
 CREATE TABLE IF NOT EXISTS runs (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     scraper    TEXT NOT NULL,
@@ -476,3 +490,31 @@ def stats(conn) -> dict:
         "SELECT COUNT(*) c FROM events WHERE approved = 0"
     ).fetchone()["c"]
     return {"total": total, "by_category": by_cat, "towns": towns, "pending": pending}
+
+
+def known_town_pages(conn) -> dict[str, str]:
+    """Every town page ever published: slug -> the name it was published under.
+
+    Fed back into landing.collect() so a page that exists today still exists
+    tomorrow, whatever the event count happens to be.
+    """
+    return {r["slug"]: r["name"]
+            for r in conn.execute("SELECT slug, name FROM landing_pages")}
+
+
+def remember_town_pages(conn, pages: list[tuple[str, str]]) -> None:
+    """Record the town pages that earned their place in this build.
+
+    `pages` is (slug, name) for towns at or above the threshold TODAY. A town
+    that is merely being kept alive is not re-recorded, so last_full stays an
+    honest answer to "when did anyone last have something on here".
+    """
+    today = date.today().isoformat()
+    conn.executemany(
+        """INSERT INTO landing_pages (slug, name, first_seen, last_full)
+                VALUES (?, ?, ?, ?)
+           ON CONFLICT(slug) DO UPDATE SET name = excluded.name,
+                                           last_full = excluded.last_full""",
+        [(slug, name, today, today) for slug, name in pages],
+    )
+    conn.commit()

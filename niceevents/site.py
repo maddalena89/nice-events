@@ -1544,7 +1544,13 @@ def build(conn: sqlite3.Connection, out_dir: str = "dist",
     # Worked out before the home page renders, because the home page links to
     # these: without a real link from the one page search engines already know,
     # every landing page is an orphan that only the sitemap mentions.
-    town_pages, cat_pages = landing.collect(events)
+    # Past town pages come in so none of them 404s today; the ones that earn
+    # their place today go back out, so tomorrow's build knows about them too.
+    town_pages, cat_pages = landing.collect(events, db.known_town_pages(conn))
+    db.remember_town_pages(conn, [
+        (p["path"].strip("/").split("/")[-1], p["name"])
+        for p in town_pages if not p.get("thin")
+    ])
     town_links, cat_links = landing.nav_links(town_pages, cat_pages)
     # Pages for WHEN: ce soir, ce week-end, aujourd'hui, cette semaine, gratuit.
     # Those phrases are the searches; the home page answers all of them at once
