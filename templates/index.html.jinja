@@ -819,6 +819,13 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
 .form input::placeholder,.form textarea::placeholder{color:var(--placeholder)}
 .form textarea{font:inherit;resize:vertical;min-height:92px;line-height:1.45}
 .form .hint{font-size:0.75rem;color:var(--muted);margin-top:5px;line-height:1.4;text-transform:none;letter-spacing:0}
+/* Live feedback under the Venue field. Amber nudges (an address typed where a
+   name belongs), blue confirms (a place the site already carries). Both are
+   advice and never a block - the form has to keep accepting a concert in
+   somebody's front room. */
+.form .hint.warn{color:#8a5a00}
+.form .hint.ok{color:var(--accent-text)}
+@media (prefers-color-scheme:dark){ .form .hint.warn{color:#e0b55c} }
 .form button.primary{border-radius:11px;text-transform:none;letter-spacing:0;font-size:0.875rem;font-weight:700;padding:14px 18px}
 .form button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
 /* the snap area becomes a soft, dashed "drop a flyer" panel */
@@ -1124,7 +1131,11 @@ dialog[open]::backdrop{animation:bdfade .2s ease}
         <input id="s-town" name="town" list="townlist" required autocomplete="off"
                placeholder="Start typing a town…">
         <datalist id="townlist"></datalist></div>
-      <div class="f-half"><label for="s-venue">Venue *</label><input id="s-venue" name="venue" required></div>
+      <div class="f-half"><label for="s-venue">Venue *</label>
+        <input id="s-venue" name="venue" list="venuelist" required autocomplete="off"
+               placeholder="The place's name, e.g. Paloma Beach">
+        <datalist id="venuelist"></datalist>
+        <div class="hint" id="venue-hint"></div></div>
       <div class="f-half"><label for="s-cat">Category *</label>
         <select id="s-cat" name="category">
           {% for k, v in categories.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
@@ -2827,6 +2838,84 @@ const FLYER = (() => {
     }
   });
 })();
+
+// The Venue field: suggest, never dictate.
+//
+// Towns are a closed list (see TOWN_CANON) because there are forty of them and
+// they never change. Venues are the opposite: 500-odd and growing, and a gig in
+// somebody's living room is a real event that has to stay submittable. So this
+// offers what the site already knows and then gets out of the way.
+//
+// What it does push back on is the address-where-a-name-belongs habit. "5 Quai
+// des Deux Emmanuels" tells a reader nothing, it is not what anyone types into
+// a search box, and it quietly breaks the "also on at this venue that day"
+// panel, which groups on the venue string.
+//
+// The test is ONE narrow thing - does it start with a house number - and that
+// narrowness is the point. Plenty of genuine venues are named after the street
+// or square they sit on ("Place du Centenaire", "Quai de la grande jetee",
+// "Jardin Albert 1er"); a cleverer test flags those too, and nagging someone
+// about a correct answer teaches them to ignore the hint.
+{
+  const inp = $("s-venue"), hint = $("venue-hint"), dl = $("venuelist");
+  if (inp && hint && dl) {
+    const addressy = v => /^\d+\s*(bis|ter|quater)?\b/i.test(v.trim());
+
+    // Every venue already on the site, minus the ones that are themselves bare
+    // addresses - suggesting those would spread the mess rather than mop it up.
+    const VENUES = [...new Set(EVENTS.filter(e => !e.online && e.venue).map(e => e.venue))]
+      .filter(v => !addressy(v))
+      .sort((a, b) => a.localeCompare(b, "fr"));
+    const VENUE_CANON = new Map(VENUES.map(v => [fold(v), v]));
+    VENUES.forEach(v => { const o = document.createElement("option"); o.value = v; dl.appendChild(o); });
+
+    // First town each venue was seen in, so a guess can be kept local.
+    const VENUE_TOWN = new Map();
+    EVENTS.forEach(e => { if (e.venue && !VENUE_TOWN.has(e.venue)) VENUE_TOWN.set(e.venue, e.town); });
+
+    // They typed an address. If a place we already carry sits on that street,
+    // it is very likely the one they mean, so offer it as a single click.
+    const guessFor = v => {
+      const street = fold(v)
+        .replace(/^\d+\s*(bis|ter|quater)?[,\s]*/i, "")   // drop the house number
+        .replace(/\b\d{5}\b.*$/, "")                      // and the postcode onwards
+        .replace(/[,\s]+$/, "");
+      if (street.length < 6) return null;                 // too vague to guess from
+      const town = $("s-town") ? $("s-town").value.trim() : "";
+      const pool = town ? VENUES.filter(x => !VENUE_TOWN.get(x) || VENUE_TOWN.get(x) === town) : VENUES;
+      return pool.find(x => fold(x).includes(street)) || null;
+    };
+
+    const say = (cls, html) => { hint.className = "hint " + cls; hint.innerHTML = html; };
+
+    const review = () => {
+      const v = inp.value.trim();
+      if (!v) { say("", ""); return; }
+      if (addressy(v)) {
+        const guess = guessFor(v);
+        say("warn", "That looks like an address. Put the <b>name</b> of the place here - "
+          + "it is what people search for, and it keeps all your events together."
+          + (guess ? ' Did you mean <button type="button" class="linklike" id="venue-guess">'
+                     + esc(guess) + "</button>?" : ""));
+        const b = $("venue-guess");
+        if (b) b.onclick = () => { inp.value = guess; review(); inp.focus(); };
+        return;
+      }
+      const known = VENUE_CANON.get(fold(v));
+      if (known) say("ok", "Already on the site - your event will sit alongside the others there.");
+      else       say("", "A new place. That is fine: a house, a garden, a pop-up all count.");
+    };
+
+    inp.addEventListener("input", review);
+    // Snap to the spelling already in use, so "la zonme" and "La Zonme" do not
+    // become two venues that never group together.
+    inp.addEventListener("blur", () => {
+      const known = VENUE_CANON.get(fold(inp.value.trim()));
+      if (known) inp.value = known;
+      review();
+    });
+  }
+}
 
 {% if submit_mode == 'supabase' %}
 // Posts straight to Supabase from the browser. No server of our own.
